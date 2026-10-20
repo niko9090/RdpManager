@@ -254,6 +254,27 @@ public sealed class UiV11Tests(ITestOutputHelper output) : IDisposable
         });
     }
 
+    /// <summary>Tastiera vera: Ctrl+Tab con il fuoco nell'elenco passa dal filtro dei messaggi e cambia scheda.</summary>
+    [Fact]
+    public void ShortcutFilter_RealCtrlTabFromTheTreeSwitchesTab()
+    {
+        WithMainForm(StoreWith(Unreachable("Uno"), Unreachable("Due")), form =>
+        {
+            OpenAll(form);
+            form.Tabs.SelectedIndex = 0;
+            WindowAttention.BringToFront(form);
+            if (!PumpUntil(IsOwnForeground, TimeSpan.FromSeconds(3)))
+            {
+                output.WriteLine("Windows non ha dato il primo piano alla finestra di prova: parte con tastiera vera non eseguita.");
+                return;
+            }
+            form.Tree.Focus();
+            Assert.True(PumpUntil(() => form.Tree.Focused, TimeSpan.FromSeconds(2)));
+            SendCombo(0x11, 0x09); // Ctrl+Tab
+            Assert.True(PumpUntil(() => form.Tabs.SelectedIndex == 1, TimeSpan.FromSeconds(3)), "Ctrl+Tab non ha cambiato scheda");
+        });
+    }
+
     [Fact]
     public void Sidebar_PinnedCanBeHiddenAndAutoHideOverlaysTheSessionsAlsoInFullScreen()
     {

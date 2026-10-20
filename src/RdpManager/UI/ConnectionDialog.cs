@@ -38,6 +38,7 @@ public sealed class ConnectionDialog : Form
     private readonly TextBox _gatewayHost = new() { Width = 280, PlaceholderText = "gateway.azienda.it (o host:porta)" };
     private readonly ComboBox _gatewayCredentials = new() { Width = 280, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly IReadOnlyList<CredentialProfile> _profiles;
+    private bool _gatewayCredentialsTouched;
     private string? _chosenColor;
     private readonly string? _originalPassword;
 
@@ -151,6 +152,7 @@ public sealed class ConnectionDialog : Form
             ? 1 + IndexOfProfile(target.GatewayProfileId)
             : 0;
         _useGateway.CheckedChanged += (_, _) => UpdateGatewayFields();
+        _gatewayCredentials.SelectionChangeCommitted += (_, _) => _gatewayCredentialsTouched = true;
         UpdateGatewayFields();
         _group.Text = target.Group;
         _fit.Checked = target.ResolutionMode == ResolutionMode.FitToWindow;
@@ -282,7 +284,11 @@ public sealed class ConnectionDialog : Form
         _target.CredentialProfileId = ChosenProfile?.Id;
         _target.UseGateway = _useGateway.Checked;
         _target.GatewayHost = _gatewayHost.Text.Trim();
-        if (_gatewayCredentials.SelectedIndex > 0)
+        if (!_gatewayCredentialsTouched)
+        {
+            // Menu non toccato: resta com'era (es. «credenziali diverse da chiedere» importato da un .rdp).
+        }
+        else if (_gatewayCredentials.SelectedIndex > 0)
         {
             _target.GatewayCredentials = GatewayCredentialsSource.Profile;
             _target.GatewayProfileId = _profiles[_gatewayCredentials.SelectedIndex - 1].Id;

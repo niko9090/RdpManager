@@ -13,6 +13,7 @@ public sealed partial class MainForm
 
     private void InitV12()
     {
+        InstallShortcutFilter();
         InitHistory();
         _split.SplitterMoved += (_, _) => OnSplitterMoved();
         _split.Panel1.Padding = _split.Panel2.Padding = new Padding(0);
@@ -87,13 +88,8 @@ public sealed partial class MainForm
                 _overview = null;
             // Chiusa durante una cattura: la scheda scelta torna subito quella di prima (poi, se l'utente ha
             // scelto una miniatura, SessionChosen porta lì).
-            if (_captureRestoreTab is { } restore && _tabs.TabPages.Contains(restore))
-            {
-                _silentTabSwitch = true;
-                _tabs.SelectedTab = restore;
-                _silentTabSwitch = false;
-            }
-            _captureRestoreTab = null;
+            if (_captureRestoreTab is not null || _captureHidSplit)
+                RestoreAfterCapture(null);
             BeginInvoke(form.Dispose);
             if (CurrentView is { } cv && Form.ActiveForm is null or MainForm)
                 BeginInvoke(cv.FocusSession);
@@ -111,8 +107,14 @@ public sealed partial class MainForm
     /// </summary>
     private async Task RefreshOverviewAsync(bool all = false)
     {
-        if (Overview is not { } overview || _overviewCapturing)
+        if (Overview is not { } overview)
             return;
+        if (_overviewCapturing)
+        {
+            // Panoramica (ri)aperta durante un giro: appena finisce, uno completo per quella nuova.
+            _overviewRefreshAllPending |= all;
+            return;
+        }
         _overviewCapturing = true;
         try
         {
@@ -126,33 +128,50 @@ public sealed partial class MainForm
             var batch = all ? others : [others[_overviewRound++ % others.Count]];
             foreach (var v in batch)
             {
-                if (Overview is null)
+                if (!ReferenceEquals(Overview, overview))
                     return;
-                overview.UpdateThumbnail(v, await CaptureHiddenAsync(v));
+                var bmp = await CaptureHiddenAsync(overview, v);
+                if (ReferenceEquals(Overview, overview))
+                    overview.UpdateThumbnail(v, bmp);
+                else
+                    bmp?.Dispose();
             }
         }
         finally
         {
             _overviewCapturing = false;
+            if (_overviewRefreshAllPending && Overview is not null)
+            {
+                _overviewRefreshAllPending = false;
+                BeginInvoke(() => _ = RefreshOverviewAsync(all: true));
+            }
         }
     }
+
+    private bool _overviewRefreshAllPending;
 
     /// <summary>Copia dello schermo se la panoramica ne è esclusa (la più fedele), altrimenti PrintWindow.</summary>
     private static Bitmap? CaptureForOverview(OverviewForm overview, RdpSessionView view) =>
         overview.ExcludedFromCapture ? view.CaptureFromScreen() : view.CaptureSession();
 
-    private async Task<Bitmap?> CaptureHiddenAsync(RdpSessionView view)
+    private async Task<Bitmap?> CaptureHiddenAsync(OverviewForm overview, RdpSessionView view)
     {
-        if (view.IsDetached || IsSplitView(view))
-            return Overview is { } o ? CaptureForOverview(o, view) : null;
+        // Finestra staccata: può stare ovunque, anche sotto altre app; PrintWindow non dipende da cosa la copre.
+        if (view.IsDetached)
+            return view.CaptureSession();
+        if (IsSplitView(view))
+            return CaptureForOverview(overview, view);
         if (PageOf(view) is not { } page)
             return null;
         var previous = _tabs.SelectedTab;
         _captureRestoreTab = previous;
+        _captureHidSplit = IsSplit;
         _silentTabSwitch = true;
         try
         {
             _tabs.SelectedTab = page;
+            if (_captureHidSplit)
+                _split.Visible = false; // sotto la panoramica: la scheda fotografata deve essere quella sullo schermo
         }
         finally
         {
@@ -160,17 +179,36 @@ public sealed partial class MainForm
         }
         await Task.Delay(150); // il controllo RDP ridisegna la sessione appena torna visibile
         // Panoramica chiusa nel frattempo: la scheda è già stata rimessa (o l'utente ne ha scelta un'altra).
-        if (Overview is not { } overview || _captureRestoreTab is null)
+        if (!ReferenceEquals(Overview, overview) || _captureRestoreTab is null)
             return null;
         var bmp = view.IsDisposed ? null : CaptureForOverview(overview, view);
+        RestoreAfterCapture(page);
+        return bmp;
+    }
+
+    private bool _captureHidSplit;
+
+    /// <summary>Rimette la scheda scelta (se nel frattempo non è cambiata) e la vista affiancata nascosta per la cattura.</summary>
+    private void RestoreAfterCapture(TabPage? captured)
+    {
+        var restore = _captureRestoreTab;
         _captureRestoreTab = null;
-        if (previous is not null && _tabs.TabPages.Contains(previous) && _tabs.SelectedTab == page)
+        _silentTabSwitch = true;
+        try
         {
-            _silentTabSwitch = true;
-            _tabs.SelectedTab = previous;
+            if (restore is not null && _tabs.TabPages.Contains(restore) && (captured is null || _tabs.SelectedTab == captured))
+                _tabs.SelectedTab = restore;
+            if (_captureHidSplit && IsSplit)
+            {
+                _split.Visible = true;
+                _split.BringToFront();
+            }
+            _captureHidSplit = false;
+        }
+        finally
+        {
             _silentTabSwitch = false;
         }
-        return bmp;
     }
 
     // ---------- ricerca rapida ----------
@@ -197,6 +235,9 @@ public sealed partial class MainForm
 
     private readonly SplitContainer _split = new() { Dock = DockStyle.Fill, Visible = false, SplitterWidth = 6, FixedPanel = FixedPanel.None };
     private RdpSessionView? _splitLeft, _splitRight;
+
+    /// <summary>Metà della vista affiancata usata per ultima (il fuoco può essere altrove, es. nella barra laterale).</summary>
+    private RdpSessionView? _splitActive;
 
     internal bool IsSplit => _splitLeft is not null;
     internal (RdpSessionView? Left, RdpSessionView? Right) SplitViews => (_splitLeft, _splitRight);
@@ -241,6 +282,9 @@ public sealed partial class MainForm
         _split.Panel2.Controls.Add(right);
         _splitLeft = left;
         _splitRight = right;
+        _splitActive = left;
+        left.Enter += OnSplitViewEnter;
+        right.Enter += OnSplitViewEnter;
         left.ToolbarVisible = right.ToolbarVisible = true;
         _split.Visible = true;
         _split.BringToFront();
@@ -257,7 +301,9 @@ public sealed partial class MainForm
     {
         if (_splitLeft is not { } left || _splitRight is not { } right)
             return;
-        var focused = right.ContainsFocus ? right : left;
+        var focused = right.ContainsFocus ? right : left.ContainsFocus ? left : _splitActive ?? left;
+        left.Enter -= OnSplitViewEnter;
+        right.Enter -= OnSplitViewEnter;
         SuspendLayout();
         _split.Visible = false;
         foreach (var v in new[] { left, right })
@@ -267,7 +313,7 @@ public sealed partial class MainForm
                 page.Controls.Add(v);
             v.ToolbarVisible = !_fullScreen;
         }
-        _splitLeft = _splitRight = null;
+        _splitLeft = _splitRight = _splitActive = null;
         ResumeLayout();
         _splitItem.Checked = false;
         if (PageOf(focused) is { } p)
@@ -275,6 +321,12 @@ public sealed partial class MainForm
         UpdateStatus();
         if (!focused.IsDisposed)
             BeginInvoke(focused.FocusSession);
+    }
+
+    private void OnSplitViewEnter(object? sender, EventArgs e)
+    {
+        if (sender is RdpSessionView v && IsSplitView(v))
+            _splitActive = v;
     }
 
     private void OnSplitterMoved()
@@ -471,6 +523,12 @@ public sealed partial class MainForm
             Show();
         if (WindowState == FormWindowState.Minimized)
             WindowState = FormWindowState.Normal;
+        // Con un dialogo aperto (finestra principale disabilitata) va davanti il dialogo, non la sessione dietro.
+        if (!Enabled && Application.OpenForms.Cast<Form>().LastOrDefault(f => f.Modal && f.Visible) is { } modal)
+        {
+            WindowAttention.BringToFront(modal);
+            return;
+        }
         WindowAttention.BringToFront(this);
         if (CurrentView is { } v)
             BeginInvoke(v.FocusSession);
@@ -484,7 +542,12 @@ public sealed partial class MainForm
             item.Dispose();
         _trayMenu.Items.Clear();
         _trayMenu.Items.Add(new ToolStripMenuItem("Mostra RdpManager", null, (_, _) => RestoreFromTray()) { Font = new Font(_trayMenu.Font, FontStyle.Bold) });
-        _trayMenu.Items.Add("Ricerca rapida…", null, (_, _) => { RestoreFromTray(); BeginInvoke(ShowQuickSearch); });
+        _trayMenu.Items.Add("Ricerca rapida…", null, (_, _) =>
+        {
+            RestoreFromTray();
+            if (Enabled)
+                BeginInvoke(ShowQuickSearch);
+        });
         _trayMenu.Items.Add(new ToolStripSeparator());
 
         ToolStripMenuItem ConnItem(RdpConnection c)
@@ -494,7 +557,12 @@ public sealed partial class MainForm
             {
                 Checked = open, ToolTipText = RdpFile.FormatAddress(c.Host, c.Port),
             };
-            item.Click += (_, _) => { RestoreFromTray(); OpenSession(c); };
+            item.Click += (_, _) =>
+            {
+                RestoreFromTray();
+                if (Enabled)
+                    OpenSession(c);
+            };
             return item;
         }
 
@@ -542,7 +610,13 @@ public sealed partial class MainForm
         _trayMenu.Items.Add(all);
 
         _trayMenu.Items.Add(new ToolStripSeparator());
-        _trayMenu.Items.Add("Esci", null, (_, _) => ExitApp());
+        _trayMenu.Items.Add("Esci", null, (_, _) =>
+        {
+            if (Enabled)
+                ExitApp();
+            else
+                RestoreFromTray(); // prima va chiuso il dialogo aperto
+        });
         ThemeManager.Apply(this, _trayMenu);
     }
 
@@ -584,6 +658,13 @@ public sealed partial class MainForm
         }
         if (_pendingInstaller is { } installer)
         {
+            // Di nuovo, subito prima dell'avvio: il file potrebbe essere stato cambiato dopo lo scaricamento.
+            if (_pendingInstallerHash is not { } hash || !File.Exists(installer) || !Sha256Sums.Verify(installer, hash))
+            {
+                MessageBox.Show("L'installer scaricato non corrisponde più allo SHA256 verificato: non viene avviato.",
+                    "Aggiornamento", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
             try
             {
                 Process.Start(new ProcessStartInfo(installer) { UseShellExecute = true });
@@ -598,7 +679,7 @@ public sealed partial class MainForm
     // ---------- aggiornamento con un clic ----------
 
     private static readonly HttpClient DownloadHttp = new() { Timeout = TimeSpan.FromMinutes(15) };
-    private string? _pendingInstaller;
+    private string? _pendingInstaller, _pendingInstallerHash;
     private bool _updating;
 
     /// <summary>Propone l'aggiornamento: scaricarlo e verificarlo, oppure aprire la pagina della release.</summary>
@@ -636,6 +717,11 @@ public sealed partial class MainForm
             var progress = new Progress<double>(p => { _notice.Text = $"Scaricamento dell'aggiornamento: {p:P0}"; _notice.Visible = true; });
             result = await UpdateDownloader.DownloadAndVerifyAsync(DownloadHttp, release, progress: progress);
         }
+        catch (Exception ex)
+        {
+            // Qualunque imprevisto (nome di file strano, errore del sistema): niente avvio e niente crash.
+            result = new UpdateDownloadResult(UpdateDownloadStatus.Failed, null, "Scaricamento non riuscito: " + ex.Message);
+        }
         finally
         {
             _updating = false;
@@ -655,11 +741,12 @@ public sealed partial class MainForm
                 "Aggiornamento", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
             return;
         _pendingInstaller = result.InstallerPath;
+        _pendingInstallerHash = result.Sha256;
         ExitApp();
         if (!IsDisposed && Visible)
         {
             // Uscita annullata: l'installer non parte.
-            _pendingInstaller = null;
+            _pendingInstaller = _pendingInstallerHash = null;
             ShowNotice("Aggiornamento rimandato: l'installer verificato resta in " + Path.GetDirectoryName(result.InstallerPath));
         }
     }

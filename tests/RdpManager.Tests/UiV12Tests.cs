@@ -217,6 +217,57 @@ public sealed class UiV12Tests : IDisposable
     }
 
     [Fact]
+    public void SplitView_ANewSessionOrCtrlTabGoesBackToTheTabs_AndTheLastUsedHalfIsCurrent()
+    {
+        WithMainForm(StoreWith(Unreachable("Uno"), Unreachable("Due"), Unreachable("Tre")), form =>
+        {
+            var conns = form.Document.Connections;
+            form.OpenSession(conns[0]);
+            form.OpenSession(conns[1]);
+            Pump(TimeSpan.FromMilliseconds(200));
+            var views = form.AllViews.ToList();
+
+            form.EnterSplit(views[0], views[1]);
+            Assert.Same(views[0], form.CurrentView);       // all'inizio la metà sinistra
+            form.ExecuteShortcut(ShortcutAction.NextSession);
+            Pump(TimeSpan.FromMilliseconds(300));
+            // Il fuoco è andato a destra (se Windows lo concede); in ogni caso CurrentView è una delle due metà.
+            Assert.Contains(form.CurrentView, new[] { views[0], views[1] });
+
+            form.OpenSession(conns[2]); // sessione nuova: non deve finire in una scheda nascosta
+            Pump(TimeSpan.FromMilliseconds(200));
+            Assert.False(form.IsSplit);
+            Assert.Equal("Tre", form.CurrentView!.Connection.Name);
+            Assert.True(form.CurrentView.Visible);
+
+            form.EnterSplit(views[0], views[1]);
+            form.CycleTab(1);
+            Assert.False(form.IsSplit);
+            Assert.All(form.AllViews, v => Assert.IsType<TabPage>(v.Parent));
+        });
+    }
+
+    [Fact]
+    public void Overview_WhileSplit_RestoresTheSplitAfterCapturing()
+    {
+        WithMainForm(StoreWith(Unreachable("Uno"), Unreachable("Due"), Unreachable("Tre")), form =>
+        {
+            var views = OpenAll(form);
+            foreach (var v in views)
+                v.SetStateForTests(SessionState.Connected, "Connessa");
+            form.EnterSplit(views[0], views[1]);
+            form.ExecuteShortcut(ShortcutAction.Overview);
+            Assert.True(PumpUntil(() => form.Overview is not null, TimeSpan.FromSeconds(3)));
+            Pump(TimeSpan.FromMilliseconds(400));
+            form.Overview!.Close(); // chiusa anche a metà di una cattura
+            Assert.True(PumpUntil(() => form.Overview is null && !form.OverviewBusy, TimeSpan.FromSeconds(3)));
+            Assert.True(form.IsSplit);
+            Assert.True(form.SplitControl.Visible);
+            Assert.Same(form.SplitControl.Panel1, views[0].Parent);
+        });
+    }
+
+    [Fact]
     public void SplitView_NeedsTwoSessions()
     {
         WithMainForm(StoreWith(Unreachable("Sola")), form =>

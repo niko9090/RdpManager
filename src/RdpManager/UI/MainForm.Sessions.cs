@@ -108,7 +108,7 @@ public sealed partial class MainForm
     /// <summary>Sessione su cui agiscono menu e scorciatoie: quella della scheda scelta, o nella vista affiancata quella col fuoco.</summary>
     internal RdpSessionView? CurrentView =>
         _splitLeft is { } left && _splitRight is { } right
-            ? (right.ContainsFocus ? right : left)
+            ? (right.ContainsFocus ? right : left.ContainsFocus ? left : _splitActive ?? left)
             : _tabs.SelectedTab?.Tag as RdpSessionView;
 
     internal IEnumerable<RdpSessionView> AllViews =>
@@ -209,6 +209,9 @@ public sealed partial class MainForm
 
     private void AddTab(RdpSessionView view)
     {
+        // Una scheda nuova sotto la vista affiancata resterebbe nascosta: si torna alle schede.
+        if (IsSplit)
+            LeaveSplit();
         var page = new TabPage { Tag = view };
         page.Controls.Add(view);
         view.ToolbarVisible = !_fullScreen;
@@ -233,6 +236,8 @@ public sealed partial class MainForm
         }
         else
         {
+            if (IsSplit && !IsSplitView(view))
+                LeaveSplit();
             if (!IsSplitView(view) && PageOf(view) is { } page)
                 _tabs.SelectedTab = page;
             host = this;
@@ -339,6 +344,8 @@ public sealed partial class MainForm
     {
         if (_tabs.TabCount < 2)
             return;
+        if (IsSplit)
+            LeaveSplit();
         _tabs.SelectedIndex = (_tabs.SelectedIndex + delta + _tabs.TabCount) % _tabs.TabCount;
     }
 
@@ -456,13 +463,44 @@ public sealed partial class MainForm
         return Control.FromChildHandle(target) is RdpClientHost ? ShortcutRoute.ToRemote : ShortcutRoute.Normal;
     }
 
-    protected override bool ProcessCmdKey(ref Message msg, Keys keyData) =>
-        RouteShortcut(keyData, msg.HWnd) switch
+    /// <summary>
+    /// Filtro dei tasti premuti nei controlli di questa finestra, prima della gestione normale di WinForms
+    /// (scorciatoie dei menu comprese): Ctrl+Tab e le scorciatoie configurabili si eseguono qui; con il fuoco
+    /// nella sessione remota le altre combinazioni vanno dritte al controllo RDP, senza far scattare i menu.
+    /// </summary>
+    private sealed class ShortcutFilter(MainForm form) : IMessageFilter
+    {
+        public bool PreFilterMessage(ref Message m)
         {
-            ShortcutRoute.Handled => true,
-            ShortcutRoute.ToRemote => false,
-            _ => base.ProcessCmdKey(ref msg, keyData),
-        };
+            if (m.Msg is not (NativeMethods.WM_KEYDOWN or NativeMethods.WM_SYSKEYDOWN) || form.IsDisposed)
+                return false;
+            if (Control.FromChildHandle(m.HWnd)?.FindForm() != form)
+                return false;
+            var keyData = (Keys)(int)m.WParam & Keys.KeyCode | Control.ModifierKeys;
+            switch (form.RouteShortcut(keyData, m.HWnd))
+            {
+                case ShortcutRoute.Handled:
+                    return true;
+                case ShortcutRoute.ToRemote:
+                    var msg = new NativeMethods.MSG { hwnd = m.HWnd, message = m.Msg, wParam = m.WParam, lParam = m.LParam };
+                    NativeMethods.TranslateMessage(ref msg);
+                    NativeMethods.DispatchMessage(ref msg);
+                    return true;
+                default:
+                    return false;
+            }
+        }
+    }
+
+    private ShortcutFilter? _shortcutFilter;
+
+    private void InstallShortcutFilter()
+    {
+        _shortcutFilter = new ShortcutFilter(this);
+        Application.AddMessageFilter(_shortcutFilter);
+        FormClosed += (_, _) => Application.RemoveMessageFilter(_shortcutFilter);
+        Disposed += (_, _) => Application.RemoveMessageFilter(_shortcutFilter);
+    }
 
     /// <summary>Dall'hook di tastiera: vero se la combinazione è una scorciatoia (il tasto non arriva alla sessione).</summary>
     private bool OnHookKeyDown(KeyCombo combo)
@@ -721,6 +759,9 @@ public sealed partial class MainForm
     {
         if (IsDisposed || WindowState == FormWindowState.Minimized)
             return;
+        // Metà della vista affiancata usata per ultima: il clic dentro il controllo RDP non arriva a WinForms.
+        if (_splitLeft is { } l && _splitRight is { } r)
+            _splitActive = r.ContainsFocus ? r : l.ContainsFocus ? l : _splitActive;
         var p = Cursor.Position;
         bool active = Form.ActiveForm == this;
 

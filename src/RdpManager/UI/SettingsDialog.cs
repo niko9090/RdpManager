@@ -193,22 +193,36 @@ public sealed class SettingsDialog : Form
             }
         }
 
-        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        /// <summary>
+        /// Ogni combinazione arriva alla casella (anche Ctrl+Tab o Alt+lettera, che altrimenti farebbero
+        /// navigazione o scorciatoie), tranne Tab ed Esc da soli: servono a passare oltre e ad annullare.
+        /// </summary>
+        protected override bool IsInputKey(Keys keyData)
         {
             var key = keyData & Keys.KeyCode;
+            bool plain = (keyData & Keys.Modifiers) == 0;
             if (key is Keys.Tab && (keyData & (Keys.Control | Keys.Alt)) == 0)
-                return base.ProcessCmdKey(ref msg, keyData); // Tab per passare alla casella successiva
-            if (key is Keys.Delete or Keys.Back && (keyData & Keys.Modifiers) == 0)
+                return false;
+            if (key is Keys.Escape && plain)
+                return false;
+            return true;
+        }
+
+        protected override bool ProcessDialogKey(Keys keyData) =>
+            IsInputKey(keyData) || base.ProcessDialogKey(keyData);
+
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            e.Handled = e.SuppressKeyPress = true;
+            var key = e.KeyData & Keys.KeyCode;
+            if (key is Keys.Delete or Keys.Back && (e.KeyData & Keys.Modifiers) == 0)
             {
                 Combo = default;
-                return true;
+                return;
             }
-            if (key is Keys.Escape && (keyData & Keys.Modifiers) == 0)
-                return base.ProcessCmdKey(ref msg, keyData);
-            var combo = KeyCombo.FromKeys(keyData);
+            var combo = KeyCombo.FromKeys(e.KeyData);
             if (!combo.IsEmpty && combo.HasCommandModifier)
                 Combo = combo;
-            return true;
         }
     }
 }

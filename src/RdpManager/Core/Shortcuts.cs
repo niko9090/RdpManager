@@ -155,7 +155,7 @@ public readonly record struct KeyCombo(bool Ctrl, bool Alt, bool Shift, Keys Key
         return false;
     }
 
-    /// <summary>Da un valore WinForms con modificatori (KeyEventArgs.KeyData, ProcessCmdKey).</summary>
+    /// <summary>Da un valore WinForms con modificatori (KeyEventArgs.KeyData).</summary>
     public static KeyCombo FromKeys(Keys keyData) =>
         new((keyData & Keys.Control) != 0, (keyData & Keys.Alt) != 0, (keyData & Keys.Shift) != 0,
             NormalizeKey(keyData & Keys.KeyCode));
@@ -279,6 +279,14 @@ public sealed class ShortcutMap
             else if (KeyCombo.TryParse(text, out var combo) && combo.HasCommandModifier)
                 map[action] = combo;
         }
+        // Un predefinito (es. di un'azione nuova in questa versione) che coincide con una combinazione scelta
+        // dall'utente per un'altra azione si disattiva: vince la scelta dell'utente.
+        var chosen = saved.Keys
+            .Select(n => Enum.TryParse<ShortcutAction>(n, ignoreCase: true, out var a) && Enum.IsDefined(a) ? a : (ShortcutAction?)null)
+            .OfType<ShortcutAction>().ToHashSet();
+        foreach (var action in Defaults.Keys.Where(a => !chosen.Contains(a)).ToList())
+            if (!map[action].IsEmpty && chosen.Any(c => map[c] == map[action]))
+                map[action] = default;
         return map;
     }
 

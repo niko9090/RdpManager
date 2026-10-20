@@ -16,7 +16,10 @@ public enum ImportMode
 {
     /// <summary>Aggiunge le connessioni nuove; quelle già presenti (stesso Id o stessa destinazione) restano come sono.</summary>
     Merge,
-    /// <summary>Sostituisce tutte le connessioni e le cartelle con quelle del file; le impostazioni restano.</summary>
+    /// <summary>
+    /// Sostituisce tutte le connessioni e le cartelle con quelle del file; impostazioni, profili di credenziali e
+    /// testi rapidi restano (quelli del file si aggiungono senza doppioni: le loro password non andrebbero perse).
+    /// </summary>
     Replace,
 }
 
@@ -231,7 +234,6 @@ public static class RdpmFile
             removed = target.Connections.Count;
             target.Connections = [];
             target.Groups = [];
-            target.CredentialProfiles = [];
         }
 
         // Profili: un doppione (stesso Id, o stesso nome/utente/dominio) non si aggiunge e le connessioni importate

@@ -165,6 +165,7 @@ public sealed class HistoryAndUpdateTests : IDisposable
 
         Assert.Equal(UpdateDownloadStatus.Verified, result.Status);
         Assert.True(result.IsVerified);
+        Assert.Equal(HashOf(Installer), result.Sha256); // da ricontrollare subito prima dell'avvio
         Assert.Equal(Path.Combine(_dir, "RdpManager-Setup-9.9.9.exe"), result.InstallerPath);
         Assert.Equal(Installer, File.ReadAllBytes(result.InstallerPath!));
     }

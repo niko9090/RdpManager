@@ -101,7 +101,7 @@ dotnet test RdpManager.sln -c Release
 dotnet run --project src/RdpManager
 ```
 
-I test (303 + 2 facoltativi; nel CI solo quelli del Core, con `--filter "Category!=UI"`) comprendono:
+I test (307 + 2 facoltativi; nel CI solo quelli del Core, con `--filter "Category!=UI"`) comprendono:
 - **Core**: salvataggio/ricaricamento JSON, cifratura DPAPI (nessuna password in chiaro nel JSON),
   lettura/generazione `.rdp`, cartelle (crea/rinomina/elimina), file temporaneo per mstsc; dalla 1.2
   profili di credenziali (risoluzione, cifratura, `.rdpm` senza password in chiaro, unione senza
@@ -357,7 +357,8 @@ Il risultato è un solo file `RdpManager.exe` in
   - **Unisci**: aggiunge solo le connessioni che mancano; un doppione (stesso host, porta, utente e
     dominio, oppure stesso identificativo) non viene duplicato, al massimo riceve la password se non
     l'aveva;
-  - **Sostituisci**: l'elenco attuale viene cancellato e sostituito da quello del file (chiede conferma).
+  - **Sostituisci**: connessioni e cartelle attuali vengono cancellate e sostituite da quelle del file
+    (chiede conferma); profili di credenziali e testi rapidi restano, e quelli del file si aggiungono.
 - Serve per spostare l'elenco su un altro PC o un altro utente Windows: il `connections.json` non
   basta, perché le sue password DPAPI valgono solo per l'utente che le ha salvate.
 

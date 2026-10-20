@@ -215,12 +215,22 @@ public sealed class CredentialProfileTests : IDisposable
     }
 
     [Fact]
-    public void Replace_ReplacesProfilesToo()
+    public void Replace_KeepsExistingProfiles_AndAddsThoseOfTheFile()
     {
+        // In sostituzione cambiano connessioni e cartelle; i profili (con le loro password DPAPI) non si perdono.
         var (source, profile, _, _) = Sample();
-        var target = new ConnectionsDocument { CredentialProfiles = [new CredentialProfile { Name = "Vecchio" }] };
-        RdpmFile.ApplyImport(target, RdpmFile.Import(RdpmFile.Export(source)), ImportMode.Replace);
-        Assert.Equal(profile.Id, Assert.Single(target.CredentialProfiles).Id);
+        var old = new CredentialProfile { Name = "Vecchio", Username = "vecchio", Password = "Da-Non-Perdere" };
+        var target = new ConnectionsDocument
+        {
+            Connections = [new RdpConnection { Host = "da-sostituire" }],
+            CredentialProfiles = [old],
+        };
+        var result = RdpmFile.ApplyImport(target, RdpmFile.Import(RdpmFile.Export(source)), ImportMode.Replace);
+        Assert.Equal(1, result.Removed);
+        Assert.Equal(1, result.ProfilesAdded);
+        Assert.Equal([old.Id, profile.Id], target.CredentialProfiles.Select(p => p.Id));
+        Assert.Equal("Da-Non-Perdere", old.Password);
+        Assert.DoesNotContain(target.Connections, c => c.Host == "da-sostituire");
     }
 
     [Fact]

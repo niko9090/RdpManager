@@ -620,7 +620,7 @@ public sealed partial class MainForm : Form
     {
         foreach (var p in typeof(RdpConnection).GetProperties())
             if (p.CanRead && p.CanWrite && p.Name != nameof(RdpConnection.Id))
-                p.SetValue(to, p.GetValue(from));
+                p.SetMethod!.Invoke(to, [p.GetValue(from)]);
     }
 
     private void DuplicateSelected()

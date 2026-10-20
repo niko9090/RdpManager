@@ -178,6 +178,19 @@ public sealed class V12CoreTests : IDisposable
     }
 
     [Fact]
+    public void Shortcuts_NewDefaultGivesWayToAComboTheUserAlreadyChose()
+    {
+        // Nella 1.1 l'utente aveva messo Ctrl+Alt+S su «Sessione successiva»: la vista affiancata (nuova) non lo ruba.
+        var map = ShortcutMap.FromSettings(new Dictionary<string, string> { ["NextSession"] = "Ctrl+Alt+S" });
+        Assert.Equal("Ctrl+Alt+S", map[ShortcutAction.NextSession].ToString());
+        Assert.True(map[ShortcutAction.ToggleSplitView].IsEmpty);
+        Assert.Empty(map.Conflicts());
+        Assert.True(map.TryGetAction(KeyCombo.Parse("Ctrl+Alt+S"), out var a));
+        Assert.Equal(ShortcutAction.NextSession, a);
+        Assert.Equal("Ctrl+Alt+G", map[ShortcutAction.Overview].ToString());
+    }
+
+    [Fact]
     public void GlobalHotkey_ParsesAndConvertsForRegisterHotKey()
     {
         var combo = GlobalHotkey.Default;

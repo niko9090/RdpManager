@@ -70,7 +70,8 @@ public enum UpdateDownloadStatus
 }
 
 /// <param name="InstallerPath">Solo con <see cref="UpdateDownloadStatus.Verified"/>.</param>
-public sealed record UpdateDownloadResult(UpdateDownloadStatus Status, string? InstallerPath, string Message)
+/// <param name="Sha256">Hash verificato (esadecimale minuscolo), da ricontrollare subito prima di avviare il file.</param>
+public sealed record UpdateDownloadResult(UpdateDownloadStatus Status, string? InstallerPath, string Message, string? Sha256 = null)
 {
     public bool IsVerified => Status == UpdateDownloadStatus.Verified && InstallerPath is not null;
 }
@@ -146,10 +147,11 @@ public static class UpdateDownloader
             }
             progress?.Report(1.0);
             return new(UpdateDownloadStatus.Verified, target,
-                $"{setup.Name} scaricato e verificato (SHA256 {expectedHash[..12]}…).");
+                $"{setup.Name} scaricato e verificato (SHA256 {expectedHash[..12]}…).", expectedHash);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException
-                                       or IOException or UnauthorizedAccessException)
+                                       or IOException or UnauthorizedAccessException or ArgumentException
+                                       or NotSupportedException or InvalidOperationException)
         {
             if (target is not null)
                 TryDelete(target);

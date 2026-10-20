@@ -6,8 +6,8 @@ namespace RdpManager.UI;
 
 /// <summary>
 /// Hook di tastiera a basso livello (WH_KEYBOARD_LL) per le scorciatoie che devono funzionare anche col
-/// fuoco nella sessione remota: il controllo RDP riceve i tasti prima di WinForms, quindi ProcessCmdKey
-/// non li vedrebbe. L'hook si installa solo mentre l'app è in primo piano (WM_ACTIVATEAPP) e, per
+/// fuoco nella sessione remota: il controllo RDP riceve i tasti prima di WinForms, quindi i filtri
+/// dei messaggi di WinForms non li vedrebbero. L'hook si installa solo mentre l'app è in primo piano (WM_ACTIVATEAPP) e, per
 /// sicurezza, ogni tasto viene esaminato solo se la finestra in primo piano è di questo processo.
 /// </summary>
 internal sealed class KeyboardHook : IDisposable
