@@ -11,13 +11,13 @@
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationVisualStyles>true</ApplicationVisualStyles>
     <Product>RdpManager</Product>
-    <!-- Versione dell'app: cambiarla qui prima di creare il tag vX.Y.Z (vedi README, «Aggiornamenti»). -->
-    <Version>1.1.0</Version>
+    <!-- Versione dell'app: cambiarla qui prima di creare il tag vX.Y.Z (vedi README, Â«AggiornamentiÂ»). -->
+    <Version>1.2.0</Version>
     <AssemblyVersion>$(Version).0</AssemblyVersion>
     <FileVersion>$(Version).0</FileVersion>
     <Company>niko9090</Company>
     <Copyright>niko9090</Copyright>
-    <!-- Con un RuntimeIdentifier (dotnet publish -r win-x64) l'output è un unico .exe -->
+    <!-- Con un RuntimeIdentifier (dotnet publish -r win-x64) l'output Ã¨ un unico .exe -->
     <PublishSingleFile Condition="'$(RuntimeIdentifier)' != ''">true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
