@@ -1,15 +1,22 @@
 using System.Diagnostics;
 using System.Drawing.Drawing2D;
+using System.Text.Json;
 using RdpManager.Core;
 using RdpManager.Rdp;
 
 namespace RdpManager.UI;
 
-public sealed class MainForm : Form
+public sealed partial class MainForm : Form
 {
     private sealed record FolderTag(string Path);
 
-    private const int ImgFolder = 0, ImgComputer = 1;
+    /// <summary>Nodo delle sezioni rapide (Preferiti, Recenti): rimanda alla stessa connessione dell'elenco.</summary>
+    private sealed record QuickTag(RdpConnection Connection);
+
+    private sealed record SectionTag(string Name);
+
+    private const int ImgFolder = 0, ImgComputer = 1, ImgStar = 2, ImgClock = 3;
+    private const int RecentCount = 8;
 
     private readonly ConnectionStore _store;
     private ConnectionsDocument _doc = new();
@@ -24,16 +31,20 @@ public sealed class MainForm : Form
     private readonly Label _emptyHint = new()
     {
         Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, ForeColor = SystemColors.GrayText,
-        Text = "Nessuna sessione aperta.\n\nFai doppio clic su una connessione a sinistra (o premi Invio) per aprirla in una scheda.\n" +
-               "Ctrl+N nuova connessione · Ctrl+Tab / Ctrl+Shift+Tab cambia scheda · F11 schermo intero",
     };
+    private readonly MenuStrip _menu = new();
+    private readonly StatusStrip _statusStrip = new();
     private readonly ToolStripStatusLabel _status = new() { Spring = true, TextAlign = ContentAlignment.MiddleLeft };
+    private readonly ToolStripStatusLabel _notice = new() { Visible = false };
+    private readonly System.Windows.Forms.Timer _noticeTimer = new() { Interval = 8000 };
     private readonly ImageList _stateImages = new() { ImageSize = new Size(12, 12), ColorDepth = ColorDepth.Depth32Bit };
     private readonly ImageList _treeImages = new() { ImageSize = new Size(16, 16), ColorDepth = ColorDepth.Depth32Bit };
     private readonly ContextMenuStrip _treeMenu = new();
     private readonly ContextMenuStrip _tabMenu = new();
     private readonly List<DetachedSessionForm> _detached = [];
     private readonly HashSet<string> _collapsed = new(StringComparer.CurrentCultureIgnoreCase);
+    private readonly Dictionary<Guid, ReachabilityStatus> _reach = [];
+    private readonly bool _backgroundChecks;
 
     private static readonly HttpClient Http = new();
     private readonly ToolStripStatusLabel _updateLabel = new() { IsLink = true, Visible = false };
@@ -41,12 +52,13 @@ public sealed class MainForm : Form
 
     private static readonly string DefaultTitle = $"RdpManager {AppInfo.VersionText} - Desktop remoti";
 
-    public MainForm() : this(new ConnectionStore(), checkUpdatesOnStartup: true) { }
+    public MainForm() : this(new ConnectionStore(), checkUpdatesOnStartup: true, backgroundChecks: true) { }
 
-    /// <summary>Con un archivio diverso da quello predefinito (usato dalle prove automatiche, senza controllo aggiornamenti).</summary>
-    internal MainForm(ConnectionStore store, bool checkUpdatesOnStartup = false)
+    /// <summary>Con un archivio diverso da quello predefinito (prove automatiche: niente controlli in rete in background).</summary>
+    internal MainForm(ConnectionStore store, bool checkUpdatesOnStartup = false, bool backgroundChecks = false)
     {
         _store = store;
+        _backgroundChecks = backgroundChecks;
         Text = DefaultTitle;
         Size = new Size(1400, 900);
         MinimumSize = new Size(800, 500);
@@ -57,45 +69,60 @@ public sealed class MainForm : Form
         BuildImages();
         _tree.ImageList = _treeImages;
         _tabs.ImageList = _stateImages;
+        _hook = new KeyboardHook(OnHookKeyDown);
 
-        var split = new SplitContainer { Dock = DockStyle.Fill, FixedPanel = FixedPanel.Panel1, SplitterWidth = 5 };
-        split.Panel1.Controls.Add(_tree);
-        split.Panel1.Controls.Add(BuildTreeToolbar());
-        split.Panel1.Controls.Add(_search);
-        split.Panel2.Controls.Add(_tabs);
-        split.Panel2.Controls.Add(_emptyHint);
-
-        var statusStrip = new StatusStrip();
-        statusStrip.Items.Add(_status);
-        statusStrip.Items.Add(_updateLabel);
+        BuildLayout();
+        _statusStrip.Items.Add(_status);
+        _statusStrip.Items.Add(_notice);
+        _statusStrip.Items.Add(_updateLabel);
         _updateLabel.Click += (_, _) => { if (_availableUpdate is { } r) OpenUrl(r.PageUrl); };
+        _noticeTimer.Tick += (_, _) => { _noticeTimer.Stop(); _notice.Visible = false; };
         if (checkUpdatesOnStartup)
             Shown += async (_, _) => await CheckForUpdatesAsync(manual: false);
 
-        Controls.Add(split);
-        Controls.Add(statusStrip);
-        Controls.Add(BuildMenu());
-        Load += (_, _) => split.SplitterDistance = 280;
+        Controls.Add(_root);
+        Controls.Add(_statusStrip);
+        BuildMenu();
+        Controls.Add(_menu);
+        MainMenuStrip = _menu;
 
         BuildContextMenus();
         WireEvents();
         LoadConnections();
+        ApplySettings();
         MstscLauncher.CleanupOldFiles();
+
+        Load += (_, _) => PlaceOnPreferredMonitor();
+        Shown += (_, _) => ReopenSessions();
+        if (_backgroundChecks)
+        {
+            Shown += async (_, _) => await CheckReachabilityAsync(_doc.Connections.ToList());
+            _reachTimer.Tick += async (_, _) => await CheckReachabilityAsync(_doc.Connections.ToList());
+            _reachTimer.Start();
+        }
     }
+
+    private readonly System.Windows.Forms.Timer _reachTimer = new() { Interval = 60_000 };
 
     // ---------- costruzione interfaccia ----------
 
-    private MenuStrip BuildMenu()
+    private ToolStripMenuItem _fullScreenItem = null!, _pinItem = null!, _sidebarItem = null!, _monitorMenu = null!;
+    private ToolStripMenuItem _nextSessionItem = null!, _previousSessionItem = null!;
+
+    private void BuildMenu()
     {
-        var menu = new MenuStrip();
         static ToolStripMenuItem Item(string text, Keys keys, EventHandler onClick, string? keyText = null) =>
             new(text, null, onClick) { ShortcutKeys = keys, ShortcutKeyDisplayString = keyText };
 
         var file = new ToolStripMenuItem("&File");
         file.DropDownItems.Add(Item("&Importa file .rdp…", Keys.Control | Keys.I, (_, _) => ImportRdpFiles()));
+        file.DropDownItems.Add(Item("Importa connessioni (.rdp&m)…", Keys.None, (_, _) => ImportRdpm()));
+        file.DropDownItems.Add(Item("&Esporta connessioni (.rdpm)…", Keys.None, (_, _) => ExportRdpm()));
+        file.DropDownItems.Add(new ToolStripSeparator());
+        file.DropDownItems.Add(Item("Impo&stazioni…", Keys.Control | Keys.Oemcomma, (_, _) => ShowSettings(), "Ctrl+,"));
         file.DropDownItems.Add(Item("Apri &cartella dei dati", Keys.None, (_, _) => OpenDataFolder()));
         file.DropDownItems.Add(new ToolStripSeparator());
-        file.DropDownItems.Add(Item("&Esci", Keys.Alt | Keys.F4, (_, _) => Close()));
+        file.DropDownItems.Add(Item("E&sci", Keys.Alt | Keys.F4, (_, _) => Close()));
 
         var conn = new ToolStripMenuItem("&Connessioni");
         conn.DropDownItems.Add(Item("&Nuova connessione…", Keys.Control | Keys.N, (_, _) => NewConnection()));
@@ -105,27 +132,55 @@ public sealed class MainForm : Form
         conn.DropDownItems.Add(Item("&Elimina", Keys.None, (_, _) => DeleteSelected(), "Canc"));
         conn.DropDownItems.Add(new ToolStripSeparator());
         conn.DropDownItems.Add(Item("C&onnetti", Keys.None, (_, _) => ConnectSelected(), "Invio"));
+        conn.DropDownItems.Add(Item("Connetti &tutta la cartella", Keys.None, (_, _) => ConnectFolder(SelectedFolderPath)));
         conn.DropDownItems.Add(Item("Apri con mst&sc", Keys.None, (_, _) => { if (SelectedConnection is { } c) LaunchMstsc(c); }));
-        conn.DropDownItems.Add(Item("Cerca", Keys.Control | Keys.F, (_, _) => { _search.Focus(); _search.SelectAll(); }));
+        conn.DropDownItems.Add(Item("&Accendi (Wake-on-LAN)", Keys.None, async (_, _) => { if (SelectedConnection is { } c) await WakeAsync(c); }));
+        conn.DropDownItems.Add(Item("&Preferita", Keys.Control | Keys.Shift | Keys.F, (_, _) => ToggleFavorite()));
+        conn.DropDownItems.Add(Item("&Verifica raggiungibilità", Keys.None, async (_, _) => await CheckReachabilityAsync(_doc.Connections.ToList(), announce: true)));
+        conn.DropDownItems.Add(new ToolStripSeparator());
+        conn.DropDownItems.Add(Item("Cerca", Keys.Control | Keys.F, (_, _) => FocusSearch()));
 
         var session = new ToolStripMenuItem("&Sessione");
         session.DropDownItems.Add(Item("&Riconnetti", Keys.F5, (_, _) => CurrentView?.Connect()));
-        session.DropDownItems.Add(Item("&Schermo intero", Keys.F11, (_, _) => CurrentView?.EnterFullScreen()));
         session.DropDownItems.Add(Item("S&tacca in una finestra", Keys.Control | Keys.Shift | Keys.D, (_, _) => { if (CurrentView is { } v) ToggleDetach(v); }));
         session.DropDownItems.Add(Item("Apri con &mstsc", Keys.None, (_, _) => CurrentView?.OpenWithMstsc()));
-        session.DropDownItems.Add(Item("&Chiudi scheda", Keys.Control | Keys.F4, (_, _) => { if (CurrentView is { } v) CloseSession(v); }));
+        session.DropDownItems.Add(new ToolStripSeparator());
+        session.DropDownItems.Add(Item("&Incolla appunti come digitazione", Keys.None, async (_, _) => { if (CurrentView is { } v) await v.PasteClipboardAsTypingAsync(); }));
+        session.DropDownItems.Add(Item("Invia Ctrl+Alt+&Canc", Keys.None, (_, _) => CurrentView?.SendCtrlAltDel()));
+        session.DropDownItems.Add(Item("&Foto della sessione", Keys.None, async (_, _) => { if (CurrentView is { } v) await SaveSnapshotAsync(v); }));
+        session.DropDownItems.Add(new ToolStripSeparator());
+        session.DropDownItems.Add(Item("C&hiudi scheda", Keys.Control | Keys.F4, (_, _) => { if (CurrentView is { } v) CloseSession(v); }));
         session.DropDownItems.Add(new ToolStripSeparator());
         session.DropDownItems.Add(Item("Scheda s&uccessiva", Keys.None, (_, _) => CycleTab(1), "Ctrl+Tab"));
         session.DropDownItems.Add(Item("Scheda &precedente", Keys.None, (_, _) => CycleTab(-1), "Ctrl+Shift+Tab"));
+        _nextSessionItem = Item("Sessione connessa successiva", Keys.None, (_, _) => ExecuteShortcut(ShortcutAction.NextSession));
+        _previousSessionItem = Item("Sessione connessa precedente", Keys.None, (_, _) => ExecuteShortcut(ShortcutAction.PreviousSession));
+        session.DropDownItems.Add(_nextSessionItem);
+        session.DropDownItems.Add(_previousSessionItem);
+
+        var view = new ToolStripMenuItem("&Visualizza");
+        _fullScreenItem = Item("&Schermo intero", Keys.F11, (_, _) => ToggleFullScreen());
+        _sidebarItem = Item("&Mostra/nascondi barra laterale", Keys.None, (_, _) => ToggleSidebar());
+        _pinItem = Item("Barra laterale &fissa", Keys.None, (_, _) => SetSidebarMode(_doc.Settings.SidebarMode == SidebarMode.Pinned ? SidebarMode.AutoHide : SidebarMode.Pinned));
+        _monitorMenu = new ToolStripMenuItem("M&onitor per lo schermo intero");
+        _monitorMenu.DropDownOpening += (_, _) => FillMonitorMenu();
+        _monitorMenu.DropDownItems.Add("(caricamento)");
+        view.DropDownItems.Add(_fullScreenItem);
+        view.DropDownItems.Add(new ToolStripSeparator());
+        view.DropDownItems.Add(_sidebarItem);
+        view.DropDownItems.Add(_pinItem);
+        view.DropDownItems.Add(new ToolStripSeparator());
+        view.DropDownItems.Add(_monitorMenu);
+        view.DropDownItems.Add(Item("Sposta la finestra sul monitor &successivo", Keys.None, (_, _) => MoveToNextMonitor()));
 
         var help = new ToolStripMenuItem("A&iuto");
+        help.DropDownItems.Add(Item("&Scorciatoie da tastiera", Keys.None, (_, _) => ShowShortcutHelp()));
         help.DropDownItems.Add(Item("Controlla &aggiornamenti", Keys.None, async (_, _) => await CheckForUpdatesAsync(manual: true)));
         help.DropDownItems.Add(Item("Pagina del &progetto su GitHub", Keys.None, (_, _) => OpenUrl(AppInfo.RepositoryUrl)));
         help.DropDownItems.Add(new ToolStripSeparator());
         help.DropDownItems.Add(Item("&Informazioni", Keys.None, (_, _) => ShowAbout()));
 
-        menu.Items.AddRange([file, conn, session, help]);
-        return menu;
+        _menu.Items.AddRange([file, conn, session, view, help]);
     }
 
     private ToolStrip BuildTreeToolbar()
@@ -139,25 +194,61 @@ public sealed class MainForm : Form
         return bar;
     }
 
+    /// <summary>Intestazione della barra laterale: titolo e pulsante per fissarla o renderla a comparsa.</summary>
+    private ToolStrip BuildSidebarHeader()
+    {
+        var header = new ToolStrip { GripStyle = ToolStripGripStyle.Hidden, Dock = DockStyle.Top, RenderMode = ToolStripRenderMode.System };
+        header.Items.Add(new ToolStripLabel("Connessioni") { Font = new Font(Font, FontStyle.Bold) });
+        _pinButton.Click += (_, _) => SetSidebarMode(_doc.Settings.SidebarMode == SidebarMode.Pinned ? SidebarMode.AutoHide : SidebarMode.Pinned);
+        header.Items.Add(_pinButton);
+        return header;
+    }
+
+    private ToolStripMenuItem _miConnect = null!, _miConnectFolder = null!, _miMstsc = null!, _miWake = null!,
+        _miCheck = null!, _miFavorite = null!, _miEdit = null!, _miDuplicate = null!, _miDelete = null!;
+
     private void BuildContextMenus()
     {
-        _treeMenu.Items.Add("Connetti", null, (_, _) => ConnectSelected());
-        _treeMenu.Items.Add("Apri con mstsc", null, (_, _) => { if (SelectedConnection is { } c) LaunchMstsc(c); });
+        ToolStripMenuItem Add(string text, EventHandler onClick)
+        {
+            var item = new ToolStripMenuItem(text, null, onClick);
+            _treeMenu.Items.Add(item);
+            return item;
+        }
+        _miConnect = Add("Connetti", (_, _) => ConnectSelected());
+        _miConnectFolder = Add("Connetti tutta la cartella", (_, _) => ConnectFolder(SelectedFolderPath));
+        _miMstsc = Add("Apri con mstsc", (_, _) => { if (SelectedConnection is { } c) LaunchMstsc(c); });
+        _miWake = Add("Accendi (Wake-on-LAN)", async (_, _) => { if (SelectedConnection is { } c) await WakeAsync(c); });
+        _miCheck = Add("Verifica raggiungibilità", async (_, _) =>
+        {
+            var list = SelectedConnection is { } c ? [c] : _doc.ConnectionsInFolder(SelectedFolderPath).ToList();
+            await CheckReachabilityAsync(list, announce: true);
+        });
         _treeMenu.Items.Add(new ToolStripSeparator());
-        _treeMenu.Items.Add("Nuova connessione…", null, (_, _) => NewConnection());
-        _treeMenu.Items.Add("Nuova cartella…", null, (_, _) => NewFolder());
-        _treeMenu.Items.Add("Modifica / Rinomina…", null, (_, _) => EditSelected());
-        _treeMenu.Items.Add("Duplica", null, (_, _) => DuplicateSelected());
-        _treeMenu.Items.Add("Elimina", null, (_, _) => DeleteSelected());
+        _miFavorite = Add("Preferita ★", (_, _) => ToggleFavorite());
+        _treeMenu.Items.Add(new ToolStripSeparator());
+        Add("Nuova connessione…", (_, _) => NewConnection());
+        Add("Nuova cartella…", (_, _) => NewFolder());
+        _miEdit = Add("Modifica / Rinomina…", (_, _) => EditSelected());
+        _miDuplicate = Add("Duplica", (_, _) => DuplicateSelected());
+        _miDelete = Add("Elimina", (_, _) => DeleteSelected());
         _treeMenu.Opening += (_, _) =>
         {
-            bool isConn = SelectedConnection is not null;
-            _treeMenu.Items[0].Enabled = _treeMenu.Items[1].Enabled = _treeMenu.Items[6].Enabled = isConn;
-            _treeMenu.Items[5].Enabled = _treeMenu.Items[7].Enabled = _tree.SelectedNode is not null;
+            var c = SelectedConnection;
+            bool isConn = c is not null;
+            bool isFolder = _tree.SelectedNode?.Tag is FolderTag;
+            _miConnect.Enabled = _miMstsc.Enabled = _miDuplicate.Enabled = _miFavorite.Enabled = isConn;
+            _miWake.Enabled = c is not null && WakeOnLan.IsValidMac(c.MacAddress);
+            _miWake.ToolTipText = _miWake.Enabled ? null : "Indica il MAC nella modifica della connessione";
+            _miConnectFolder.Visible = isFolder;
+            _miCheck.Enabled = isConn || isFolder;
+            _miFavorite.Checked = c?.IsFavorite == true;
+            _miEdit.Enabled = isConn || isFolder;
+            _miDelete.Enabled = isConn || isFolder;
         };
 
         _tabMenu.Items.Add("Riconnetti", null, (_, _) => CurrentView?.Connect());
-        _tabMenu.Items.Add("Schermo intero", null, (_, _) => CurrentView?.EnterFullScreen());
+        _tabMenu.Items.Add("Schermo intero", null, (_, _) => ToggleFullScreen());
         _tabMenu.Items.Add("Stacca in una finestra", null, (_, _) => { if (CurrentView is { } v) ToggleDetach(v); });
         _tabMenu.Items.Add("Apri con mstsc", null, (_, _) => CurrentView?.OpenWithMstsc());
         _tabMenu.Items.Add(new ToolStripSeparator());
@@ -173,7 +264,7 @@ public sealed class MainForm : Form
             else if (e.KeyCode is Keys.Down or Keys.Enter) { _tree.Focus(); SelectFirstConnection(); e.SuppressKeyPress = true; }
         };
 
-        _tree.NodeMouseDoubleClick += (_, e) => { if (e.Node.Tag is RdpConnection c) OpenSession(c); };
+        _tree.NodeMouseDoubleClick += (_, e) => { if (ConnectionOf(e.Node) is { } c) OpenSession(c); };
         _tree.NodeMouseClick += (_, e) => { if (e.Button == MouseButtons.Right) _tree.SelectedNode = e.Node; };
         _tree.ContextMenuStrip = _treeMenu;
         _tree.KeyDown += (_, e) =>
@@ -182,8 +273,8 @@ public sealed class MainForm : Form
             else if (e.KeyCode == Keys.Delete) { DeleteSelected(); e.SuppressKeyPress = true; }
             else if (e.KeyCode == Keys.F2) { EditSelected(); e.SuppressKeyPress = true; }
         };
-        _tree.AfterCollapse += (_, e) => { if (e.Node?.Tag is FolderTag f && _search.TextLength == 0) _collapsed.Add(f.Path); };
-        _tree.AfterExpand += (_, e) => { if (e.Node?.Tag is FolderTag f && _search.TextLength == 0) _collapsed.Remove(f.Path); };
+        _tree.AfterCollapse += (_, e) => { if (CollapseKey(e.Node) is { } k && _search.TextLength == 0) _collapsed.Add(k); };
+        _tree.AfterExpand += (_, e) => { if (CollapseKey(e.Node) is { } k && _search.TextLength == 0) _collapsed.Remove(k); };
 
         // Trascinamento delle connessioni nelle cartelle.
         _tree.ItemDrag += (_, e) => { if (e.Item is TreeNode { Tag: RdpConnection }) DoDragDrop(e.Item, DragDropEffects.Move); };
@@ -204,7 +295,12 @@ public sealed class MainForm : Form
             RefreshTree(c);
         };
 
-        _tabs.SelectedIndexChanged += (_, _) => UpdateStatus();
+        _tabs.SelectedIndexChanged += (_, _) =>
+        {
+            UpdateStatus();
+            if (_fullScreen)
+                UpdateFullScreenBounds();
+        };
         _tabs.MouseUp += (_, e) =>
         {
             for (int i = 0; i < _tabs.TabCount; i++)
@@ -222,6 +318,13 @@ public sealed class MainForm : Form
 
         FormClosing += OnFormClosing;
     }
+
+    private static string? CollapseKey(TreeNode? node) => node?.Tag switch
+    {
+        FolderTag f => f.Path,
+        SectionTag s => "\0" + s.Name,
+        _ => null,
+    };
 
     // ---------- dati ----------
 
@@ -259,18 +362,28 @@ public sealed class MainForm : Form
 
     // ---------- elenco ----------
 
-    private RdpConnection? SelectedConnection => _tree.SelectedNode?.Tag as RdpConnection;
+    private static RdpConnection? ConnectionOf(TreeNode? node) => node?.Tag switch
+    {
+        RdpConnection c => c,
+        QuickTag q => q.Connection,
+        _ => null,
+    };
+
+    private RdpConnection? SelectedConnection => ConnectionOf(_tree.SelectedNode);
 
     private string SelectedFolderPath => _tree.SelectedNode?.Tag switch
     {
         FolderTag f => f.Path,
         RdpConnection c => c.Group,
+        QuickTag q => q.Connection.Group,
         _ => "",
     };
 
     private void RefreshTree(object? select = null)
     {
         select ??= _tree.SelectedNode?.Tag;
+        if (select is QuickTag q)
+            select = q.Connection;
         var query = _search.Text.Trim();
         bool filtering = query.Length > 0;
         var folders = new Dictionary<string, TreeNode>(StringComparer.CurrentCultureIgnoreCase);
@@ -293,18 +406,18 @@ public sealed class MainForm : Form
         _tree.Nodes.Clear();
         if (!filtering)
         {
+            // Sezioni rapide in cima: Preferiti e Recenti (gli stessi oggetti dell'elenco, non copie).
+            AddSection("Preferiti", ImgStar, _doc.Favorites());
+            AddSection("Recenti", ImgClock, _doc.Recent(RecentCount));
             foreach (var g in _doc.AllGroups())
                 FolderNodes(g);
         }
         TreeNode? toSelect = null;
         var comparer = StringComparer.CurrentCultureIgnoreCase;
-        foreach (var c in _doc.Connections.Where(c => c.Matches(query)).OrderBy(c => c.DisplayName, comparer))
+        foreach (var c in _doc.Connections.Where(c => c.Matches(query) || (filtering && c.Label.Contains(query, StringComparison.CurrentCultureIgnoreCase)))
+                     .OrderBy(c => c.DisplayName, comparer))
         {
-            var node = new TreeNode(c.DisplayName, ImgComputer, ImgComputer)
-            {
-                Tag = c,
-                ToolTipText = $"{RdpFile.FormatAddress(c.Host, c.Port)}" + (c.Username.Length > 0 ? $"\nUtente: {(c.Domain.Length > 0 ? c.Domain + "\\" : "")}{c.Username}" : ""),
-            };
+            var node = ConnectionNode(c, c);
             FolderNodes(c.Group).Add(node);
             if (ReferenceEquals(c, select))
                 toSelect = node;
@@ -323,6 +436,73 @@ public sealed class MainForm : Form
             toSelect.EnsureVisible();
         }
         UpdateStatus();
+
+        void AddSection(string name, int image, IReadOnlyList<RdpConnection> items)
+        {
+            if (items.Count == 0)
+                return;
+            var section = new TreeNode(name, image, image) { Tag = new SectionTag(name), NodeFont = new Font(_tree.Font, FontStyle.Bold) };
+            foreach (var c in items)
+                section.Nodes.Add(ConnectionNode(c, new QuickTag(c)));
+            _tree.Nodes.Add(section);
+            if (!_collapsed.Contains("\0" + name))
+                section.Expand();
+        }
+    }
+
+    private TreeNode ConnectionNode(RdpConnection c, object tag)
+    {
+        var node = new TreeNode(NodeText(c)) { Tag = tag };
+        ApplyNodeState(node, c);
+        return node;
+    }
+
+    private static string NodeText(RdpConnection c) =>
+        c.DisplayName + (c.Label.Length > 0 ? $"  [{c.Label}]" : "");
+
+    /// <summary>Stato mostrato nell'elenco: quello della sessione se è aperta, altrimenti la raggiungibilità.</summary>
+    private (string Word, Color? Dot, bool Filled) NodeState(RdpConnection c)
+    {
+        if (AllViews.FirstOrDefault(v => v.Connection == c) is { } view)
+            return (RdpSessionView.StateWord(view.State), RdpSessionView.StateColor(view.State), true);
+        return _reach.GetValueOrDefault(c.Id) switch
+        {
+            ReachabilityStatus.Reachable => ("Raggiungibile", Color.FromArgb(46, 160, 67), false),
+            ReachabilityStatus.Unreachable => ("Non raggiungibile", Color.FromArgb(150, 150, 150), false),
+            _ => ("Non verificata", null, false),
+        };
+    }
+
+    private void ApplyNodeState(TreeNode node, RdpConnection c)
+    {
+        var (word, dot, filled) = NodeState(c);
+        node.ImageKey = node.SelectedImageKey = ComputerIcon(ConnectionDialog.ToColor(c.Color), dot, filled);
+        var tip = $"{RdpFile.FormatAddress(c.Host, c.Port)} — {word}";
+        if (c.Username.Length > 0)
+            tip += $"\nUtente: {(c.Domain.Length > 0 ? c.Domain + "\\" : "")}{c.Username}";
+        if (c.LastConnectedUtc is { } last)
+            tip += $"\nUltima connessione: {last.ToLocalTime():g}";
+        node.ToolTipText = tip;
+        node.NodeFont = AllViews.Any(v => v.Connection == c && v.State == SessionState.Connected) ? new Font(_tree.Font, FontStyle.Bold) : null;
+        if (node.Text != NodeText(c))
+            node.Text = NodeText(c);
+    }
+
+    /// <summary>Aggiorna stato e colore dei nodi senza ricostruire l'elenco (selezione e scorrimento restano).</summary>
+    private void UpdateTreeStates()
+    {
+        void Walk(TreeNodeCollection nodes)
+        {
+            foreach (TreeNode n in nodes)
+            {
+                if (ConnectionOf(n) is { } c)
+                    ApplyNodeState(n, c);
+                Walk(n.Nodes);
+            }
+        }
+        _tree.BeginUpdate();
+        Walk(_tree.Nodes);
+        _tree.EndUpdate();
     }
 
     private void SelectFirstConnection()
@@ -340,6 +520,14 @@ public sealed class MainForm : Form
             _tree.SelectedNode = node;
     }
 
+    private void FocusSearch()
+    {
+        if (!SidebarShown)
+            ShowSidebar(focusSearch: true);
+        _search.Focus();
+        _search.SelectAll();
+    }
+
     private void NewConnection()
     {
         var c = new RdpConnection { Group = SelectedFolderPath };
@@ -353,35 +541,38 @@ public sealed class MainForm : Form
 
     private void EditSelected()
     {
-        switch (_tree.SelectedNode?.Tag)
+        if (SelectedConnection is { } c)
         {
-            case RdpConnection c:
-                var edited = c.Clone();
-                using (var dlg = new ConnectionDialog(edited, _doc.AllGroups(), $"Modifica: {c.DisplayName}"))
-                {
-                    if (dlg.ShowDialog(this) != DialogResult.OK)
-                        return;
-                }
-                CopyInto(edited, c);
-                SaveConnections();
-                RefreshTree(c);
-                UpdateSessionTitles();
-                break;
-            case FolderTag f:
-                RenameFolder(f.Path);
-                break;
+            EditConnection(c);
+            return;
         }
+        if (_tree.SelectedNode?.Tag is FolderTag f)
+            RenameFolder(f.Path);
     }
 
-    /// <summary>Copia i valori modificati nell'oggetto originale, che le sessioni aperte già referenziano.</summary>
-    private static void CopyInto(RdpConnection from, RdpConnection to)
+    private void EditConnection(RdpConnection c)
     {
-        to.Name = from.Name; to.Host = from.Host; to.Port = from.Port;
-        to.Username = from.Username; to.Domain = from.Domain;
-        to.Password = from.Password; to.ProtectedPassword = from.ProtectedPassword;
-        to.ResolutionMode = from.ResolutionMode; to.DesktopWidth = from.DesktopWidth; to.DesktopHeight = from.DesktopHeight;
-        to.RedirectClipboard = from.RedirectClipboard; to.RedirectDrives = from.RedirectDrives;
-        to.Group = from.Group;
+        var edited = c.Clone();
+        using (var dlg = new ConnectionDialog(edited, _doc.AllGroups(), $"Modifica: {c.DisplayName}"))
+        {
+            if (dlg.ShowDialog(this) != DialogResult.OK)
+                return;
+        }
+        CopyInto(edited, c);
+        SaveConnections();
+        RefreshTree(c);
+        UpdateSessionTitles();
+    }
+
+    /// <summary>
+    /// Copia i valori modificati nell'oggetto originale, che le sessioni aperte già referenziano.
+    /// Tutte le proprietà scrivibili tranne l'Id: così i campi aggiunti in futuro non vanno persi.
+    /// </summary>
+    internal static void CopyInto(RdpConnection from, RdpConnection to)
+    {
+        foreach (var p in typeof(RdpConnection).GetProperties())
+            if (p.CanRead && p.CanWrite && p.Name != nameof(RdpConnection.Id))
+                p.SetValue(to, p.GetValue(from));
     }
 
     private void DuplicateSelected()
@@ -389,6 +580,7 @@ public sealed class MainForm : Form
         if (SelectedConnection is not { } c)
             return;
         var copy = c.Duplicate();
+        copy.LastConnectedUtc = null;
         _doc.Connections.Add(copy);
         SaveConnections();
         RefreshTree(copy);
@@ -396,20 +588,27 @@ public sealed class MainForm : Form
 
     private void DeleteSelected()
     {
-        switch (_tree.SelectedNode?.Tag)
+        if (SelectedConnection is { } c)
         {
-            case RdpConnection c:
-                if (MessageBox.Show(this, $"Eliminare la connessione «{c.DisplayName}»?", "Elimina",
-                        MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
-                    return;
-                _doc.Connections.Remove(c);
-                SaveConnections();
-                RefreshTree();
-                break;
-            case FolderTag f:
-                DeleteFolder(f.Path);
-                break;
+            if (MessageBox.Show(this, $"Eliminare la connessione «{c.DisplayName}»?", "Elimina",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+                return;
+            _doc.Connections.Remove(c);
+            SaveConnections();
+            RefreshTree();
+            return;
         }
+        if (_tree.SelectedNode?.Tag is FolderTag f)
+            DeleteFolder(f.Path);
+    }
+
+    private void ToggleFavorite()
+    {
+        if (SelectedConnection is not { } c)
+            return;
+        c.IsFavorite = !c.IsFavorite;
+        SaveConnections();
+        RefreshTree(c);
     }
 
     private void NewFolder()
@@ -484,234 +683,196 @@ public sealed class MainForm : Form
             "Importa .rdp", MessageBoxButtons.OK, errors.Count > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
     }
 
-    // ---------- sessioni ----------
+    // ---------- esportazione e importazione .rdpm ----------
 
-    internal RdpSessionView? CurrentView => _tabs.SelectedTab?.Tag as RdpSessionView;
-
-    internal IEnumerable<RdpSessionView> AllViews =>
-        _tabs.TabPages.Cast<TabPage>().Select(p => (RdpSessionView)p.Tag!).Concat(_detached.Select(d => d.View));
-
-    private void ConnectSelected()
+    private void ExportRdpm()
     {
-        if (SelectedConnection is { } c)
-            OpenSession(c);
-    }
-
-    internal void OpenSession(RdpConnection c)
-    {
-        // Una sessione per connessione: se è già aperta la si porta in primo piano.
-        var existing = AllViews.FirstOrDefault(v => v.Connection == c);
-        if (existing is not null)
+        if (_doc.Connections.Count == 0)
         {
-            if (existing.IsDetached)
-                _detached.First(d => d.View == existing).Activate();
-            else
-                _tabs.SelectedTab = (TabPage)existing.Parent!;
-            if (existing.State == SessionState.Disconnected)
-                existing.Connect();
+            MessageBox.Show(this, "Non ci sono connessioni da esportare.", "Esporta", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
-
-        var view = new RdpSessionView(c);
-        view.StateChanged += (_, _) => UpdateSessionTab(view);
-        view.CloseRequested += (_, _) => CloseSession(view);
-        view.DetachToggleRequested += (_, _) => ToggleDetach(view);
-        view.AttentionRequired += (_, _) => BringSessionToFront(view);
-        ConfigureNewSession?.Invoke(view);
-        AddTab(view);
-        view.Connect();
-    }
-
-    private void AddTab(RdpSessionView view)
-    {
-        var page = new TabPage { Tag = view };
-        page.Controls.Add(view);
-        _tabs.TabPages.Add(page);
-        _tabs.Visible = true;
-        _emptyHint.Visible = false;
-        _tabs.SelectedTab = page;
-        UpdateSessionTab(view);
-    }
-
-    /// <summary>Esito dell'ultima richiesta di primo piano (per le prove automatiche).</summary>
-    internal WindowAttention.Result? LastAttentionResult { get; private set; }
-
-    /// <summary>Rende visibile la sessione che ha aperto un avviso/richiesta modale: scheda selezionata, finestra ripristinata e in primo piano.</summary>
-    private void BringSessionToFront(RdpSessionView view)
-    {
-        Form host;
-        if (view.IsDetached)
+        string? password;
+        using (var options = new RdpmExportDialog(_doc.Connections.Count))
         {
-            host = _detached.First(d => d.View == view);
+            if (options.ShowDialog(this) != DialogResult.OK)
+                return;
+            password = options.FilePassword;
         }
-        else
+        using var save = new SaveFileDialog
         {
-            if (view.Parent is TabPage page)
-                _tabs.SelectedTab = page;
-            host = this;
-        }
-        LastAttentionResult = WindowAttention.BringToFront(host);
-    }
-
-    private void UpdateSessionTab(RdpSessionView view)
-    {
-        if (view.Parent is TabPage page)
-        {
-            page.Text = view.Connection.DisplayName + "   ";
-            page.ToolTipText = $"{RdpFile.FormatAddress(view.Connection.Host, view.Connection.Port)}\n{view.StateText}";
-            page.ImageIndex = (int)view.State;
-        }
-        UpdateStatus();
-    }
-
-    private void UpdateSessionTitles()
-    {
-        foreach (var v in AllViews)
-            UpdateSessionTab(v);
-    }
-
-    internal void CloseSession(RdpSessionView view)
-    {
-        if (view.State == SessionState.Connected &&
-            MessageBox.Show(this, $"Disconnettere «{view.Connection.DisplayName}» e chiudere la scheda?", "Chiudi sessione",
-                MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
-            return;
-
-        if (view.IsDetached)
-        {
-            var form = _detached.First(d => d.View == view);
-            _detached.Remove(form);
-            form.ReleaseView();
-            form.Close();
-        }
-        else if (view.Parent is TabPage page)
-        {
-            int index = _tabs.TabPages.IndexOf(page);
-            _tabs.TabPages.Remove(page);
-            page.Dispose();
-            if (_tabs.TabCount > 0)
-                _tabs.SelectedIndex = Math.Min(index, _tabs.TabCount - 1);
-        }
-        view.Dispose();
-        ShowHintIfEmpty();
-        UpdateStatus();
-    }
-
-    internal void ToggleDetach(RdpSessionView view)
-    {
-        if (view.IsDetached)
-        {
-            ReattachFromForm(_detached.First(d => d.View == view), closeForm: true);
-            return;
-        }
-        if (view.Parent is not TabPage page)
-            return;
-        page.Controls.Remove(view);
-        _tabs.TabPages.Remove(page);
-        page.Dispose();
-        ShowHintIfEmpty();
-
-        view.SetDetached(true);
-        var form = new DetachedSessionForm(view, Icon);
-        form.FormClosing += (_, e) =>
-        {
-            // Chiudere la finestra separata riporta la sessione in una scheda (non la disconnette).
-            if (_detached.Contains(form) && e.CloseReason != CloseReason.ApplicationExitCall)
-                ReattachFromForm(form, closeForm: false);
+            Title = "Esporta connessioni", Filter = RdpmFile.DialogFilter, DefaultExt = RdpmFile.Extension.TrimStart('.'),
+            FileName = $"connessioni-{DateTime.Now:yyyy-MM-dd}{RdpmFile.Extension}", AddExtension = true,
         };
-        _detached.Add(form);
-        form.Show();
-        UpdateStatus();
-    }
-
-    private void ReattachFromForm(DetachedSessionForm form, bool closeForm)
-    {
-        _detached.Remove(form);
-        form.ReleaseView();
-        form.View.SetDetached(false);
-        AddTab(form.View);
-        if (closeForm)
-            form.Close();
-        Activate();
-    }
-
-    internal void CycleTab(int delta)
-    {
-        if (_tabs.TabCount < 2)
+        if (save.ShowDialog(this) != DialogResult.OK)
             return;
-        _tabs.SelectedIndex = (_tabs.SelectedIndex + delta + _tabs.TabCount) % _tabs.TabCount;
-    }
-
-    private void ShowHintIfEmpty()
-    {
-        bool empty = _tabs.TabCount == 0;
-        _tabs.Visible = !empty;
-        _emptyHint.Visible = empty;
-    }
-
-    private void LaunchMstsc(RdpConnection c)
-    {
-        try { MstscLauncher.Launch(c); }
-        catch (Exception ex) { MessageBox.Show(this, "Impossibile avviare mstsc.exe: " + ex.Message, "RdpManager", MessageBoxButtons.OK, MessageBoxIcon.Error); }
-    }
-
-    internal enum ShortcutRoute { Handled, ToRemote, Normal }
-
-    /// <summary>Decide chi gestisce una combinazione di tasti diretta alla finestra <paramref name="target"/>.</summary>
-    internal ShortcutRoute RouteShortcut(Keys keyData, IntPtr target)
-    {
-        switch (keyData)
+        try
         {
-            case Keys.Control | Keys.Tab:
-                CycleTab(1);
-                return ShortcutRoute.Handled;
-            case Keys.Control | Keys.Shift | Keys.Tab:
-                CycleTab(-1);
-                return ShortcutRoute.Handled;
+            Cursor = Cursors.WaitCursor;
+            RdpmFile.Save(save.FileName, _doc.Connections, _doc.AllGroups(), password);
         }
-        // Con il fuoco dentro una sessione remota le altre combinazioni (Ctrl+N, F5, …) vanno al PC remoto.
-        return Control.FromChildHandle(target) is RdpClientHost ? ShortcutRoute.ToRemote : ShortcutRoute.Normal;
-    }
-
-    protected override bool ProcessCmdKey(ref Message msg, Keys keyData) =>
-        RouteShortcut(keyData, msg.HWnd) switch
+        catch (Exception ex)
         {
-            ShortcutRoute.Handled => true,
-            ShortcutRoute.ToRemote => false,
-            _ => base.ProcessCmdKey(ref msg, keyData),
-        };
-
-    // Accesso per le prove automatiche.
-    /// <summary>Chiamata su ogni nuova sessione prima della connessione (le prove la usano per impostare opzioni).</summary>
-    internal Action<RdpSessionView>? ConfigureNewSession { get; set; }
-    internal TabControl Tabs => _tabs;
-    internal TreeView Tree => _tree;
-    internal TextBox SearchBox => _search;
-    internal ConnectionsDocument Document => _doc;
-    internal IReadOnlyList<DetachedSessionForm> DetachedForms => _detached;
-
-    private void OnFormClosing(object? sender, FormClosingEventArgs e)
-    {
-        var views = AllViews.ToList();
-        int connected = views.Count(v => v.State == SessionState.Connected);
-        if (connected > 0 && e.CloseReason == CloseReason.UserClosing &&
-            MessageBox.Show(this, $"Ci sono {connected} sessioni connesse. Disconnetterle e uscire?", "Esci",
-                MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
-        {
-            e.Cancel = true;
+            MessageBox.Show(this, "Esportazione non riuscita: " + ex.Message, "Esporta", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return;
         }
-        foreach (var form in _detached.ToList())
+        finally
         {
-            _detached.Remove(form);
-            form.ReleaseView();
-            form.Close();
+            Cursor = Cursors.Default;
         }
-        foreach (var v in views)
-            v.Dispose();
+        int withPassword = password is null ? 0 : _doc.Connections.Count(c => !string.IsNullOrEmpty(c.Password));
+        ShowNotice($"Esportate {_doc.Connections.Count} connessioni in {Path.GetFileName(save.FileName)}" +
+                   (password is null ? " (senza password)" : $" ({withPassword} password cifrate)"));
+    }
+
+    private void ImportRdpm()
+    {
+        using var open = new OpenFileDialog { Title = "Importa connessioni", Filter = RdpmFile.DialogFilter };
+        if (open.ShowDialog(this) != DialogResult.OK)
+            return;
+        var name = Path.GetFileName(open.FileName);
+        ConnectionsDocument imported;
+        try
+        {
+            var json = File.ReadAllText(open.FileName);
+            string? password = null;
+            bool retry = false;
+            while (true)
+            {
+                if (RdpmFile.IsEncrypted(json))
+                {
+                    password = FilePasswordDialog.Ask(this, name, retry);
+                    if (password is null)
+                        return;
+                }
+                try
+                {
+                    Cursor = Cursors.WaitCursor;
+                    imported = RdpmFile.Import(json, password);
+                    break;
+                }
+                catch (RdpmPasswordException)
+                {
+                    retry = true;
+                }
+                finally
+                {
+                    Cursor = Cursors.Default;
+                }
+            }
+        }
+        catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException or JsonException)
+        {
+            MessageBox.Show(this, $"«{name}» non si può importare: {ex.Message}", "Importa", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return;
+        }
+
+        ImportMode mode;
+        using (var dlg = new RdpmImportDialog(imported.Connections.Count, _doc.Connections.Count, imported.Connections.Any(c => c.HasPassword)))
+        {
+            if (dlg.ShowDialog(this) != DialogResult.OK)
+                return;
+            mode = dlg.Mode;
+        }
+        var result = RdpmFile.ApplyImport(_doc, imported, mode);
+        SaveConnections();
+        RefreshTree();
+        var text = $"Aggiunte {result.Added} connessioni";
+        if (result.Skipped > 0)
+            text += $", {result.Skipped} già presenti";
+        if (result.Removed > 0)
+            text += $", {result.Removed} sostituite";
+        MessageBox.Show(this, text + ".", "Importa", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        if (_backgroundChecks)
+            _ = CheckReachabilityAsync(_doc.Connections.ToList());
+    }
+
+    // ---------- rete: raggiungibilità e Wake-on-LAN ----------
+
+    private bool _checking;
+
+    /// <summary>Prova la porta RDP delle connessioni (al massimo 8 alla volta) e aggiorna lo stato nell'elenco.</summary>
+    private async Task CheckReachabilityAsync(IReadOnlyList<RdpConnection> list, bool announce = false)
+    {
+        if (_checking && !announce)
+            return;
+        _checking = true;
+        try
+        {
+            using var gate = new SemaphoreSlim(8);
+            var tasks = list.Select(async c =>
+            {
+                await gate.WaitAsync();
+                try { return (c, await HostReachability.CheckAsync(c)); }
+                finally { gate.Release(); }
+            }).ToList();
+            var results = await Task.WhenAll(tasks);
+            if (IsDisposed)
+                return;
+            foreach (var (c, r) in results)
+                _reach[c.Id] = r.Status;
+            UpdateTreeStates();
+            if (announce)
+            {
+                int ok = results.Count(r => r.Item2.IsReachable);
+                ShowNotice(list.Count == 1
+                    ? $"«{list[0].DisplayName}»: {(ok == 1 ? "raggiungibile" : "non raggiungibile")}"
+                    : $"Raggiungibili {ok} su {list.Count}");
+            }
+        }
+        finally
+        {
+            _checking = false;
+        }
+    }
+
+    private async Task WakeAsync(RdpConnection c)
+    {
+        if (!WakeOnLan.IsValidMac(c.MacAddress))
+        {
+            if (MessageBox.Show(this, $"Per accendere «{c.DisplayName}» serve l'indirizzo MAC della sua scheda di rete.\n\nAprire la modifica della connessione?",
+                    "Wake-on-LAN", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
+                EditConnection(c);
+            return;
+        }
+        try
+        {
+            await WakeOnLan.SendAsync(c.MacAddress);
+        }
+        catch (Exception ex) when (ex is System.Net.Sockets.SocketException or FormatException)
+        {
+            MessageBox.Show(this, "Invio non riuscito: " + ex.Message, "Wake-on-LAN", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        ShowNotice($"Accensione inviata a «{c.DisplayName}» ({c.MacAddress}). Può servire un minuto.");
+        // Si controlla per un paio di minuti quando il PC risponde.
+        for (int i = 0; i < 8 && !IsDisposed; i++)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(15));
+            if (IsDisposed)
+                return;
+            var r = await HostReachability.CheckAsync(c);
+            if (IsDisposed)
+                return;
+            _reach[c.Id] = r.Status;
+            UpdateTreeStates();
+            if (r.IsReachable)
+            {
+                ShowNotice($"«{c.DisplayName}» è raggiungibile.");
+                return;
+            }
+        }
     }
 
     // ---------- varie ----------
+
+    private void ShowNotice(string text)
+    {
+        _notice.Text = text;
+        _notice.Visible = true;
+        _noticeTimer.Stop();
+        _noticeTimer.Start();
+    }
 
     private void UpdateStatus()
     {
@@ -719,6 +880,25 @@ public sealed class MainForm : Form
         int connected = AllViews.Count(v => v.State == SessionState.Connected);
         _status.Text = $"{_doc.Connections.Count} connessioni salvate · {sessions} sessioni aperte ({connected} connesse)";
         Text = CurrentView is { } v ? $"{v.Connection.DisplayName} - RdpManager {AppInfo.VersionText}" : DefaultTitle;
+    }
+
+    private void UpdateEmptyHint()
+    {
+        var map = _shortcuts;
+        _emptyHint.Text = "Nessuna sessione aperta.\n\nFai doppio clic su una connessione nella barra laterale (o premi Invio) per aprirla in una scheda.\n" +
+                          $"Ctrl+N nuova connessione · Ctrl+Tab cambia scheda · {map[ShortcutAction.ToggleFullScreen]} schermo intero · " +
+                          $"{map[ShortcutAction.ToggleSidebar]} barra laterale";
+    }
+
+    private void ShowShortcutHelp()
+    {
+        var lines = Enum.GetValues<ShortcutAction>()
+            .Select(a => $"{(_shortcuts[a].IsEmpty ? "(nessuna)" : _shortcuts[a].ToString()),-20}\t{ShortcutMap.Describe(a)}");
+        MessageBox.Show(this,
+            "Valgono anche con il fuoco dentro la sessione remota:\n\n" + string.Join('\n', lines) +
+            "\n\nNell'app: Ctrl+Tab / Ctrl+Shift+Tab cambia scheda, F5 riconnetti, F11 schermo intero, Ctrl+F cerca.\n" +
+            "Le scorciatoie si cambiano in File › Impostazioni.",
+            "Scorciatoie da tastiera", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
     /// <summary>
@@ -779,15 +959,17 @@ public sealed class MainForm : Form
             $"Dati: {_store.FilePath}\n\nLe password sono cifrate con DPAPI per l'utente Windows corrente.",
             "Informazioni", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
+    // ---------- immagini ----------
+
     private void BuildImages()
     {
         // Indici = valori di SessionState: Idle, Connecting, Connected, Disconnected.
-        foreach (var color in new[] { Color.Gray, Color.Orange, Color.LimeGreen, Color.Red })
+        foreach (var state in new[] { SessionState.Idle, SessionState.Connecting, SessionState.Connected, SessionState.Disconnected })
         {
             var bmp = new Bitmap(12, 12);
             using var g = Graphics.FromImage(bmp);
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            using var brush = new SolidBrush(color);
+            using var brush = new SolidBrush(RdpSessionView.StateColor(state));
             g.FillEllipse(brush, 1, 1, 10, 10);
             _stateImages.Images.Add(bmp);
         }
@@ -802,18 +984,71 @@ public sealed class MainForm : Form
             g.DrawRectangle(edge, 1, 4, 13, 9);
         }
         _treeImages.Images.Add(folder);
+        _treeImages.Images.Add(DrawComputer(null, null, false));
 
-        var computer = new Bitmap(16, 16);
-        using (var g = Graphics.FromImage(computer))
+        var star = new Bitmap(16, 16);
+        using (var g = Graphics.FromImage(star))
         {
-            using var frame = new SolidBrush(Color.FromArgb(60, 60, 70));
-            using var screen = new SolidBrush(Color.FromArgb(70, 140, 220));
-            g.FillRectangle(frame, 1, 2, 14, 10);
-            g.FillRectangle(screen, 2, 3, 12, 8);
-            g.FillRectangle(frame, 6, 12, 4, 2);
-            g.FillRectangle(frame, 4, 14, 8, 1);
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            var points = Enumerable.Range(0, 10).Select(i =>
+            {
+                double angle = -Math.PI / 2 + i * Math.PI / 5;
+                double r = i % 2 == 0 ? 7.5 : 3.2;
+                return new PointF((float)(8 + r * Math.Cos(angle)), (float)(8.5 + r * Math.Sin(angle)));
+            }).ToArray();
+            using var fill = new SolidBrush(Color.FromArgb(245, 180, 30));
+            g.FillPolygon(fill, points);
         }
-        _treeImages.Images.Add(computer);
+        _treeImages.Images.Add(star);
+
+        var clock = new Bitmap(16, 16);
+        using (var g = Graphics.FromImage(clock))
+        {
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            using var pen = new Pen(Color.FromArgb(90, 110, 140), 1.6f);
+            g.DrawEllipse(pen, 1.5f, 1.5f, 13, 13);
+            g.DrawLine(pen, 8, 8, 8, 4);
+            g.DrawLine(pen, 8, 8, 11, 9.5f);
+        }
+        _treeImages.Images.Add(clock);
+    }
+
+    /// <summary>Icona del PC con la striscia del colore della connessione e il pallino dello stato (in cache per chiave).</summary>
+    private string ComputerIcon(Color? color, Color? dot, bool filled)
+    {
+        var key = $"pc|{color?.ToArgb()}|{dot?.ToArgb()}|{filled}";
+        if (!_treeImages.Images.ContainsKey(key))
+            _treeImages.Images.Add(key, DrawComputer(color, dot, filled));
+        return key;
+    }
+
+    private static Bitmap DrawComputer(Color? color, Color? dot, bool filled)
+    {
+        var bmp = new Bitmap(16, 16);
+        using var g = Graphics.FromImage(bmp);
+        using var frame = new SolidBrush(Color.FromArgb(60, 60, 70));
+        using var screen = new SolidBrush(color ?? Color.FromArgb(70, 140, 220));
+        g.FillRectangle(frame, 1, 2, 14, 10);
+        g.FillRectangle(screen, 2, 3, 12, 8);
+        g.FillRectangle(frame, 6, 12, 4, 2);
+        g.FillRectangle(frame, 4, 14, 8, 1);
+        if (dot is { } d)
+        {
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            using var white = new SolidBrush(Color.White);
+            g.FillEllipse(white, 8.5f, 8.5f, 7.5f, 7.5f);
+            if (filled)
+            {
+                using var b = new SolidBrush(d);
+                g.FillEllipse(b, 9.5f, 9.5f, 5.5f, 5.5f);
+            }
+            else
+            {
+                using var p = new Pen(d, 2f);
+                g.DrawEllipse(p, 10.2f, 10.2f, 4.2f, 4.2f);
+            }
+        }
+        return bmp;
     }
 
     private static Icon CreateAppIcon()

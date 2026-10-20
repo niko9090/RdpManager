@@ -1,3 +1,5 @@
+using RdpManager.Core;
+
 namespace RdpManager.UI;
 
 /// <summary>Richiesta di un testo (nome cartella).</summary>
@@ -50,6 +52,18 @@ public sealed class DetachedSessionForm : Form
         Size = new Size(1280, 800);
         Controls.Add(view);
         view.StateChanged += OnViewStateChanged;
+        view.FullScreenRequested += OnFullScreenRequested;
+    }
+
+    /// <summary>Apre la finestra sul monitor indicato (quello della finestra principale, di solito).</summary>
+    public void ShowOn(ScreenInfo? screen)
+    {
+        if (screen is not null)
+        {
+            StartPosition = FormStartPosition.Manual;
+            Bounds = MonitorLayout.Center(Size, screen.WorkingArea);
+        }
+        Show();
     }
 
     public RdpSessionView View { get; }
@@ -58,8 +72,12 @@ public sealed class DetachedSessionForm : Form
     public void ReleaseView()
     {
         View.StateChanged -= OnViewStateChanged;
+        View.FullScreenRequested -= OnFullScreenRequested;
         Controls.Remove(View);
     }
+
+    // Nella finestra staccata lo schermo intero è quello del controllo RDP (si esce dalla sua barra di connessione).
+    private void OnFullScreenRequested(object? sender, EventArgs e) => View.EnterControlFullScreen();
 
     private void OnViewStateChanged(object? sender, EventArgs e) =>
         Text = $"{View.Connection.DisplayName} ({View.StateText}) - RdpManager";

@@ -20,7 +20,28 @@ public sealed class ConnectionDialog : Form
     private readonly NumericUpDown _height = new() { Minimum = 480, Maximum = 8192, Width = 70 };
     private readonly CheckBox _clipboard = new() { Text = "Condividi appunti", AutoSize = true };
     private readonly CheckBox _drives = new() { Text = "Condividi unità locali", AutoSize = true };
+    private readonly CheckBox _printers = new() { Text = "Stampanti", AutoSize = true };
+    private readonly CheckBox _microphone = new() { Text = "Microfono", AutoSize = true };
+    private readonly ComboBox _audio = new() { Width = 200, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly CheckBox _allMonitors = new() { Text = "Usa tutti i monitor", AutoSize = true };
+    private readonly CheckBox _autoReconnect = new() { Text = "Riconnetti da sola, al massimo", AutoSize = true };
+    private readonly NumericUpDown _attempts = new() { Minimum = 1, Maximum = ReconnectPolicy.MaxAllowedAttempts, Width = 50 };
+    private readonly CheckBox _favorite = new() { Text = "Preferita ★", AutoSize = true };
+    private readonly TextBox _label = new() { Width = 90, MaxLength = 12, PlaceholderText = "es. PROD" };
+    private readonly Button _color = new() { Text = "Colore…", AutoSize = true };
+    private readonly Button _noColor = new() { Text = "Nessuno", AutoSize = true };
+    private readonly Panel _colorSwatch = new() { Size = new Size(22, 22), BorderStyle = BorderStyle.FixedSingle, Margin = new Padding(3, 4, 3, 3) };
+    private readonly TextBox _mac = new() { Width = 160, PlaceholderText = "AA:BB:CC:DD:EE:FF" };
+    private readonly ToolTip _tips = new() { AutoPopDelay = 15000 };
+    private string? _chosenColor;
     private readonly string? _originalPassword;
+
+    private static readonly (AudioMode Mode, string Text)[] AudioChoices =
+    [
+        (AudioMode.Local, "Su questo PC"),
+        (AudioMode.Remote, "Sul PC remoto"),
+        (AudioMode.None, "Nessun audio"),
+    ];
 
     public ConnectionDialog(RdpConnection target, IEnumerable<string> groups, string title)
     {
@@ -61,7 +82,13 @@ public sealed class ConnectionDialog : Form
         });
         Row("Cartella", _group);
         Row("Risoluzione", Flow(_fit, _fixed, _width, new Label { Text = "×", AutoSize = true, Margin = new Padding(0, 6, 0, 0) }, _height));
-        Row("Risorse", Flow(_clipboard, _drives));
+        Row("Risorse", Flow(_clipboard, _drives, _printers, _microphone));
+        Row("Audio", _audio);
+        Row("Monitor", Flow(_allMonitors, Help("A schermo intero la sessione occupa tutti i monitor come un unico desktop. Con «Apri con mstsc» usa la modalità multimonitor di Windows.")));
+        Row("Riconnessione", Flow(_autoReconnect, _attempts, new Label { Text = "volte", AutoSize = true, Margin = new Padding(3, 6, 0, 0) },
+            Help("Dopo una disconnessione non voluta (rete, server riavviato) l'app ritenta con attese crescenti: 2, 4, 8, 16, 30 secondi. Non ritenta se hai chiuso tu la sessione o se le credenziali sono sbagliate.")));
+        Row("Elenco", Flow(_favorite, new Label { Text = "Etichetta", AutoSize = true, Margin = new Padding(10, 6, 3, 0) }, _label, _colorSwatch, _color, _noColor));
+        Row("MAC", Flow(_mac, Help("Indirizzo della scheda di rete del PC remoto, per accenderlo con Wake-on-LAN (menu Connessioni › Accendi). Il PC deve avere il Wake-on-LAN attivo ed essere nella stessa rete.")));
 
         var ok = new Button { Text = "OK", DialogResult = DialogResult.OK, AutoSize = true };
         var cancel = new Button { Text = "Annulla", DialogResult = DialogResult.Cancel, AutoSize = true };
@@ -77,6 +104,15 @@ public sealed class ConnectionDialog : Form
         _group.Items.AddRange(groups.Cast<object>().ToArray());
         _showPassword.CheckedChanged += (_, _) => _password.UseSystemPasswordChar = !_showPassword.Checked;
         _fixed.CheckedChanged += (_, _) => _width.Enabled = _height.Enabled = _fixed.Checked;
+        _autoReconnect.CheckedChanged += (_, _) => _attempts.Enabled = _autoReconnect.Checked;
+        _audio.Items.AddRange(AudioChoices.Select(a => (object)a.Text).ToArray());
+        _color.Click += (_, _) =>
+        {
+            using var dlg = new ColorDialog { FullOpen = true, Color = ToColor(_chosenColor) ?? Color.SteelBlue };
+            if (dlg.ShowDialog(this) == DialogResult.OK)
+                SetColor($"#{dlg.Color.R:X2}{dlg.Color.G:X2}{dlg.Color.B:X2}");
+        };
+        _noColor.Click += (_, _) => SetColor(null);
         ok.Click += OnOk;
 
         _name.Text = target.Name;
@@ -96,7 +132,41 @@ public sealed class ConnectionDialog : Form
         _width.Enabled = _height.Enabled = _fixed.Checked;
         _clipboard.Checked = target.RedirectClipboard;
         _drives.Checked = target.RedirectDrives;
+        _printers.Checked = target.RedirectPrinters;
+        _microphone.Checked = target.RedirectMicrophone;
+        _audio.SelectedIndex = Math.Max(0, Array.FindIndex(AudioChoices, a => a.Mode == target.AudioMode));
+        _allMonitors.Checked = target.UseAllMonitors;
+        _autoReconnect.Checked = target.AutoReconnect;
+        _attempts.Value = Math.Clamp(target.AutoReconnectMaxAttempts, 1, ReconnectPolicy.MaxAllowedAttempts);
+        _attempts.Enabled = _autoReconnect.Checked;
+        _favorite.Checked = target.IsFavorite;
+        _label.Text = target.Label;
+        _mac.Text = target.MacAddress;
+        SetColor(target.Color);
     }
+
+    /// <summary>Un «?» con la spiegazione nel suggerimento (e in un messaggio al clic).</summary>
+    private Label Help(string text)
+    {
+        var mark = new Label
+        {
+            Text = "?", AutoSize = true, ForeColor = SystemColors.HotTrack, Cursor = Cursors.Help,
+            Font = new Font(Font, FontStyle.Bold), Margin = new Padding(6, 6, 3, 0),
+        };
+        _tips.SetToolTip(mark, text);
+        mark.Click += (_, _) => MessageBox.Show(this, text, Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+        return mark;
+    }
+
+    private void SetColor(string? color)
+    {
+        _chosenColor = RdpConnection.NormalizeColor(color);
+        _colorSwatch.BackColor = ToColor(_chosenColor) ?? SystemColors.Control;
+        _noColor.Enabled = _chosenColor is not null;
+    }
+
+    internal static Color? ToColor(string? hex) =>
+        RdpConnection.NormalizeColor(hex) is { } h ? ColorTranslator.FromHtml(h) : null;
 
     private void OnOk(object? sender, EventArgs e)
     {
@@ -106,6 +176,16 @@ public sealed class ConnectionDialog : Form
             MessageBox.Show(this, "Indica l'host (nome o indirizzo del PC remoto).", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
             DialogResult = DialogResult.None;
             _host.Focus();
+            return;
+        }
+
+        string mac = "";
+        if (_mac.Text.Trim().Length > 0 && !WakeOnLan.TryNormalizeMac(_mac.Text, out mac))
+        {
+            MessageBox.Show(this, "Indirizzo MAC non valido. Usa la forma AA:BB:CC:DD:EE:FF (oppure lascia vuoto).", Text,
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            DialogResult = DialogResult.None;
+            _mac.Focus();
             return;
         }
 
@@ -125,5 +205,15 @@ public sealed class ConnectionDialog : Form
         _target.DesktopHeight = (int)_height.Value;
         _target.RedirectClipboard = _clipboard.Checked;
         _target.RedirectDrives = _drives.Checked;
+        _target.RedirectPrinters = _printers.Checked;
+        _target.RedirectMicrophone = _microphone.Checked;
+        _target.AudioMode = AudioChoices[Math.Max(0, _audio.SelectedIndex)].Mode;
+        _target.UseAllMonitors = _allMonitors.Checked;
+        _target.AutoReconnect = _autoReconnect.Checked;
+        _target.AutoReconnectMaxAttempts = (int)_attempts.Value;
+        _target.IsFavorite = _favorite.Checked;
+        _target.Label = _label.Text.Trim();
+        _target.Color = _chosenColor;
+        _target.MacAddress = mac;
     }
 }
