@@ -1,7 +1,9 @@
-# Pubblica RdpManager (self-contained, file unico, win-x64) e compila l'installer Inno Setup.
+﻿# Pubblica RdpManager (self-contained, file unico, win-x64) e compila l'installer Inno Setup.
 # Risultato in dist\:
 #   RdpManager-Setup-<versione>.exe          installer per utente (senza diritti di amministratore)
 #   RdpManager-<versione>-win-x64.exe        eseguibile portatile
+#   SHA256SUMS.txt                           SHA256 dei due file (formato sha256sum): l'aggiornamento con un
+#                                            clic dell'app lo usa per verificare l'installer prima di avviarlo
 #
 # Uso:   powershell -NoProfile -ExecutionPolicy Bypass -File build-installer.ps1
 # La versione si legge da <Version> in src\RdpManager\RdpManager.csproj.
@@ -49,4 +51,12 @@ Copy-Item $exe $portable -Force
 
 $setup = Join-Path $dist "RdpManager-Setup-$version.exe"
 if (-not (Test-Path $setup)) { throw "Installer non trovato: $setup" }
-Get-Item $setup, $portable | ForEach-Object { '{0}  ({1:N1} MB)' -f $_.FullName, ($_.Length / 1MB) }
+
+# SHA256SUMS.txt: "<hash>  <nome>" con a capo LF, UTF-8 senza BOM (come sha256sum).
+$sums = Join-Path $dist 'SHA256SUMS.txt'
+$lines = foreach ($f in $setup, $portable) {
+    '{0}  {1}' -f (Get-FileHash -Algorithm SHA256 -LiteralPath $f).Hash.ToLowerInvariant(), (Split-Path $f -Leaf)
+}
+[IO.File]::WriteAllText($sums, (($lines -join "`n") + "`n"), (New-Object Text.UTF8Encoding($false)))
+
+Get-Item $setup, $portable, $sums | ForEach-Object { '{0}  ({1:N1} MB)' -f $_.FullName, ($_.Length / 1MB) }

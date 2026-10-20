@@ -142,6 +142,7 @@ public sealed partial class MainForm : Form
         conn.DropDownItems.Add(Item("C&onnetti", Keys.None, (_, _) => ConnectSelected(), "Invio"));
         conn.DropDownItems.Add(Item("Connetti &tutta la cartella", Keys.None, (_, _) => ConnectFolder(SelectedFolderPath)));
         conn.DropDownItems.Add(Item("Apri con mst&sc", Keys.None, (_, _) => { if (SelectedConnection is { } c) LaunchMstsc(c); }));
+        conn.DropDownItems.Add(Item("Esporta come file .&rdp…", Keys.None, (_, _) => { if (SelectedConnection is { } c) ExportRdpFile(c); }));
         conn.DropDownItems.Add(Item("&Accendi (Wake-on-LAN)", Keys.None, async (_, _) => { if (SelectedConnection is { } c) await WakeAsync(c); }));
         conn.DropDownItems.Add(Item("&Preferita", Keys.Control | Keys.Shift | Keys.F, (_, _) => ToggleFavorite()));
         conn.DropDownItems.Add(Item("&Verifica raggiungibilità", Keys.None, async (_, _) => await CheckReachabilityAsync(_doc.Connections.ToList(), announce: true)));
@@ -240,7 +241,7 @@ public sealed partial class MainForm : Form
     }
 
     private ToolStripMenuItem _miConnect = null!, _miConnectFolder = null!, _miMstsc = null!, _miWake = null!,
-        _miCheck = null!, _miFavorite = null!, _miEdit = null!, _miDuplicate = null!, _miDelete = null!, _miHistory = null!;
+        _miCheck = null!, _miFavorite = null!, _miEdit = null!, _miDuplicate = null!, _miDelete = null!, _miHistory = null!, _miExportRdp = null!;
 
     private void BuildContextMenus()
     {
@@ -253,6 +254,7 @@ public sealed partial class MainForm : Form
         _miConnect = Add("Connetti", (_, _) => ConnectSelected());
         _miConnectFolder = Add("Connetti tutta la cartella", (_, _) => ConnectFolder(SelectedFolderPath));
         _miMstsc = Add("Apri con mstsc", (_, _) => { if (SelectedConnection is { } c) LaunchMstsc(c); });
+        _miExportRdp = Add("Esporta come file .rdp…", (_, _) => { if (SelectedConnection is { } c) ExportRdpFile(c); });
         _miWake = Add("Accendi (Wake-on-LAN)", async (_, _) => { if (SelectedConnection is { } c) await WakeAsync(c); });
         _miCheck = Add("Verifica raggiungibilità", async (_, _) =>
         {
@@ -273,7 +275,7 @@ public sealed partial class MainForm : Form
             var c = SelectedConnection;
             bool isConn = c is not null;
             bool isFolder = _tree.SelectedNode?.Tag is FolderTag;
-            _miConnect.Enabled = _miMstsc.Enabled = _miDuplicate.Enabled = _miFavorite.Enabled = _miHistory.Enabled = isConn;
+            _miConnect.Enabled = _miMstsc.Enabled = _miDuplicate.Enabled = _miFavorite.Enabled = _miHistory.Enabled = _miExportRdp.Enabled = isConn;
             _miWake.Enabled = c is not null && WakeOnLan.IsValidMac(c.MacAddress);
             _miWake.ToolTipText = _miWake.Enabled ? null : "Indica il MAC nella modifica della connessione";
             _miConnectFolder.Visible = isFolder;

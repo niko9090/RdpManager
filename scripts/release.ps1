@@ -6,7 +6,7 @@
 #
 # Passi: controlli → <Version> nel csproj → build → test → pubblicazione + installer (build-installer.ps1)
 # → commit «Versione X.Y.Z» (se la versione è cambiata) → tag vX.Y.Z → push di main e del tag
-# → gh release create con l'installer e l'eseguibile portatile.
+# → gh release create con l'installer, l'eseguibile portatile e SHA256SUMS.txt (serve all'aggiornamento con un clic).
 # Si ferma senza fare nulla se ci sono modifiche non salvate, se non si è su main o se il tag esiste già.
 
 param(
@@ -96,7 +96,19 @@ catch {
 
 $setup = Join-Path $root "dist\RdpManager-Setup-$Version.exe"
 $portable = Join-Path $root "dist\RdpManager-$Version-win-x64.exe"
-foreach ($f in $setup, $portable) { if (-not (Test-Path $f)) { throw "Manca $f" } }
+$sums = Join-Path $root 'dist\SHA256SUMS.txt'
+foreach ($f in $setup, $portable, $sums) { if (-not (Test-Path $f)) { throw "Manca $f" } }
+
+# SHA256SUMS.txt deve descrivere proprio i file che si pubblicano: l'app rifiuta un installer con hash diverso.
+$expected = @{}
+foreach ($line in [IO.File]::ReadAllLines($sums)) {
+    if ($line -match '^([0-9a-f]{64})  (.+)$') { $expected[$Matches[2]] = $Matches[1] }
+}
+foreach ($f in $setup, $portable) {
+    $name = Split-Path $f -Leaf
+    $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $f).Hash.ToLowerInvariant()
+    if ($expected[$name] -ne $hash) { throw "SHA256SUMS.txt non corrisponde a $name" }
+}
 
 # ---------- commit, tag, push ----------
 if ($changed) {
@@ -113,7 +125,7 @@ if (-not $Notes) {
 # Le note passano da un file UTF-8: come argomento, PowerShell 5.1 rovinerebbe a capo, virgolette e accenti.
 $notesFile = Join-Path $env:TEMP "RdpManager-note-$Version.md"
 [IO.File]::WriteAllText($notesFile, $Notes, (New-Object Text.UTF8Encoding($false)))
-Run "Release $tag" { gh release create $tag $setup $portable --repo $repo --title "RdpManager $Version" --notes-file $notesFile --verify-tag }
+Run "Release $tag" { gh release create $tag $setup $portable $sums --repo $repo --title "RdpManager $Version" --notes-file $notesFile --verify-tag }
 Remove-Item $notesFile -ErrorAction SilentlyContinue
 
 Write-Host ""

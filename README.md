@@ -7,6 +7,12 @@ bordo in alto, scorciatoie che funzionano anche dentro la sessione remota (**Ctr
 Ctrl+Alt+1…9, Ctrl+Alt+Invio), **barra laterale** fissa o a comparsa con preferiti, recenti e stato
 dei PC, scelta del **monitor** e uso di tutti i monitor, **esportazione/importazione** cifrata in `.rdpm`,
 Wake-on-LAN, riconnessione automatica e altro (vedi «Uso»).
+Dalla 1.2: **Panoramica** con le miniature delle sessioni connesse (**Ctrl+Alt+G**), **ricerca rapida**
+(Ctrl+Alt+Spazio), **vista affiancata** di due sessioni, **profili di credenziali** condivisi,
+**Remote Desktop Gateway** per connessione, **testi rapidi**, icona nell'**area di notifica** con una
+scorciatoia globale, **tema scuro**, **cronologia** delle connessioni, **aggiornamento con un clic**
+verificato con SHA256 e importazione dalla cronologia di mstsc. Le novità di ogni versione sono in
+[CHANGELOG.md](CHANGELOG.md).
 
 Le sessioni usano il controllo ActiveX Desktop remoto di Windows (`mstscax.dll`, classe
 `MsRdpClient*NotSafeForScripting`), ospitato da una sottoclasse di `AxHost` scritta nel codice
@@ -34,11 +40,20 @@ salvate in `%APPDATA%\RdpManager` restano**.
 ## Aggiornamenti
 
 **Come avvisa l'app.** Dal menu **Aiuto → Controlla aggiornamenti** RdpManager legge l'ultima
-release su GitHub e, se è più recente della versione in uso, propone di aprirne la pagina nel
-browser, da cui si scarica il nuovo Setup. Non scarica né installa nulla da solo; se manca la rete
-o GitHub non risponde lo dice con un messaggio, senza bloccarsi. Inoltre all'avvio fa lo stesso
-controllo una volta, in background e con un timeout di 5 secondi: se trova una versione nuova lo
-segnala nella barra di stato in basso (clic = apre la pagina della release), altrimenti tace.
+release su GitHub; se è più recente della versione in uso propone **Aggiorna ora**, **Apri la
+pagina** o Annulla. Se manca la rete o GitHub non risponde lo dice con un messaggio, senza
+bloccarsi. Inoltre all'avvio fa lo stesso controllo una volta, in background e con un timeout di 5
+secondi: se trova una versione nuova lo segnala nella barra di stato in basso (clic = stessa
+proposta), altrimenti tace.
+
+**Aggiornamento con un clic (dalla 1.2).** «Aggiorna ora» scarica `RdpManager-Setup-X.Y.Z.exe`
+dell'ultima release in una cartella temporanea (`%TEMP%\RdpManager\aggiornamento`) e ne calcola lo
+SHA256, che deve coincidere con la riga dello stesso file in **`SHA256SUMS.txt`** allegato alla
+release. Solo se coincide chiede conferma; con il sì RdpManager si chiude (le sessioni connesse
+vengono disconnesse, dopo la solita conferma) e avvia l'installer, che si installa sopra la
+versione in uso tenendo connessioni e impostazioni. Se la release non ha `SHA256SUMS.txt`, se il
+file non vi compare o se l'hash è diverso, il file scaricato viene cancellato e **non si avvia
+nulla**: resta la strada della pagina della release.
 
 ## Pubblicare un aggiornamento
 
@@ -46,19 +61,24 @@ La strada principale è lo script **`scripts/release.ps1`** (serve un PC con .NE
 Setup 6 e `gh` collegato all'account GitHub):
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 -Version 1.1.0
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 -Version 1.2.0
 ```
 
 Lo script, in ordine:
 1. si ferma se ci sono modifiche non salvate, se non si è sul ramo `main`, se il ramo è indietro
-   rispetto a GitHub o se il tag `v1.1.0` (o la release) esiste già;
+   rispetto a GitHub o se il tag `v1.2.0` (o la release) esiste già;
 2. scrive la versione in `<Version>` di `src/RdpManager/RdpManager.csproj` (l'unico punto in cui
    sta: app, installer e controllo aggiornamenti la leggono da lì);
 3. compila ed esegue tutti i test;
-4. pubblica l'exe unico e compila l'installer con `build-installer.ps1` → `dist\`;
-5. fa il commit «Versione 1.1.0», crea il tag `v1.1.0` e fa il push di `main` e del tag;
-6. crea la release su GitHub con `gh release create`, allegando `RdpManager-Setup-1.1.0.exe` e
-   `RdpManager-1.1.0-win-x64.exe` (note: la sezione della versione in `CHANGELOG.md` più le istruzioni di installazione; oppure `-Notes "..."`).
+4. pubblica l'exe unico e compila l'installer con `build-installer.ps1` → `dist\`, insieme a
+   `SHA256SUMS.txt` (SHA256 dei due file, formato di `sha256sum`), e controlla che corrisponda;
+5. fa il commit «Versione 1.2.0» (se la versione nel csproj è cambiata), crea il tag `v1.2.0` e fa il
+   push di `main` e del tag;
+6. crea la release su GitHub con `gh release create`, allegando `RdpManager-Setup-1.2.0.exe`,
+   `RdpManager-1.2.0-win-x64.exe` e `SHA256SUMS.txt` (note: la sezione della versione in `CHANGELOG.md` più le istruzioni di installazione; oppure `-Notes "..."`).
+
+`SHA256SUMS.txt` è indispensabile: senza, l'aggiornamento con un clic delle versioni 1.2 e successive
+rifiuta l'installer.
 
 A ogni push il workflow `.github/workflows/ci.yml` ricompila ed esegue i test del Core su GitHub
 (scheda «Actions»); non pubblica nulla.
@@ -81,9 +101,13 @@ dotnet test RdpManager.sln -c Release
 dotnet run --project src/RdpManager
 ```
 
-I test (225 + 1 facoltativo; nel CI solo quelli del Core, con `--filter "Category!=UI"`) comprendono:
+I test (303 + 2 facoltativi; nel CI solo quelli del Core, con `--filter "Category!=UI"`) comprendono:
 - **Core**: salvataggio/ricaricamento JSON, cifratura DPAPI (nessuna password in chiaro nel JSON),
-  lettura/generazione `.rdp`, cartelle (crea/rinomina/elimina), file temporaneo per mstsc;
+  lettura/generazione `.rdp`, cartelle (crea/rinomina/elimina), file temporaneo per mstsc; dalla 1.2
+  profili di credenziali (risoluzione, cifratura, `.rdpm` senza password in chiaro, unione senza
+  doppioni), gateway nei `.rdp`, ricerca approssimata, testi rapidi, cronologia, verifica SHA256
+  dell'aggiornamento (file giusto accettato, file alterato rifiutato e cancellato) e caricamento di un
+  `connections.json` della 1.0.0 e della 1.1.0 (fixture inventati in `tests/RdpManager.Tests/Fixtures`);
 - **integrazione interfaccia** (`UiIntegrationTests`): aprono la finestra principale vera con il
   controllo ActiveX RDP verso host irraggiungibili — scheda e stato con motivo di disconnessione,
   Riconnetti, più sessioni e Ctrl+Tab, tasti inoltrati al PC remoto, stacca/riaggancia senza
@@ -100,6 +124,15 @@ screenshot in `RDPMANAGER_LIVE_OUT` (o in `%TEMP%\RdpManagerLive`).
 ```powershell
 $env:RDPMANAGER_LIVE_HOST = "nome-del-pc"
 dotnet test RdpManager.sln -c Release --filter "FullyQualifiedName~LiveRdp"
+```
+
+**Schermate dell'interfaccia** (facoltativa, saltata se la variabile manca): salva in una cartella le
+immagini della finestra con il tema scuro, della Panoramica, della ricerca rapida, della vista affiancata,
+delle impostazioni e del dialogo della connessione, con connessioni inventate.
+
+```powershell
+$env:RDPMANAGER_SCREENSHOTS = "C:\cartella\schermate"
+dotnet test RdpManager.sln -c Release --filter "FullyQualifiedName~Screenshot"
 ```
 
 Agli avvisi la prova risponde sempre «No» (mai «Sì»). Gli avvisi stessi sono provati anche senza
@@ -189,6 +222,33 @@ connessioni diverse) e, se possibile, due monitor. Stesse avvertenze: avvisa chi
 | 22 | *File → Impostazioni*: cambia «Sessione successiva» in Ctrl+Alt+Pag giù; spunta *Riapri all'avvio*; chiudi l'app con due sessioni aperte e riaprila | La nuova scorciatoia funziona dentro la sessione; all'avvio le due sessioni si riaprono nello stesso ordine. |
 | 23 | Passa a un'altra applicazione (Alt+Tab) e premi Ctrl+Alt+Destra lì | L'altra applicazione riceve i tasti normalmente: l'hook di RdpManager è attivo solo con RdpManager in primo piano. |
 
+## Prova manuale 1.2
+
+Da fare con **almeno due** PC remoti connessi (anche lo stesso PC con due connessioni diverse). Stesse
+avvertenze delle prove precedenti.
+
+| # | Passo | Risultato atteso |
+|---|---|---|
+| 1 | Avvia la 1.2 su un PC che aveva la 1.1.0 (o la 1.0.0) | Connessioni, cartelle, password, preferiti, colori, scorciatoie e impostazioni di prima ci sono ancora. |
+| 2 | *Connessioni → Profili di credenziali → Nuovo*: nome, utente, dominio, password | Il profilo compare nell'elenco. |
+| 3 | Modifica due connessioni: *Credenziali* = il profilo; connetti | Entrambe entrano con utente e password del profilo; il suggerimento nell'elenco dice «(profilo …)». |
+| 4 | Cambia la password del profilo, poi riconnetti una delle due | Usa la password nuova senza toccare la connessione. |
+| 5 | Con un Remote Desktop Gateway: *Passa da un Remote Desktop Gateway*, host del gateway, credenziali «le stesse» o un profilo; connetti | La sessione passa dal gateway (sul gateway la si vede tra le connessioni). |
+| 6 | *Apri con mstsc* sulla stessa connessione; poi clic destro → *Esporta come file .rdp*, e *File → Importa file .rdp* con quel file | mstsc passa dal gateway; il `.rdp` contiene il gateway e la connessione importata ha «Passa da un Remote Desktop Gateway» con lo stesso host. |
+| 7 | Con tre sessioni connesse: **Ctrl+Alt+G** (anche col clic dentro una sessione) | Si apre la Panoramica con le miniature delle sessioni connesse; in pochi secondi tutte mostrano il desktop remoto e si aggiornano. |
+| 8 | Clic su una miniatura (oppure frecce + Invio, o il numero 1-9) | Si passa a quella sessione; Esc o di nuovo Ctrl+Alt+G chiude senza cambiare sessione. |
+| 9 | **Ctrl+Alt+Spazio**, scrivi parte del nome con un errore (es. «magazzno») | La connessione giusta è in cima; Invio apre una sessione nuova o passa a quella già aperta. |
+| 10 | **Ctrl+Alt+S** con due sessioni aperte | Le due sessioni sono affiancate; il divisore si sposta e viene ricordato. Ctrl+Alt+Destra passa dall'una all'altra; Ctrl+Alt+S (o andare a una terza sessione) torna alle schede, senza riconnettere. |
+| 11 | *Sessione → Testi rapidi → Gestisci*: aggiungi `ipconfig /all` + a capo; poi in una sessione con il Prompt dei comandi scegli il testo | Il comando viene digitato ed eseguito nel PC remoto. |
+| 12 | *File → Impostazioni → Tema: Scuro*, poi *Come Windows* | Finestra, elenco, menu e dialoghi diventano scuri; con «Come Windows» seguono la modalità app di Windows. |
+| 13 | Riduci a icona RdpManager, passa a un'altra app e premi **Ctrl+Alt+Maiusc+R** | RdpManager torna in primo piano. |
+| 14 | Clic destro sull'icona nell'area di notifica → *Tutte le connessioni* → una connessione | La finestra torna davanti e la sessione si apre. |
+| 15 | Impostazioni: *Chiudendo la finestra resta nell'area di notifica*; chiudi con la X | La finestra sparisce, le sessioni restano connesse; clic sull'icona la riapre; *Esci* dal suo menu chiude davvero. |
+| 16 | Connetti e disconnetti una sessione; *Connessioni → Cronologia* | Righe con inizio, fine, durata e motivo; filtro per connessione; «Svuota quelle mostrate» le toglie. |
+| 17 | *File → Importa dalla cronologia di mstsc* | Elenco dei PC che mstsc ricorda per il tuo utente (quelli già presenti sono senza spunta); importati nella cartella «Importate da mstsc». |
+| 18 | Esporta in `.rdpm` con password del file; importa su un altro PC | Profili e testi rapidi arrivano con le connessioni; le password del profilo solo con la password del file giusta. |
+| 19 | Quando esce la versione successiva: *Aiuto → Controlla aggiornamenti → Aggiorna ora* | Scarica il Setup, dice «verificato (SHA256 …)», chiede conferma, si chiude e l'installer aggiorna l'app tenendo i dati. |
+
 ## Cosa è stato provato e cosa no
 
 - **Provato automaticamente** (`dotnet test`): modello, salvataggio JSON e cifratura DPAPI, file `.rdp`,
@@ -200,16 +260,23 @@ connessioni diverse) e, se possibile, due monitor. Stesse avvertenze: avvisa chi
   monitor per le connessioni che lo chiedono), barra di passaggio, barra laterale fissa e a comparsa
   anche a schermo intero, Preferiti/Recenti, connetti cartella, riconnessione automatica con limite,
   riapertura all'avvio, e **Ctrl+Alt+Destra digitato davvero** (SendInput) con il fuoco nella finestra
-  interna del controllo RDP. Lo stato «connessa» in queste prove è simulato.
+  interna del controllo RDP; 1.2: Panoramica (solo sessioni connesse, la scheda scelta non cambia
+  durante l'aggiornamento delle miniature, clic che porta alla sessione), ricerca rapida con un errore di
+  battitura, vista affiancata senza ricreare i controlli ActiveX, cronologia in `history.json`, tema
+  scuro e ritorno al chiaro, testi rapidi nel menu, credenziali del profilo e del gateway passate alla
+  sessione, menu dell'area di notifica, scorciatoia globale (messaggio WM_HOTKEY) e chiusura nell'area di
+  notifica. Lo stato «connessa» in queste prove è simulato.
 - **Provato con clic e tasti veri** sull'app compilata (ottobre 2026, un monitor, connessioni finte):
   doppio clic sull'elenco, Ctrl+Alt+Invio dentro la sessione, barra in alto dal bordo e clic su una
   sessione, barra laterale a comparsa dal bordo sinistro a schermo intero, impostazioni, modifica.
 - **Provato con un server vero** (un PC Windows della rete locale, ottobre 2026, senza credenziali):
   raggiungibilità, avviso sul certificato, stato e motivo nella scheda.
-- **Non provato** (passi 6-17 della prima prova e tutta la prova 1.1): accesso con password, NLA con
+- **Non provato** (passi 6-17 della prima prova e tutte le prove 1.1 e 1.2): accesso con password, NLA con
   credenziali, adattamento della risoluzione e del DPI con sessione connessa, due monitor veri,
   Ctrl+Alt+Canc, incolla come digitazione, foto, audio/stampanti/microfono, Wake-on-LAN verso un PC
-  vero, «Apri con mstsc» verso un PC reale.
+  vero, «Apri con mstsc» verso un PC reale; per la 1.2: miniature di sessioni davvero connesse, un
+  Remote Desktop Gateway vero, testi rapidi digitati in un PC remoto, aggiornamento con un clic da una
+  release vera (la verifica SHA256 è provata con un server finto).
 
 ## Pubblicare un eseguibile unico
 
@@ -256,7 +323,28 @@ Il risultato è un solo file `RdpManager.exe` in
   parole = tutte devono comparire. Esc svuota la ricerca, Invio/freccia giù passa all'elenco.
 - **Importa file .rdp** (Ctrl+I, menu File): importa uno o più file `.rdp` esistenti nella cartella
   selezionata (indirizzo, porta, utente/dominio, risoluzione, appunti, unità, audio, stampanti,
-  microfono, multimonitor; la password solo se il file l'aveva cifrata per lo stesso utente Windows).
+  microfono, multimonitor, Remote Desktop Gateway; la password solo se il file l'aveva cifrata per lo
+  stesso utente Windows).
+- **Importa dalla cronologia di mstsc** (menu File): elenca i PC che il client Desktop remoto di
+  Windows ricorda per il tuo utente, con l'ultimo nome utente usato, e importa quelli spuntati nella
+  cartella «Importate da mstsc» (senza doppioni). La cronologia si legge dal registro
+  (`HKCU\Software\Microsoft\Terminal Server Client`) **in sola lettura e solo quando lo chiedi**; lì
+  mstsc non tiene password.
+
+### Profili di credenziali e Remote Desktop Gateway
+
+- **Connessioni → Profili di credenziali**: un profilo tiene nome, utente, dominio e password (cifrata
+  con DPAPI come quelle delle connessioni). Nella modifica di una connessione, **Credenziali** sceglie fra
+  «Proprie» (utente, dominio e password della connessione) e un profilo: cambiando il profilo cambiano
+  tutte le connessioni che lo usano. Eliminare un profilo lascia alle connessioni utente e dominio.
+- **Gateway**: *Passa da un Remote Desktop Gateway*, l'host del gateway (anche `host:porta`) e le
+  **credenziali del gateway**: le stesse della connessione oppure un profilo. Vale per la sessione nella
+  scheda, per «Apri con mstsc» e per i file `.rdp` (righe `gatewayhostname`, `gatewayusagemethod`,
+  `promptcredentialonce`), sia in importazione (*File → Importa file .rdp*) sia in esportazione (clic
+  destro su una connessione → *Esporta come file .rdp*, senza password).
+- Nei file `.rdpm` i profili seguono le stesse regole delle password: esclusi, oppure cifrati con la
+  password del file; importando con «Unisci» un profilo già presente (stesso nome, utente e dominio) non
+  si duplica e le connessioni importate usano quello esistente.
 
 ### Esportazione e importazione (.rdpm)
 
@@ -299,6 +387,43 @@ Il risultato è un solo file `RdpManager.exe` in
   - **Chiudi scheda** (Ctrl+F4, clic con il tasto centrale sulla scheda).
 - **Riapri all'avvio** (File → Impostazioni): chiudendo l'app si ricordano le sessioni aperte e al
   prossimo avvio si riaprono, nello stesso ordine.
+- **Testi rapidi** (*Sessione → Testi rapidi*, «Invia» nella barra della sessione, «Testi» nella barra a
+  schermo intero): frammenti salvati (comandi, indirizzi, firme) che un clic digita nella sessione attiva,
+  con gli a capo come Invio. *Gestisci testi rapidi* li crea, modifica e ordina. Sono salvati in chiaro:
+  non usarli per le password.
+- **Cronologia** (*Connessioni → Cronologia*, Ctrl+H, o clic destro su una connessione): per ogni sessione
+  inizio, fine, durata e motivo della disconnessione, con il tempo totale; filtro per connessione e
+  «Svuota quelle mostrate». Si salva in `history.json` (ultime 2000 sessioni) e si può disattivare nelle
+  impostazioni.
+
+### Panoramica, ricerca rapida e vista affiancata
+
+- **Panoramica** (**Ctrl+Alt+G**, *Visualizza → Panoramica*, «Panoramica» nella barra a schermo intero):
+  una griglia con le miniature dal vivo delle sessioni **connesse**, sopra la finestra (anche a schermo
+  intero). La miniatura della sessione visibile si aggiorna di continuo, le altre a turno ogni pochi
+  secondi. Clic su una miniatura, oppure frecce e Invio, oppure il suo numero 1-9: si passa a quella
+  sessione. Esc o di nuovo Ctrl+Alt+G chiude.
+- **Ricerca rapida** (**Ctrl+Alt+Spazio**): si scrive parte del nome, dell'host o dell'etichetta, anche con
+  le lettere a pezzi («srvpr» trova «server-prod») o con un errore di battitura; maiuscole e accenti non
+  contano. Invio passa alla sessione se è già aperta, altrimenti ne apre una nuova; senza testo mostra le
+  sessioni aperte, poi preferiti e recenti.
+- **Vista affiancata** (**Ctrl+Alt+S**, *Visualizza → Vista affiancata* o *Affianca la sessione corrente
+  a ›*): la sessione corrente e un'altra (la connessa successiva) una accanto all'altra nella stessa
+  finestra; il divisore si trascina e la posizione viene ricordata. Ctrl+Alt+Destra/Sinistra passano da
+  una metà all'altra; Ctrl+Alt+S, Ctrl+Alt+1…9 verso una terza sessione o chiudere una delle due
+  tornano alle schede, sempre senza riconnettere.
+
+### Area di notifica, scorciatoia globale e tema
+
+- **Icona nell'area di notifica** (attiva di serie): clic = riporta la finestra; clic destro = menu con
+  sessioni aperte, preferiti, recenti e tutte le connessioni divise per cartella, più la ricerca rapida
+  ed *Esci*. Con *Chiudendo la finestra resta nell'area di notifica* la X nasconde la finestra lasciando
+  le sessioni connesse; *Esci* (menu File o dell'icona) chiude davvero.
+- **Scorciatoia globale** (predefinita **Ctrl+Alt+Maiusc+R**, si cambia o si disattiva in *File →
+  Impostazioni*): richiama RdpManager da qualunque programma (`RegisterHotKey`). Se un altro programma
+  usa già la stessa combinazione l'app lo dice nella barra di stato.
+- **Tema** (*File → Impostazioni → Aspetto*): chiaro, scuro o come Windows (legge, senza modificarla, la
+  modalità app di Windows); vale per finestra, menu, elenco e dialoghi.
 
 ### Schermo intero dell'app e più monitor
 
@@ -336,6 +461,12 @@ Impostazioni* (clic sulla casella, poi la combinazione; serve Ctrl o Alt; Canc l
 | Ctrl+Alt+1 … Ctrl+Alt+9 | prima … nona sessione connessa (come i numeri della barra di passaggio) |
 | Ctrl+Alt+Invio | schermo intero sì/no |
 | Ctrl+Alt+B | mostra/nascondi la barra laterale |
+| Ctrl+Alt+G | Panoramica delle sessioni connesse |
+| Ctrl+Alt+Spazio | ricerca rapida |
+| Ctrl+Alt+S | vista affiancata sì/no |
+
+Fuori dall'app, da qualunque programma: **Ctrl+Alt+Maiusc+R** riporta in primo piano RdpManager
+(scorciatoia globale, si cambia nelle impostazioni).
 
 Funzionano grazie a un hook di tastiera (`WH_KEYBOARD_LL`) che l'app installa **solo mentre è in
 primo piano** e toglie appena si passa a un'altra applicazione; i tasti che non sono scorciatoie
@@ -351,6 +482,7 @@ Nell'app:
 | Ctrl+Shift+F | preferita sì/no |
 | Ctrl+F | ricerca |
 | Ctrl+I | importa file .rdp |
+| Ctrl+H | cronologia delle connessioni |
 | Ctrl+, | impostazioni |
 | Invio | connetti la connessione selezionata |
 | F5 / F11 | riconnetti / schermo intero |
@@ -362,17 +494,23 @@ remoto (così Ctrl+N, F5 ecc. funzionano nelle app remote).
 
 ## Dove sono salvati i dati
 
-- Connessioni, cartelle e impostazioni (scorciatoie, monitor, barra laterale, sessioni da
-  riaprire): `%APPDATA%\RdpManager\connections.json` (menu *File → Apri cartella dei dati*). Un
-  file della 1.0.0 si carica senza perdite: i campi nuovi prendono i valori predefiniti.
+- Connessioni, cartelle, profili di credenziali, testi rapidi e impostazioni (scorciatoie, monitor,
+  barra laterale, tema, sessioni da riaprire): `%APPDATA%\RdpManager\connections.json` (menu *File →
+  Apri cartella dei dati*). Un file della 1.0.0 o della 1.1.0 si carica senza perdite: i campi nuovi
+  prendono i valori predefiniti.
+- Cronologia delle sessioni: `%APPDATA%\RdpManager\history.json` (nomi, host, orari e motivi; niente
+  utenti né password).
   Per provare con un elenco a parte: `RdpManager.exe --dati C:\percorso\prova.json`.
-- Le password **non sono mai scritte in chiaro**: nel JSON c'è solo `protectedPassword`, cifrata
+- Le password (delle connessioni e dei profili) **non sono mai scritte in chiaro**: nel JSON c'è solo `protectedPassword`, cifrata
   con DPAPI (`ProtectedData`, ambito *CurrentUser*). Si può decifrare solo con lo stesso utente
   Windows sullo stesso PC; copiando il file su un altro PC le password andranno reinserite.
 - I file `.rdp` temporanei di *Apri con mstsc* stanno in `%TEMP%\RdpManager` e contengono la
   password solo in forma cifrata DPAPI (`password 51:b:`); le versioni recenti di mstsc possono
   comunque chiederla di nuovo.
-- L'app non modifica il registro di Windows e non salva credenziali di sistema (niente `cmdkey`).
+- L'app non scrive nel registro di Windows e non salva credenziali di sistema (niente `cmdkey`). Lo
+  legge soltanto, in `HKCU`, per il tema «come Windows» e, quando lo chiedi, per la cronologia di mstsc.
+- L'aggiornamento con un clic scarica l'installer in `%TEMP%\RdpManager\aggiornamento`.
+
 
 ## Struttura
 

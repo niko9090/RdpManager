@@ -664,6 +664,33 @@ public sealed partial class MainForm
         }
     }
 
+    // ---------- esportazione di un file .rdp ----------
+
+    /// <summary>
+    /// Salva la connessione come file .rdp per mstsc o altri client (con il gateway e l'utente del profilo, se ci sono).
+    /// Senza password: una password DPAPI nel file varrebbe solo per questo utente Windows.
+    /// </summary>
+    private void ExportRdpFile(RdpConnection c)
+    {
+        var safe = string.Concat(c.DisplayName.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));
+        using var save = new SaveFileDialog
+        {
+            Title = "Esporta come file .rdp", Filter = "Connessioni Desktop remoto (*.rdp)|*.rdp",
+            FileName = safe + ".rdp", DefaultExt = "rdp", AddExtension = true,
+        };
+        if (save.ShowDialog(this) != DialogResult.OK)
+            return;
+        try
+        {
+            RdpFile.Save(save.FileName, _doc.WithResolvedCredentials(c), includePassword: false);
+            ShowNotice($"«{c.DisplayName}» esportata in {Path.GetFileName(save.FileName)} (senza password)");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, "Esportazione non riuscita: " + ex.Message, "Esporta", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
     // ---------- importazione dalla cronologia di mstsc ----------
 
     private void ImportMstscHistory()

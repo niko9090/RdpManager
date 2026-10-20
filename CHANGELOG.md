@@ -1,5 +1,46 @@
 # Novità di RdpManager
 
+## 1.2.0
+
+**Trovare e vedere le sessioni**
+- Panoramica (Ctrl+Alt+G): griglia di miniature dal vivo delle sessioni connesse, anche a schermo
+  intero; clic, Invio o il numero 1-9 per passare alla sessione.
+- Ricerca rapida (Ctrl+Alt+Spazio): ricerca approssimata su nome, host ed etichetta (anche con un
+  errore di battitura); Invio passa alla sessione aperta o ne apre una nuova.
+- Vista affiancata (Ctrl+Alt+S): due sessioni nella stessa finestra con divisione regolabile e
+  ricordata, senza riconnettere.
+
+**Credenziali e accesso**
+- Profili di credenziali condivisi: utente, dominio e password (cifrata DPAPI) salvati una volta e
+  usati da più connessioni, anche per il gateway. Nei file .rdpm seguono le stesse regole delle
+  password: esclusi oppure cifrati con la password del file.
+- Remote Desktop Gateway per connessione (host del gateway, credenziali uguali o da un profilo),
+  anche nei file .rdp importati ed esportati (nuovo: clic destro → Esporta come file .rdp).
+- Importazione della cronologia di mstsc (File → Importa dalla cronologia di mstsc): letta dal
+  registro HKCU in sola lettura e solo quando lo chiedi.
+
+**Lavorare nelle sessioni**
+- Testi rapidi: frammenti salvati che un clic digita nella sessione attiva (menu Sessione, «Invia»,
+  «Testi» a schermo intero).
+- Cronologia delle connessioni (Ctrl+H): inizio, fine, durata e motivo della disconnessione, con
+  filtro per connessione e svuotamento; si può disattivare.
+
+**L'app**
+- Icona nell'area di notifica con il menu delle connessioni; volendo, la X lascia l'app lì.
+- Scorciatoia globale per richiamare l'app da qualunque programma (predefinita Ctrl+Alt+Maiusc+R,
+  RegisterHotKey).
+- Tema chiaro, scuro o come Windows.
+- Aggiornamento con un clic: scarica l'installer dell'ultima release, ne verifica lo SHA256 con
+  SHA256SUMS.txt della release e lo avvia solo dopo la tua conferma; se la verifica fallisce non
+  avvia nulla. Da questa versione ogni release contiene SHA256SUMS.txt.
+- Impostazioni divise in «Generale» e «Scorciatoie».
+
+Un connections.json della 1.0.0 o della 1.1.0 si carica senza perdere nulla.
+
+Da provare a mano con PC veri (vedi «Prova manuale 1.2» nel README): miniature di sessioni davvero
+connesse, un gateway vero, testi rapidi in un PC remoto, aggiornamento con un clic dalla release
+successiva.
+
 ## 1.1.0
 
 Pensata per chi lavora con più PC remoti insieme.
