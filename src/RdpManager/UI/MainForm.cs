@@ -191,9 +191,17 @@ public sealed partial class MainForm : Form
         bar.Items.Add(new ToolStripButton("Modifica", null, (_, _) => EditSelected()) { ToolTipText = "Modifica (Ctrl+E)" });
         bar.Items.Add(new ToolStripButton("Duplica", null, (_, _) => DuplicateSelected()) { ToolTipText = "Duplica (Ctrl+D)" });
         bar.Items.Add(new ToolStripButton("Elimina", null, (_, _) => DeleteSelected()) { ToolTipText = "Elimina (Canc)" });
-        _pinButton.Click += (_, _) => SetSidebarMode(_doc.Settings.SidebarMode == SidebarMode.Pinned ? SidebarMode.AutoHide : SidebarMode.Pinned);
-        bar.Items.Add(_pinButton);
         return bar;
+    }
+
+    /// <summary>Intestazione della barra laterale: titolo e pulsante per fissarla o renderla a comparsa.</summary>
+    private ToolStrip BuildSidebarHeader()
+    {
+        var header = new ToolStrip { GripStyle = ToolStripGripStyle.Hidden, Dock = DockStyle.Top, RenderMode = ToolStripRenderMode.System };
+        header.Items.Add(new ToolStripLabel("Connessioni") { Font = new Font(Font, FontStyle.Bold) });
+        _pinButton.Click += (_, _) => SetSidebarMode(_doc.Settings.SidebarMode == SidebarMode.Pinned ? SidebarMode.AutoHide : SidebarMode.Pinned);
+        header.Items.Add(_pinButton);
+        return header;
     }
 
     private ToolStripMenuItem _miConnect = null!, _miConnectFolder = null!, _miMstsc = null!, _miWake = null!,
@@ -560,7 +568,7 @@ public sealed partial class MainForm : Form
     /// Copia i valori modificati nell'oggetto originale, che le sessioni aperte già referenziano.
     /// Tutte le proprietà scrivibili tranne l'Id: così i campi aggiunti in futuro non vanno persi.
     /// </summary>
-    private static void CopyInto(RdpConnection from, RdpConnection to)
+    internal static void CopyInto(RdpConnection from, RdpConnection to)
     {
         foreach (var p in typeof(RdpConnection).GetProperties())
             if (p.CanRead && p.CanWrite && p.Name != nameof(RdpConnection.Id))

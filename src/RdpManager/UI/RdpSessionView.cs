@@ -115,9 +115,11 @@ public sealed class RdpSessionView : UserControl
     /// <summary>Barra comandi della sessione: nascosta a schermo intero, dove c'è la barra di passaggio.</summary>
     public bool ToolbarVisible
     {
-        get => _bar.Visible;
-        set => _bar.Visible = value;
+        get => _toolbarVisible;
+        set => _bar.Visible = _toolbarVisible = value; // Visible di un controllo nascosto (scheda non scelta) è sempre falso
     }
+
+    private bool _toolbarVisible = true;
 
     public event EventHandler? StateChanged;
     public event EventHandler? CloseRequested;

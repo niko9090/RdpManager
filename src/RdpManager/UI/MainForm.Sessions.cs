@@ -12,7 +12,7 @@ public sealed partial class MainForm
     private readonly Panel _edge = new() { Dock = DockStyle.Left, Width = 6, BackColor = Color.FromArgb(200, 205, 215), Cursor = Cursors.Hand, Visible = false };
     private readonly Panel _content = new() { Dock = DockStyle.Fill };
     private readonly SwitchBar _switchBar = new() { Visible = false };
-    private readonly ToolStripButton _pinButton = new("Fissa") { Alignment = ToolStripItemAlignment.Right, CheckOnClick = false };
+    private readonly ToolStripButton _pinButton = new("A comparsa") { Alignment = ToolStripItemAlignment.Right, CheckOnClick = false };
     private readonly ToolTip _tips = new();
     private readonly System.Windows.Forms.Timer _edgeTimer = new() { Interval = 120 };
     private readonly KeyboardHook _hook;
@@ -36,6 +36,7 @@ public sealed partial class MainForm
         _sidebar.Controls.Add(_tree);
         _sidebar.Controls.Add(BuildTreeToolbar());
         _sidebar.Controls.Add(_search);
+        _sidebar.Controls.Add(BuildSidebarHeader());
 
         _content.Controls.Add(_tabs);
         _content.Controls.Add(_emptyHint);
@@ -163,7 +164,7 @@ public sealed partial class MainForm
     }
 
     /// <summary>Connette tutte le connessioni della cartella (e sottocartelle), ognuna nella sua scheda.</summary>
-    private void ConnectFolder(string folder)
+    internal void ConnectFolder(string folder)
     {
         var list = _doc.ConnectionsInFolder(folder);
         if (list.Count == 0)
@@ -734,7 +735,7 @@ public sealed partial class MainForm
         }
         ResumeLayout();
         LayoutOverlays();
-        _pinButton.Text = pinned ? "Sblocca" : "Fissa";
+        _pinButton.Text = pinned ? "A comparsa" : "Fissa";
         _pinButton.ToolTipText = pinned
             ? "Barra a comparsa: si nasconde e riappare portando il mouse sul bordo sinistro"
             : "Fissa la barra laterale accanto alle sessioni";
