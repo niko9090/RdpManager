@@ -8,7 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>RdpManager</RootNamespace>
     <AssemblyName>RdpManager</AssemblyName>
-    <ApplicationHighDpiMode>SystemAware</ApplicationHighDpiMode>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationVisualStyles>true</ApplicationVisualStyles>
     <Product>RdpManager</Product>
     <!-- Versione dell'app: cambiarla qui prima di creare il tag vX.Y.Z (vedi README, «Aggiornamenti»). -->

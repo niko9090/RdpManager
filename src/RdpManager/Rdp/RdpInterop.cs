@@ -36,7 +36,16 @@ public interface IMsRdpClientNonScriptable3
     // IMsTscNonScriptable (10 slot), IMsRdpClientNonScriptable (2), IMsRdpClientNonScriptable2 (2)
     void Slot03(); void Slot04(); void Slot05(); void Slot06(); void Slot07();
     void Slot08(); void Slot09(); void Slot10(); void Slot11(); void Slot12();
-    void Slot13(); void Slot14(); void Slot15(); void Slot16();
+
+    // IMsRdpClientNonScriptable: NotifyRedirectDeviceChange (13), SendKeys (14).
+    void NotifyRedirectDeviceChange(uint wParam, int lParam);
+    /// <summary>
+    /// Invia alla sessione una sequenza di scan code. <paramref name="keyUp"/> è un VARIANT_BOOL per tasto
+    /// (-1 = rilascio, 0 = pressione): si passa il primo elemento di un array, che resta fissato in memoria.
+    /// </summary>
+    void SendKeys(int numKeys, ref short keyUp, ref int keyData);
+
+    void Slot15(); void Slot16();
 
     void put_ShowRedirectionWarningDialog([MarshalAs(UnmanagedType.VariantBool)] bool value);
     [return: MarshalAs(UnmanagedType.VariantBool)] bool get_ShowRedirectionWarningDialog();
