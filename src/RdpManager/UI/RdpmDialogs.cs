@@ -151,6 +151,7 @@ public sealed class FilePasswordDialog : Form
         CancelButton = cancel;
         Controls.Add(layout);
         Controls.Add(buttons);
+        ThemeManager.Apply(this);
     }
 
     public static string? Ask(IWin32Window owner, string fileName, bool retry)

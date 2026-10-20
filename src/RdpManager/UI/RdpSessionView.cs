@@ -45,10 +45,13 @@ public sealed class RdpSessionView : UserControl
         _sendButton.DropDownItems.Add("Ctrl+Alt+Canc", null, (_, _) => SendCtrlAltDel());
         _sendButton.DropDownItems.Add(new ToolStripSeparator());
         _sendButton.DropDownItems.Add("Foto della sessione", null, (_, _) => SnapshotRequested?.Invoke(this, EventArgs.Empty));
+        _sendButton.DropDownItems.Add(new ToolStripSeparator());
+        _sendButton.DropDownItems.Add(_quickTextsItem);
         _sendButton.DropDownOpening += (_, _) =>
         {
             foreach (ToolStripItem item in _sendButton.DropDownItems)
                 item.Enabled = State == SessionState.Connected;
+            FillQuickTextsMenu(_quickTextsItem);
         };
 
         _bar.Items.Add(_stateLabel);
@@ -78,6 +81,44 @@ public sealed class RdpSessionView : UserControl
     }
 
     public RdpConnection Connection { get; }
+
+    private readonly ToolStripMenuItem _quickTextsItem = new("Testi rapidi");
+
+    /// <summary>
+    /// Connessione con le credenziali effettive (dal profilo, se ne usa uno): la usano il controllo RDP e mstsc.
+    /// Null = la connessione così com'è.
+    /// </summary>
+    public Func<RdpConnection, RdpConnection>? ResolveForConnect { get; set; }
+
+    /// <summary>Credenziali del Remote Desktop Gateway (null = da chiedere o stesse della connessione).</summary>
+    public Func<RdpConnection, ResolvedCredentials?>? ResolveGateway { get; set; }
+
+    /// <summary>Testi rapidi da offrire nel menu «Invia».</summary>
+    public Func<IReadOnlyList<QuickText>>? QuickTexts { get; set; }
+
+    /// <summary>Chiesta la gestione dei testi rapidi (voce «Gestisci…» del menu).</summary>
+    public event EventHandler? ManageQuickTextsRequested;
+
+    private RdpConnection Effective => ResolveForConnect?.Invoke(Connection) ?? Connection;
+
+    /// <summary>Riempie un menu con i testi rapidi: un clic li digita in questa sessione.</summary>
+    internal void FillQuickTextsMenu(ToolStripMenuItem menu)
+    {
+        menu.DropDownItems.Clear();
+        var texts = QuickTexts?.Invoke() ?? [];
+        foreach (var t in texts)
+        {
+            var text = t;
+            var item = new ToolStripMenuItem(t.DisplayName.Replace("&", "&&")) { ToolTipText = QuickText.Preview(t.Text, 120) };
+            item.Click += async (_, _) => await TypeTextAsync(text.TextToType());
+            item.Enabled = State == SessionState.Connected;
+            menu.DropDownItems.Add(item);
+        }
+        if (texts.Count > 0)
+            menu.DropDownItems.Add(new ToolStripSeparator());
+        menu.DropDownItems.Add("Gestisci testi rapidi…", null, (_, _) => ManageQuickTextsRequested?.Invoke(this, EventArgs.Empty));
+        menu.Enabled = true;
+    }
 
     /// <summary>Controllo ActiveX corrente (null prima della connessione); per le prove automatiche.</summary>
     internal RdpClientHost? Client => _rdp;
@@ -221,7 +262,7 @@ public sealed class RdpSessionView : UserControl
 
     public void OpenWithMstsc()
     {
-        try { MstscLauncher.Launch(Connection); }
+        try { MstscLauncher.Launch(Effective); }
         catch (Exception ex) { MessageBox.Show(this, "Impossibile avviare mstsc.exe: " + ex.Message, "RdpManager", MessageBoxButtons.OK, MessageBoxIcon.Error); }
     }
 
@@ -359,6 +400,20 @@ public sealed class RdpSessionView : UserControl
         return bmp;
     }
 
+    /// <summary>
+    /// Copia dallo schermo della zona della sessione (null se non è visibile). La usa la panoramica, che è esclusa
+    /// dalle catture: così si vede la sessione anche se la panoramica le sta sopra.
+    /// </summary>
+    public Bitmap? CaptureFromScreen()
+    {
+        if (_rdp is not { IsHandleCreated: true, Visible: true } rdp || rdp.Width <= 0 || rdp.Height <= 0)
+            return null;
+        var bmp = new Bitmap(rdp.Width, rdp.Height);
+        using var g = Graphics.FromImage(bmp);
+        g.CopyFromScreen(rdp.PointToScreen(Point.Empty), Point.Empty, rdp.Size);
+        return bmp;
+    }
+
     // ---------- connessione ----------
 
     /// <summary>Il controllo ActiveX richiede una finestra visibile: la connessione parte appena c'è.</summary>
@@ -384,7 +439,7 @@ public sealed class RdpSessionView : UserControl
 
     private void ConfigureClient(dynamic ocx)
     {
-        var c = Connection;
+        var c = Effective;
         ocx.Server = c.Host;
         if (!string.IsNullOrEmpty(c.Username))
             ocx.UserName = c.Username;
@@ -428,6 +483,8 @@ public sealed class RdpSessionView : UserControl
             adv8.AuthenticationLevel = 2;      // avvisa se il server non è verificabile
         });
         Try(() => ocx.AdvancedSettings8.AudioCaptureRedirectionMode = c.RedirectMicrophone);
+        if (c.HasGateway)
+            ConfigureGateway(ocx, c);
         if (AllowCredentialPrompt)
         {
             Try(() => _rdp!.NonScriptable?.put_PromptForCredentials(string.IsNullOrEmpty(c.Password)));
@@ -445,6 +502,29 @@ public sealed class RdpSessionView : UserControl
             if (ns5.get_AllowPromptingForCredentials())
                 throw new InvalidOperationException("la richiesta di credenziali risulta ancora permessa");
             PromptForCredentialsDisabledVerified = true;
+        }
+    }
+
+    /// <summary>
+    /// Remote Desktop Gateway: host, uso sempre (TSC_PROXY_MODE_DIRECT) e credenziali. Se il controllo non accetta
+    /// il gateway la connessione non parte (andare diretti al PC remoto non è quello che l'utente ha chiesto).
+    /// </summary>
+    private void ConfigureGateway(dynamic ocx, RdpConnection c)
+    {
+        dynamic ts = ocx.TransportSettings;
+        ts.GatewayHostname = c.GatewayHost.Trim();
+        ts.GatewayUsageMethod = 1u;         // TSC_PROXY_MODE_DIRECT: usa sempre il gateway
+        ts.GatewayProfileUsageMethod = 1u;  // impostazioni esplicite, non quelle predefinite
+        ts.GatewayCredsSource = 0u;         // TSC_PROXY_CREDS_MODE_USERPASS
+        bool same = c.GatewayCredentials == GatewayCredentialsSource.SameAsConnection;
+        Try(() => ocx.TransportSettings2.GatewayCredSharing = same ? 1u : 0u);
+        if (!same && ResolveGateway?.Invoke(Connection) is { } g)
+        {
+            dynamic ts2 = ocx.TransportSettings2;
+            ts2.GatewayUsername = g.Username;
+            ts2.GatewayDomain = g.Domain;
+            if (!string.IsNullOrEmpty(g.Password))
+                ts2.GatewayPassword = g.Password;
         }
     }
 
@@ -524,25 +604,37 @@ public sealed class RdpSessionView : UserControl
 
     private void SetState(SessionState state, string text)
     {
+        if (state == SessionState.Connected)
+            LastDisconnectReason = LastExtendedDisconnectReason = null; // il codice di una disconnessione passata non vale più
         State = state;
         StateText = text;
         // Le descrizioni del controllo possono essere su più righe: nella barra va una riga sola.
         var oneLine = string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
         _stateLabel.Text = $"{Connection.DisplayName} — {(oneLine.Length > 110 ? oneLine[..110] + "…" : oneLine)}";
         _stateLabel.ToolTipText = text;
-        _stateLabel.ForeColor = state switch
-        {
-            SessionState.Connected => Color.DarkGreen,
-            SessionState.Disconnected => Color.Firebrick,
-            SessionState.Connecting => Color.DarkGoldenrod,
-            _ => SystemColors.ControlText,
-        };
+        ApplyStateColor();
         _reconnectButton.Enabled = state != SessionState.Connecting;
         _message.Text = state == SessionState.Disconnected ? text + "\n\nPremi «Riconnetti» (F5) oppure «Apri con mstsc»." : "";
         if (_rdp is not null)
             _rdp.Visible = state != SessionState.Disconnected;
         StateChanged?.Invoke(this, EventArgs.Empty);
     }
+
+    /// <summary>Colore del testo di stato, leggibile nel tema corrente.</summary>
+    private void ApplyStateColor()
+    {
+        bool dark = ThemeManager.Current.IsDark;
+        _stateLabel.ForeColor = State switch
+        {
+            SessionState.Connected => dark ? Color.FromArgb(110, 210, 120) : Color.DarkGreen,
+            SessionState.Disconnected => dark ? Color.FromArgb(240, 120, 110) : Color.Firebrick,
+            SessionState.Connecting => dark ? Color.FromArgb(235, 190, 90) : Color.DarkGoldenrod,
+            _ => ThemeManager.Current.Text,
+        };
+    }
+
+    /// <summary>Dopo un cambio di tema.</summary>
+    internal void RefreshStateColors() => ApplyStateColor();
 
     /// <summary>Parola breve dello stato, la stessa usata in barra laterale e barra di passaggio.</summary>
     public static string StateWord(SessionState state) => state switch

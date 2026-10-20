@@ -54,11 +54,16 @@ public sealed partial class MainForm : Form
 
     public MainForm() : this(new ConnectionStore(), checkUpdatesOnStartup: true, backgroundChecks: true) { }
 
-    /// <summary>Con un archivio diverso da quello predefinito (prove automatiche: niente controlli in rete in background).</summary>
-    internal MainForm(ConnectionStore store, bool checkUpdatesOnStartup = false, bool backgroundChecks = false)
+    /// <summary>
+    /// Con un archivio diverso da quello predefinito (prove automatiche: niente controlli in rete in background).
+    /// <paramref name="systemIntegration"/>: icona nell'area di notifica e scorciatoia globale (predefinito: come
+    /// <paramref name="backgroundChecks"/>, quindi spente nelle prove che non le chiedono).
+    /// </summary>
+    internal MainForm(ConnectionStore store, bool checkUpdatesOnStartup = false, bool backgroundChecks = false, bool? systemIntegration = null)
     {
         _store = store;
         _backgroundChecks = backgroundChecks;
+        _systemIntegration = systemIntegration ?? backgroundChecks;
         Text = DefaultTitle;
         Size = new Size(1400, 900);
         MinimumSize = new Size(800, 500);
@@ -75,7 +80,7 @@ public sealed partial class MainForm : Form
         _statusStrip.Items.Add(_status);
         _statusStrip.Items.Add(_notice);
         _statusStrip.Items.Add(_updateLabel);
-        _updateLabel.Click += (_, _) => { if (_availableUpdate is { } r) OpenUrl(r.PageUrl); };
+        _updateLabel.Click += async (_, _) => { if (_availableUpdate is { } r) await OfferUpdateAsync(r); };
         _noticeTimer.Tick += (_, _) => { _noticeTimer.Stop(); _notice.Visible = false; };
         if (checkUpdatesOnStartup)
             Shown += async (_, _) => await CheckForUpdatesAsync(manual: false);
@@ -90,6 +95,7 @@ public sealed partial class MainForm : Form
         WireEvents();
         LoadConnections();
         ApplySettings();
+        InitV12();
         MstscLauncher.CleanupOldFiles();
 
         Load += (_, _) => PlaceOnPreferredMonitor();
@@ -108,6 +114,7 @@ public sealed partial class MainForm : Form
 
     private ToolStripMenuItem _fullScreenItem = null!, _pinItem = null!, _sidebarItem = null!, _monitorMenu = null!;
     private ToolStripMenuItem _nextSessionItem = null!, _previousSessionItem = null!;
+    private ToolStripMenuItem _overviewItem = null!, _quickSearchItem = null!, _splitItem = null!;
 
     private void BuildMenu()
     {
@@ -118,11 +125,12 @@ public sealed partial class MainForm : Form
         file.DropDownItems.Add(Item("&Importa file .rdp…", Keys.Control | Keys.I, (_, _) => ImportRdpFiles()));
         file.DropDownItems.Add(Item("Importa connessioni (.rdp&m)…", Keys.None, (_, _) => ImportRdpm()));
         file.DropDownItems.Add(Item("&Esporta connessioni (.rdpm)…", Keys.None, (_, _) => ExportRdpm()));
+        file.DropDownItems.Add(Item("Importa dalla cronologia di ms&tsc…", Keys.None, (_, _) => ImportMstscHistory()));
         file.DropDownItems.Add(new ToolStripSeparator());
         file.DropDownItems.Add(Item("Impo&stazioni…", Keys.Control | Keys.Oemcomma, (_, _) => ShowSettings(), "Ctrl+,"));
         file.DropDownItems.Add(Item("Apri &cartella dei dati", Keys.None, (_, _) => OpenDataFolder()));
         file.DropDownItems.Add(new ToolStripSeparator());
-        file.DropDownItems.Add(Item("E&sci", Keys.Alt | Keys.F4, (_, _) => Close()));
+        file.DropDownItems.Add(Item("E&sci", Keys.Alt | Keys.F4, (_, _) => ExitApp()));
 
         var conn = new ToolStripMenuItem("&Connessioni");
         conn.DropDownItems.Add(Item("&Nuova connessione…", Keys.Control | Keys.N, (_, _) => NewConnection()));
@@ -138,6 +146,9 @@ public sealed partial class MainForm : Form
         conn.DropDownItems.Add(Item("&Preferita", Keys.Control | Keys.Shift | Keys.F, (_, _) => ToggleFavorite()));
         conn.DropDownItems.Add(Item("&Verifica raggiungibilità", Keys.None, async (_, _) => await CheckReachabilityAsync(_doc.Connections.ToList(), announce: true)));
         conn.DropDownItems.Add(new ToolStripSeparator());
+        conn.DropDownItems.Add(Item("Pro&fili di credenziali…", Keys.None, (_, _) => ManageProfiles()));
+        conn.DropDownItems.Add(Item("Cronolo&gia…", Keys.Control | Keys.H, (_, _) => ShowHistory(null)));
+        conn.DropDownItems.Add(new ToolStripSeparator());
         conn.DropDownItems.Add(Item("Cerca", Keys.Control | Keys.F, (_, _) => FocusSearch()));
 
         var session = new ToolStripMenuItem("&Sessione");
@@ -148,6 +159,20 @@ public sealed partial class MainForm : Form
         session.DropDownItems.Add(Item("&Incolla appunti come digitazione", Keys.None, async (_, _) => { if (CurrentView is { } v) await v.PasteClipboardAsTypingAsync(); }));
         session.DropDownItems.Add(Item("Invia Ctrl+Alt+&Canc", Keys.None, (_, _) => CurrentView?.SendCtrlAltDel()));
         session.DropDownItems.Add(Item("&Foto della sessione", Keys.None, async (_, _) => { if (CurrentView is { } v) await SaveSnapshotAsync(v); }));
+        var quickTexts = new ToolStripMenuItem("&Testi rapidi");
+        quickTexts.DropDownItems.Add("(caricamento)");
+        quickTexts.DropDownOpening += (_, _) =>
+        {
+            if (CurrentView is { } v)
+            {
+                v.FillQuickTextsMenu(quickTexts);
+                return;
+            }
+            quickTexts.DropDownItems.Clear();
+            quickTexts.DropDownItems.Add(new ToolStripMenuItem("(nessuna sessione aperta)") { Enabled = false });
+            quickTexts.DropDownItems.Add("Gestisci testi rapidi…", null, (_, _) => ManageQuickTexts());
+        };
+        session.DropDownItems.Add(quickTexts);
         session.DropDownItems.Add(new ToolStripSeparator());
         session.DropDownItems.Add(Item("C&hiudi scheda", Keys.Control | Keys.F4, (_, _) => { if (CurrentView is { } v) CloseSession(v); }));
         session.DropDownItems.Add(new ToolStripSeparator());
@@ -165,7 +190,17 @@ public sealed partial class MainForm : Form
         _monitorMenu = new ToolStripMenuItem("M&onitor per lo schermo intero");
         _monitorMenu.DropDownOpening += (_, _) => FillMonitorMenu();
         _monitorMenu.DropDownItems.Add("(caricamento)");
+        _overviewItem = Item("&Panoramica delle sessioni", Keys.None, (_, _) => ToggleOverview());
+        _quickSearchItem = Item("&Ricerca rapida…", Keys.None, (_, _) => ShowQuickSearch());
+        _splitItem = Item("Vista &affiancata", Keys.None, (_, _) => ToggleSplitView());
+        var splitWith = new ToolStripMenuItem("Affianca la sessione corrente a");
+        splitWith.DropDownItems.Add("(caricamento)");
+        splitWith.DropDownOpening += (_, _) => FillSplitMenu(splitWith);
         view.DropDownItems.Add(_fullScreenItem);
+        view.DropDownItems.Add(_overviewItem);
+        view.DropDownItems.Add(_quickSearchItem);
+        view.DropDownItems.Add(_splitItem);
+        view.DropDownItems.Add(splitWith);
         view.DropDownItems.Add(new ToolStripSeparator());
         view.DropDownItems.Add(_sidebarItem);
         view.DropDownItems.Add(_pinItem);
@@ -205,7 +240,7 @@ public sealed partial class MainForm : Form
     }
 
     private ToolStripMenuItem _miConnect = null!, _miConnectFolder = null!, _miMstsc = null!, _miWake = null!,
-        _miCheck = null!, _miFavorite = null!, _miEdit = null!, _miDuplicate = null!, _miDelete = null!;
+        _miCheck = null!, _miFavorite = null!, _miEdit = null!, _miDuplicate = null!, _miDelete = null!, _miHistory = null!;
 
     private void BuildContextMenus()
     {
@@ -226,6 +261,7 @@ public sealed partial class MainForm : Form
         });
         _treeMenu.Items.Add(new ToolStripSeparator());
         _miFavorite = Add("Preferita ★", (_, _) => ToggleFavorite());
+        _miHistory = Add("Cronologia…", (_, _) => { if (SelectedConnection is { } c) ShowHistory(c.Id); });
         _treeMenu.Items.Add(new ToolStripSeparator());
         Add("Nuova connessione…", (_, _) => NewConnection());
         Add("Nuova cartella…", (_, _) => NewFolder());
@@ -237,7 +273,7 @@ public sealed partial class MainForm : Form
             var c = SelectedConnection;
             bool isConn = c is not null;
             bool isFolder = _tree.SelectedNode?.Tag is FolderTag;
-            _miConnect.Enabled = _miMstsc.Enabled = _miDuplicate.Enabled = _miFavorite.Enabled = isConn;
+            _miConnect.Enabled = _miMstsc.Enabled = _miDuplicate.Enabled = _miFavorite.Enabled = _miHistory.Enabled = isConn;
             _miWake.Enabled = c is not null && WakeOnLan.IsValidMac(c.MacAddress);
             _miWake.ToolTipText = _miWake.Enabled ? null : "Indica il MAC nella modifica della connessione";
             _miConnectFolder.Visible = isFolder;
@@ -251,6 +287,8 @@ public sealed partial class MainForm : Form
         _tabMenu.Items.Add("Schermo intero", null, (_, _) => ToggleFullScreen());
         _tabMenu.Items.Add("Stacca in una finestra", null, (_, _) => { if (CurrentView is { } v) ToggleDetach(v); });
         _tabMenu.Items.Add("Apri con mstsc", null, (_, _) => CurrentView?.OpenWithMstsc());
+        _tabMenu.Items.Add("Vista affiancata", null, (_, _) => ToggleSplitView());
+        _tabMenu.Items.Add("Cronologia…", null, (_, _) => { if (CurrentView is { } v) ShowHistory(v.Connection.Id); });
         _tabMenu.Items.Add(new ToolStripSeparator());
         _tabMenu.Items.Add("Chiudi scheda", null, (_, _) => { if (CurrentView is { } v) CloseSession(v); });
     }
@@ -297,6 +335,8 @@ public sealed partial class MainForm : Form
 
         _tabs.SelectedIndexChanged += (_, _) =>
         {
+            if (_silentTabSwitch)
+                return;
             UpdateStatus();
             if (_fullScreen)
                 UpdateFullScreenBounds();
@@ -478,8 +518,12 @@ public sealed partial class MainForm : Form
         var (word, dot, filled) = NodeState(c);
         node.ImageKey = node.SelectedImageKey = ComputerIcon(ConnectionDialog.ToColor(c.Color), dot, filled);
         var tip = $"{RdpFile.FormatAddress(c.Host, c.Port)} — {word}";
-        if (c.Username.Length > 0)
-            tip += $"\nUtente: {(c.Domain.Length > 0 ? c.Domain + "\\" : "")}{c.Username}";
+        var creds = _doc.ResolveCredentials(c);
+        if (creds.Username.Length > 0)
+            tip += $"\nUtente: {(creds.Domain.Length > 0 ? creds.Domain + "\\" : "")}{creds.Username}" +
+                   (_doc.FindProfile(creds.ProfileId) is { } profile ? $" (profilo «{profile.Name}»)" : "");
+        if (c.HasGateway)
+            tip += $"\nGateway: {c.GatewayHost}";
         if (c.LastConnectedUtc is { } last)
             tip += $"\nUltima connessione: {last.ToLocalTime():g}";
         node.ToolTipText = tip;
@@ -531,7 +575,8 @@ public sealed partial class MainForm : Form
     private void NewConnection()
     {
         var c = new RdpConnection { Group = SelectedFolderPath };
-        using var dlg = new ConnectionDialog(c, _doc.AllGroups(), "Nuova connessione");
+        using var dlg = new ConnectionDialog(c, _doc.AllGroups(), "Nuova connessione", _doc.CredentialProfiles);
+        ThemeManager.Apply(dlg);
         if (dlg.ShowDialog(this) != DialogResult.OK)
             return;
         _doc.Connections.Add(c);
@@ -553,8 +598,9 @@ public sealed partial class MainForm : Form
     private void EditConnection(RdpConnection c)
     {
         var edited = c.Clone();
-        using (var dlg = new ConnectionDialog(edited, _doc.AllGroups(), $"Modifica: {c.DisplayName}"))
+        using (var dlg = new ConnectionDialog(edited, _doc.AllGroups(), $"Modifica: {c.DisplayName}", _doc.CredentialProfiles))
         {
+            ThemeManager.Apply(dlg);
             if (dlg.ShowDialog(this) != DialogResult.OK)
                 return;
         }
@@ -695,6 +741,7 @@ public sealed partial class MainForm : Form
         string? password;
         using (var options = new RdpmExportDialog(_doc.Connections.Count))
         {
+            ThemeManager.Apply(options);
             if (options.ShowDialog(this) != DialogResult.OK)
                 return;
             password = options.FilePassword;
@@ -709,7 +756,7 @@ public sealed partial class MainForm : Form
         try
         {
             Cursor = Cursors.WaitCursor;
-            RdpmFile.Save(save.FileName, _doc.Connections, _doc.AllGroups(), password);
+            RdpmFile.Save(save.FileName, _doc, password);
         }
         catch (Exception ex)
         {
@@ -720,8 +767,10 @@ public sealed partial class MainForm : Form
         {
             Cursor = Cursors.Default;
         }
-        int withPassword = password is null ? 0 : _doc.Connections.Count(c => !string.IsNullOrEmpty(c.Password));
-        ShowNotice($"Esportate {_doc.Connections.Count} connessioni in {Path.GetFileName(save.FileName)}" +
+        int withPassword = password is null ? 0
+            : _doc.Connections.Count(c => !string.IsNullOrEmpty(c.Password)) + _doc.CredentialProfiles.Count(p => !string.IsNullOrEmpty(p.Password));
+        var profiles = _doc.CredentialProfiles.Count > 0 ? $", {_doc.CredentialProfiles.Count} profili" : "";
+        ShowNotice($"Esportate {_doc.Connections.Count} connessioni{profiles} in {Path.GetFileName(save.FileName)}" +
                    (password is null ? " (senza password)" : $" ({withPassword} password cifrate)"));
     }
 
@@ -768,8 +817,10 @@ public sealed partial class MainForm : Form
         }
 
         ImportMode mode;
-        using (var dlg = new RdpmImportDialog(imported.Connections.Count, _doc.Connections.Count, imported.Connections.Any(c => c.HasPassword)))
+        using (var dlg = new RdpmImportDialog(imported.Connections.Count, _doc.Connections.Count,
+                   imported.Connections.Any(c => c.HasPassword) || imported.CredentialProfiles.Any(p => p.HasPassword)))
         {
+            ThemeManager.Apply(dlg);
             if (dlg.ShowDialog(this) != DialogResult.OK)
                 return;
             mode = dlg.Mode;
@@ -782,6 +833,10 @@ public sealed partial class MainForm : Form
             text += $", {result.Skipped} già presenti";
         if (result.Removed > 0)
             text += $", {result.Removed} sostituite";
+        if (result.ProfilesAdded > 0)
+            text += $", {result.ProfilesAdded} profili di credenziali";
+        if (result.QuickTextsAdded > 0)
+            text += $", {result.QuickTextsAdded} testi rapidi";
         MessageBox.Show(this, text + ".", "Importa", MessageBoxButtons.OK, MessageBoxIcon.Information);
         if (_backgroundChecks)
             _ = CheckReachabilityAsync(_doc.Connections.ToList());
@@ -887,7 +942,9 @@ public sealed partial class MainForm : Form
         var map = _shortcuts;
         _emptyHint.Text = "Nessuna sessione aperta.\n\nFai doppio clic su una connessione nella barra laterale (o premi Invio) per aprirla in una scheda.\n" +
                           $"Ctrl+N nuova connessione · Ctrl+Tab cambia scheda · {map[ShortcutAction.ToggleFullScreen]} schermo intero · " +
-                          $"{map[ShortcutAction.ToggleSidebar]} barra laterale";
+                          $"{map[ShortcutAction.ToggleSidebar]} barra laterale\n" +
+                          $"{map[ShortcutAction.QuickSearch]} ricerca rapida · {map[ShortcutAction.Overview]} panoramica · " +
+                          $"{map[ShortcutAction.ToggleSplitView]} vista affiancata";
     }
 
     private void ShowShortcutHelp()
@@ -913,7 +970,8 @@ public sealed partial class MainForm : Form
         if (result is { Status: UpdateCheckStatus.NewerAvailable, Release: { } release })
         {
             _availableUpdate = release;
-            _updateLabel.Text = $"È disponibile la versione {release.Version.ToString(3)} — clic per aprire la pagina";
+            _updateLabel.Text = $"È disponibile la versione {release.Version.ToString(3)} — clic per aggiornare";
+
             _updateLabel.ToolTipText = release.PageUrl;
             _updateLabel.Visible = true;
         }
@@ -922,9 +980,7 @@ public sealed partial class MainForm : Form
         switch (result.Status)
         {
             case UpdateCheckStatus.NewerAvailable:
-                if (MessageBox.Show(this, $"È disponibile RdpManager {result.Release!.Version.ToString(3)} (in uso: {AppInfo.VersionText}).\n\nAprire la pagina della release per scaricare il Setup?",
-                        "Aggiornamenti", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
-                    OpenUrl(result.Release.PageUrl);
+                await OfferUpdateAsync(result.Release!);
                 break;
             case UpdateCheckStatus.UpToDate:
                 MessageBox.Show(this, $"RdpManager {AppInfo.VersionText} è la versione più recente.", "Aggiornamenti",

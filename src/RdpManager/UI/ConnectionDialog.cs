@@ -33,6 +33,11 @@ public sealed class ConnectionDialog : Form
     private readonly Panel _colorSwatch = new() { Size = new Size(22, 22), BorderStyle = BorderStyle.FixedSingle, Margin = new Padding(3, 4, 3, 3) };
     private readonly TextBox _mac = new() { Width = 160, PlaceholderText = "AA:BB:CC:DD:EE:FF" };
     private readonly ToolTip _tips = new() { AutoPopDelay = 15000 };
+    private readonly ComboBox _credentials = new() { Width = 280, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly CheckBox _useGateway = new() { Text = "Passa da un Remote Desktop Gateway", AutoSize = true };
+    private readonly TextBox _gatewayHost = new() { Width = 280, PlaceholderText = "gateway.azienda.it (o host:porta)" };
+    private readonly ComboBox _gatewayCredentials = new() { Width = 280, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly IReadOnlyList<CredentialProfile> _profiles;
     private string? _chosenColor;
     private readonly string? _originalPassword;
 
@@ -43,9 +48,11 @@ public sealed class ConnectionDialog : Form
         (AudioMode.None, "Nessun audio"),
     ];
 
-    public ConnectionDialog(RdpConnection target, IEnumerable<string> groups, string title)
+    public ConnectionDialog(RdpConnection target, IEnumerable<string> groups, string title,
+        IReadOnlyList<CredentialProfile>? profiles = null)
     {
         _target = target;
+        _profiles = (profiles ?? []).OrderBy(p => p.DisplayName, StringComparer.CurrentCultureIgnoreCase).ToList();
         Text = title;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = MinimizeBox = false;
@@ -71,6 +78,7 @@ public sealed class ConnectionDialog : Form
         Row("Nome", _name);
         Row("Host", _host);
         Row("Porta", _port);
+        Row("Credenziali", Flow(_credentials, Help("«Proprie» usa utente, dominio e password qui sotto. Un profilo (menu Connessioni › Profili di credenziali) li prende da lì: cambiando il profilo cambiano tutte le connessioni che lo usano.")));
         Row("Utente", _user);
         Row("Dominio", _domain);
         Row("Password", Flow(_password, _showPassword));
@@ -80,6 +88,9 @@ public sealed class ConnectionDialog : Form
             Text = "Facoltativa. Viene salvata cifrata (DPAPI, solo per il tuo utente Windows).",
             AutoSize = true, ForeColor = SystemColors.GrayText, MaximumSize = new Size(300, 0),
         });
+        Row("Gateway", Flow(_useGateway, Help("Remote Desktop Gateway (RD Gateway): il PC remoto si raggiunge attraverso questo server, di solito da fuori dall'ufficio. Si salva anche nei file .rdp esportati.")));
+        Row("", _gatewayHost);
+        Row("Credenziali gateway", _gatewayCredentials);
         Row("Cartella", _group);
         Row("Risoluzione", Flow(_fit, _fixed, _width, new Label { Text = "×", AutoSize = true, Margin = new Padding(0, 6, 0, 0) }, _height));
         Row("Risorse", Flow(_clipboard, _drives, _printers, _microphone));
@@ -124,6 +135,23 @@ public sealed class ConnectionDialog : Form
         _password.Text = _originalPassword;
         if (target.Password is null && !string.IsNullOrEmpty(target.ProtectedPassword))
             _password.PlaceholderText = "(password salvata non leggibile da questo utente)";
+        _credentials.Items.Add("Proprie (qui sotto)");
+        _gatewayCredentials.Items.Add("Le stesse della connessione");
+        foreach (var p in _profiles)
+        {
+            _credentials.Items.Add("Profilo: " + p.DisplayName);
+            _gatewayCredentials.Items.Add("Profilo: " + p.DisplayName);
+        }
+        _credentials.SelectedIndex = 1 + IndexOfProfile(target.CredentialProfileId);
+        _credentials.SelectedIndexChanged += (_, _) => UpdateCredentialFields();
+        UpdateCredentialFields();
+        _useGateway.Checked = target.UseGateway;
+        _gatewayHost.Text = target.GatewayHost;
+        _gatewayCredentials.SelectedIndex = target.GatewayCredentials == GatewayCredentialsSource.Profile
+            ? 1 + IndexOfProfile(target.GatewayProfileId)
+            : 0;
+        _useGateway.CheckedChanged += (_, _) => UpdateGatewayFields();
+        UpdateGatewayFields();
         _group.Text = target.Group;
         _fit.Checked = target.ResolutionMode == ResolutionMode.FitToWindow;
         _fixed.Checked = !_fit.Checked;
@@ -144,6 +172,33 @@ public sealed class ConnectionDialog : Form
         _mac.Text = target.MacAddress;
         SetColor(target.Color);
     }
+
+    /// <summary>Posizione del profilo nell'elenco ordinato, -1 se assente.</summary>
+    private int IndexOfProfile(Guid? id) => id is Guid g ? _profiles.ToList().FindIndex(p => p.Id == g) : -1;
+
+    private CredentialProfile? ChosenProfile =>
+        _credentials.SelectedIndex > 0 ? _profiles[_credentials.SelectedIndex - 1] : null;
+
+    private void UpdateCredentialFields()
+    {
+        bool own = ChosenProfile is null;
+        _user.Enabled = _domain.Enabled = _password.Enabled = _showPassword.Enabled = own;
+        if (ChosenProfile is { } p)
+        {
+            _user.PlaceholderText = p.Username;
+            _domain.PlaceholderText = p.Domain;
+            _password.PlaceholderText = p.HasPassword ? "(dal profilo)" : "(il profilo non ha password)";
+        }
+        else
+        {
+            _user.PlaceholderText = _domain.PlaceholderText = "";
+            _password.PlaceholderText = _target.Password is null && !string.IsNullOrEmpty(_target.ProtectedPassword)
+                ? "(password salvata non leggibile da questo utente)" : "";
+        }
+    }
+
+    private void UpdateGatewayFields() =>
+        _gatewayHost.Enabled = _gatewayCredentials.Enabled = _useGateway.Checked;
 
     /// <summary>Un «?» con la spiegazione nel suggerimento (e in un messaggio al clic).</summary>
     private Label Help(string text)
@@ -176,6 +231,15 @@ public sealed class ConnectionDialog : Form
             MessageBox.Show(this, "Indica l'host (nome o indirizzo del PC remoto).", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
             DialogResult = DialogResult.None;
             _host.Focus();
+            return;
+        }
+
+        if (_useGateway.Checked && _gatewayHost.Text.Trim().Length == 0)
+        {
+            MessageBox.Show(this, "Indica l'host del gateway, oppure togli la spunta «Passa da un Remote Desktop Gateway».", Text,
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            DialogResult = DialogResult.None;
+            _gatewayHost.Focus();
             return;
         }
 
@@ -215,5 +279,19 @@ public sealed class ConnectionDialog : Form
         _target.Label = _label.Text.Trim();
         _target.Color = _chosenColor;
         _target.MacAddress = mac;
+        _target.CredentialProfileId = ChosenProfile?.Id;
+        _target.UseGateway = _useGateway.Checked;
+        _target.GatewayHost = _gatewayHost.Text.Trim();
+        if (_gatewayCredentials.SelectedIndex > 0)
+        {
+            _target.GatewayCredentials = GatewayCredentialsSource.Profile;
+            _target.GatewayProfileId = _profiles[_gatewayCredentials.SelectedIndex - 1].Id;
+        }
+        else
+        {
+            _target.GatewayCredentials = GatewayCredentialsSource.SameAsConnection;
+            _target.GatewayProfileId = null;
+        }
+
     }
 }

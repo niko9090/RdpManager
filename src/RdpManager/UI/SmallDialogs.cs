@@ -31,6 +31,7 @@ public sealed class TextPromptDialog : Form
         AcceptButton = ok;
         CancelButton = cancel;
         _text.Text = initial;
+        ThemeManager.Apply(this);
     }
 
     public static string? Ask(IWin32Window owner, string title, string label, string initial = "")

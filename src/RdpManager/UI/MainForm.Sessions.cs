@@ -66,6 +66,9 @@ public sealed partial class MainForm
         _sidebarItem.ShortcutKeyDisplayString = _shortcuts[ShortcutAction.ToggleSidebar].ToString();
         _nextSessionItem.ShortcutKeyDisplayString = _shortcuts[ShortcutAction.NextSession].ToString();
         _previousSessionItem.ShortcutKeyDisplayString = _shortcuts[ShortcutAction.PreviousSession].ToString();
+        _overviewItem.ShortcutKeyDisplayString = _shortcuts[ShortcutAction.Overview].ToString();
+        _quickSearchItem.ShortcutKeyDisplayString = _shortcuts[ShortcutAction.QuickSearch].ToString();
+        _splitItem.ShortcutKeyDisplayString = _shortcuts[ShortcutAction.ToggleSplitView].ToString();
         UpdateEmptyHint();
         ApplySidebarLayout();
         if (_fullScreen)
@@ -74,33 +77,39 @@ public sealed partial class MainForm
 
     private void ShowSettings()
     {
-        var copy = new AppSettings
-        {
-            PreferredMonitor = _doc.Settings.PreferredMonitor,
-            SidebarMode = _doc.Settings.SidebarMode,
-            ReopenSessionsOnStartup = _doc.Settings.ReopenSessionsOnStartup,
-            OpenSessions = _doc.Settings.OpenSessions,
-            Shortcuts = new Dictionary<string, string>(_doc.Settings.Shortcuts),
-        };
-        _hook.Suspended = true; // le combinazioni premute nella finestra servono a registrare le scorciatoie
+        var copy = _doc.Settings.Clone();
+        // Le combinazioni premute nella finestra servono a registrare le scorciatoie (anche quella globale).
+        _hook.Suspended = true;
+        UnregisterGlobalHotkey();
+        bool ok;
         try
         {
             using var dlg = new SettingsDialog(copy);
-            if (dlg.ShowDialog(this) != DialogResult.OK)
-                return;
+            ok = dlg.ShowDialog(this) == DialogResult.OK;
         }
         finally
         {
             _hook.Suspended = false;
         }
+        if (!ok)
+        {
+            RegisterGlobalHotkey();
+            return;
+        }
         _doc.Settings = copy;
         SaveConnections();
         ApplySettings();
+        ApplyTheme();
+        ApplySystemIntegration();
     }
 
     // ---------- sessioni ----------
 
-    internal RdpSessionView? CurrentView => _tabs.SelectedTab?.Tag as RdpSessionView;
+    /// <summary>Sessione su cui agiscono menu e scorciatoie: quella della scheda scelta, o nella vista affiancata quella col fuoco.</summary>
+    internal RdpSessionView? CurrentView =>
+        _splitLeft is { } left && _splitRight is { } right
+            ? (right.ContainsFocus ? right : left)
+            : _tabs.SelectedTab?.Tag as RdpSessionView;
 
     internal IEnumerable<RdpSessionView> AllViews =>
         _tabs.TabPages.Cast<TabPage>().Select(p => (RdpSessionView)p.Tag!).Concat(_detached.Select(d => d.View));
@@ -137,6 +146,10 @@ public sealed partial class MainForm
         view.FullScreenRequested += (_, _) => { if (!view.IsDetached) ToggleFullScreen(); };
         view.SnapshotRequested += async (_, _) => await SaveSnapshotAsync(view);
         view.AttentionRequired += (_, _) => BringSessionToFront(view);
+        view.ResolveForConnect = connection => _doc.WithResolvedCredentials(connection);
+        view.ResolveGateway = connection => _doc.ResolveGatewayCredentials(connection);
+        view.QuickTexts = () => _doc.QuickTexts;
+        view.ManageQuickTextsRequested += (_, _) => ManageQuickTexts();
         ConfigureNewSession?.Invoke(view);
         AddTab(view);
         view.Connect();
@@ -144,6 +157,7 @@ public sealed partial class MainForm
 
     private void OnSessionStateChanged(RdpSessionView view, SessionState previous)
     {
+        RecordHistory(view, previous);
         UpdateSessionTab(view);
         if (view.State == SessionState.Connected && previous != SessionState.Connected)
         {
@@ -184,7 +198,9 @@ public sealed partial class MainForm
             _detached.First(d => d.View == view).Activate();
             return;
         }
-        if (view.Parent is TabPage page)
+        if (IsSplit && !IsSplitView(view))
+            LeaveSplit();
+        if (!IsSplit && PageOf(view) is { } page)
             _tabs.SelectedTab = page;
         if (Form.ActiveForm != this)
             Activate();
@@ -196,6 +212,7 @@ public sealed partial class MainForm
         var page = new TabPage { Tag = view };
         page.Controls.Add(view);
         view.ToolbarVisible = !_fullScreen;
+        ThemeManager.Apply(view);
         _tabs.TabPages.Add(page);
         _tabs.Visible = true;
         _emptyHint.Visible = false;
@@ -216,7 +233,7 @@ public sealed partial class MainForm
         }
         else
         {
-            if (view.Parent is TabPage page)
+            if (!IsSplitView(view) && PageOf(view) is { } page)
                 _tabs.SelectedTab = page;
             host = this;
         }
@@ -225,7 +242,7 @@ public sealed partial class MainForm
 
     private void UpdateSessionTab(RdpSessionView view)
     {
-        if (view.Parent is TabPage page)
+        if (PageOf(view) is { } page)
         {
             var c = view.Connection;
             page.Text = c.DisplayName + (c.Label.Length > 0 ? $" [{c.Label}]" : "") + "   ";
@@ -250,6 +267,9 @@ public sealed partial class MainForm
                 MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
             return;
 
+        if (IsSplitView(view))
+            LeaveSplit();
+        EndHistory(view, "Sessione chiusa in RdpManager");
         if (view.IsDetached)
         {
             var form = _detached.First(d => d.View == view);
@@ -280,6 +300,8 @@ public sealed partial class MainForm
             ReattachFromForm(_detached.First(d => d.View == view), closeForm: true);
             return;
         }
+        if (IsSplitView(view))
+            LeaveSplit();
         if (view.Parent is not TabPage page)
             return;
         page.Controls.Remove(view);
@@ -290,6 +312,7 @@ public sealed partial class MainForm
         view.SetDetached(true);
         view.ToolbarVisible = true;
         var form = new DetachedSessionForm(view, Icon);
+        ThemeManager.Apply(form);
         form.FormClosing += (_, e) =>
         {
             // Chiudere la finestra separata riporta la sessione in una scheda (non la disconnette).
@@ -328,7 +351,7 @@ public sealed partial class MainForm
 
     private void LaunchMstsc(RdpConnection c)
     {
-        try { MstscLauncher.Launch(c); }
+        try { MstscLauncher.Launch(_doc.WithResolvedCredentials(c)); }
         catch (Exception ex) { MessageBox.Show(this, "Impossibile avviare mstsc.exe: " + ex.Message, "RdpManager", MessageBoxButtons.OK, MessageBoxIcon.Error); }
     }
 
@@ -372,6 +395,8 @@ public sealed partial class MainForm
 
     private void OnFormClosing(object? sender, FormClosingEventArgs e)
     {
+        if (HideToTrayInsteadOfClosing(e))
+            return;
         var views = AllViews.ToList();
         int connected = views.Count(v => v.State == SessionState.Connected);
         if (connected > 0 && e.CloseReason == CloseReason.UserClosing &&
@@ -379,8 +404,12 @@ public sealed partial class MainForm
                 MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
         {
             e.Cancel = true;
+            _pendingInstaller = null;
             return;
         }
+        Overview?.Close();
+        foreach (var v in views)
+            EndHistory(v, "Uscita da RdpManager");
         // Si ricordano le sessioni aperte (nell'ordine delle schede) per riaprirle al prossimo avvio.
         var open = _doc.Settings.ReopenSessionsOnStartup ? views.Select(v => v.Connection.Id).ToList() : [];
         if (!open.SequenceEqual(_doc.Settings.OpenSessions))
@@ -452,6 +481,8 @@ public sealed partial class MainForm
     internal void ExecuteShortcut(ShortcutAction action)
     {
         ShortcutsExecuted++;
+        if (action != ShortcutAction.Overview)
+            Overview?.Close();
         switch (action)
         {
             case ShortcutAction.ToggleFullScreen:
@@ -459,6 +490,21 @@ public sealed partial class MainForm
                 return;
             case ShortcutAction.ToggleSidebar:
                 ToggleSidebar();
+                return;
+            case ShortcutAction.Overview:
+                ToggleOverview();
+                return;
+            case ShortcutAction.QuickSearch:
+                ShowQuickSearch();
+                return;
+            case ShortcutAction.ToggleSplitView:
+                ToggleSplitView();
+                return;
+            case ShortcutAction.NextSession or ShortcutAction.PreviousSession when IsSplit:
+                // Nella vista affiancata si passa da una metà all'altra.
+                var other = CurrentView == _splitLeft ? _splitRight : _splitLeft;
+                if (other is not null)
+                    BeginInvoke(other.FocusSession);
                 return;
         }
         var views = TabViews;
@@ -497,6 +543,12 @@ public sealed partial class MainForm
                 TryInstallHook();
             else
                 _hook.Uninstall();
+        }
+        // Scorciatoia globale (RegisterHotKey): riporta l'app in primo piano da qualunque programma.
+        if (m.Msg == NativeMethods.WM_HOTKEY && m.WParam == (IntPtr)HotkeyId)
+        {
+            RestoreFromTray();
+            return;
         }
         base.WndProc(ref m);
     }
@@ -626,7 +678,11 @@ public sealed partial class MainForm
         }));
         var commands = new List<(string, string, Action)>
         {
+            ("Panoramica", $"Miniature delle sessioni connesse ({_shortcuts[ShortcutAction.Overview]})", ToggleOverview),
+            ("Cerca", $"Ricerca rapida ({_shortcuts[ShortcutAction.QuickSearch]})", ShowQuickSearch),
+            ("Testi", "Testi rapidi da digitare nella sessione", ShowQuickTextsMenuAtCursor),
             ("Ctrl+Alt+Canc", "Invia Ctrl+Alt+Canc alla sessione", () => CurrentView?.SendCtrlAltDel()),
+
             ("Foto", "Foto della sessione (Immagini\\RdpManager)", async () => { if (CurrentView is { } v) await SaveSnapshotAsync(v); }),
             ("Barra laterale", $"Mostra/nascondi la barra laterale ({_shortcuts[ShortcutAction.ToggleSidebar]})", ToggleSidebar),
         };

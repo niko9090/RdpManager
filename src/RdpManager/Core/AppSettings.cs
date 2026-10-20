@@ -61,6 +61,15 @@ public sealed class AppSettings
 
     public ShortcutMap GetShortcuts() => ShortcutMap.FromSettings(Shortcuts);
 
+    /// <summary>Copia indipendente (elenchi compresi), per i dialoghi che si possono annullare.</summary>
+    public AppSettings Clone()
+    {
+        var copy = (AppSettings)MemberwiseClone();
+        copy.OpenSessions = [.. OpenSessions ?? []];
+        copy.Shortcuts = new Dictionary<string, string>(Shortcuts ?? []);
+        return copy;
+    }
+
     public void SetShortcuts(ShortcutMap map) => Shortcuts = map.ToSettings();
 
     /// <summary>Ripara i valori mancanti o non validi dopo il caricamento.</summary>
