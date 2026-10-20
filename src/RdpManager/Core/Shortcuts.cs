@@ -137,6 +137,17 @@ public readonly record struct KeyCombo(bool Ctrl, bool Alt, bool Shift, Keys Key
             key = Keys.F1 + (f - 1);
             return true;
         }
+        // Ripiego sui nomi dell'enum, gli stessi che KeyName produce per i tasti senza nome italiano
+        // (es. "OemPeriod", "Oem3", "Multiply"): solo nomi di un singolo tasto, non numeri né modificatori.
+        if (char.IsAsciiLetter(token[0]) && !token.Contains(',')
+            && Enum.TryParse<Keys>(token, ignoreCase: true, out var named)
+            && Enum.IsDefined(named) && (named & ~Keys.KeyCode) == 0 && named != Keys.None
+            && named is not (Keys.ControlKey or Keys.LControlKey or Keys.RControlKey or Keys.Menu or Keys.LMenu
+                or Keys.RMenu or Keys.ShiftKey or Keys.LShiftKey or Keys.RShiftKey or Keys.LWin or Keys.RWin))
+        {
+            key = named;
+            return true;
+        }
         return false;
     }
 

@@ -104,6 +104,33 @@ public class ShortcutTests
         Assert.Equal(ShortcutMap.Defaults[ShortcutAction.Session1], loaded[ShortcutAction.Session1]);
     }
 
+    [Theory]
+    [InlineData(Keys.OemPeriod)]
+    [InlineData(Keys.Oem3)]
+    [InlineData(Keys.OemMinus)]
+    [InlineData(Keys.Multiply)]
+    [InlineData(Keys.NumPad5)]
+    [InlineData(Keys.PageDown)]
+    public void Settings_RoundTripKeysWithoutItalianName(Keys key)
+    {
+        var combo = new KeyCombo(true, true, false, key);
+        Assert.Equal(combo, KeyCombo.Parse(combo.ToString()));
+
+        var map = new ShortcutMap();
+        map[ShortcutAction.ToggleSidebar] = combo;
+        var loaded = ShortcutMap.FromSettings(map.ToSettings());
+        Assert.Equal(combo, loaded[ShortcutAction.ToggleSidebar]);
+    }
+
+    [Theory]
+    [InlineData("Ctrl+Alt+ControlKey")]
+    [InlineData("Ctrl+Alt+LWin")]
+    [InlineData("Ctrl+Alt+None")]
+    [InlineData("Ctrl+Alt+Modifiers")]
+    [InlineData("Ctrl+Alt+65")]
+    public void Parse_RejectsEnumNamesThatAreNotSingleKeys(string text) =>
+        Assert.False(KeyCombo.TryParse(text, out _));
+
     [Fact]
     public void Conflicts_AreReported()
     {
