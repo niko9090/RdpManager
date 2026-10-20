@@ -1,0 +1,30 @@
+# Controllo automatico su GitHub: build e test del Core a ogni push su main, pull request e tag.
+# Le release le crea scripts/release.ps1 (installer compilato e provato in locale); questo
+# workflow non pubblica nulla. Le prove con categoria UI (finestre e controllo RDP) richiedono un
+# desktop interattivo e si eseguono solo in locale.
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build
+        run: dotnet build RdpManager.sln -c Release
+
+      - name: Test (Core)
+        run: dotnet test RdpManager.sln -c Release --no-build --filter "Category!=UI" --logger "console;verbosity=normal"
