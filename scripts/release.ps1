@@ -1,4 +1,4 @@
-# Pubblica una nuova versione di RdpManager su GitHub.
+﻿# Pubblica una nuova versione di RdpManager su GitHub.
 #
 # Uso (dalla cartella del progetto, su un PC con .NET 8 SDK, Inno Setup 6 e gh autenticato):
 #   powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 -Version 1.1.0

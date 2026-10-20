@@ -1,4 +1,4 @@
-# Prova dell'installer: installazione silenziosa per utente, avvio dell'exe installato per 5 s,
+﻿# Prova dell'installer: installazione silenziosa per utente, avvio dell'exe installato per 5 s,
 # disinstallazione silenziosa, controllo che %APPDATA%\RdpManager non venga toccata.
 # Uso: powershell -NoProfile -ExecutionPolicy Bypass -File verifica/installer.ps1 [-Setup dist\RdpManager-Setup-X.Y.Z.exe]
 param([string]$Setup = '')
