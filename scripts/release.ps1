@@ -45,8 +45,14 @@ if (git tag --list $tag) { throw "Il tag $tag esiste già: scegliere un'altra ve
 if (git ls-remote --tags origin "refs/tags/$tag") { throw "Il tag $tag esiste già su GitHub" }
 $behind = git rev-list --count 'HEAD..origin/main'
 if ([int]$behind -gt 0) { throw "Il ramo locale è indietro di $behind commit rispetto a origin/main: fare git pull" }
-gh release view $tag --repo $repo *> $null
-if ($LASTEXITCODE -eq 0) { throw "La release $tag esiste già su GitHub" }
+# In Windows PowerShell 5.1, con ErrorActionPreference=Stop, lo stderr ridiretto di un comando
+# esterno («release not found») diventerebbe un errore che interrompe lo script: qui conta solo
+# il codice di uscita.
+$ErrorActionPreference = 'Continue'
+gh release view $tag --repo $repo 2>&1 | Out-Null
+$releaseExists = $LASTEXITCODE -eq 0
+$ErrorActionPreference = 'Stop'
+if ($releaseExists) { throw "La release $tag esiste già su GitHub" }
 
 # ---------- versione ----------
 $csproj = Get-Content -Raw $csprojPath
