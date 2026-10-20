@@ -2,7 +2,7 @@
 #
 # Uso (dalla cartella del progetto, su un PC con .NET 8 SDK, Inno Setup 6 e gh autenticato):
 #   powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 -Version 1.1.0
-#   (facoltativo) -Notes "Novità di questa versione"
+#   (facoltativo) -Notes "Novità di questa versione"; altrimenti la sezione «## X.Y.Z» di CHANGELOG.md
 #
 # Passi: controlli → <Version> nel csproj → build → test → pubblicazione + installer (build-installer.ps1)
 # → commit «Versione X.Y.Z» (se la versione è cambiata) → tag vX.Y.Z → push di main e del tag
@@ -19,6 +19,22 @@ $root = Split-Path $PSScriptRoot -Parent
 Set-Location $root
 $repo = 'niko9090/RdpManager'
 $csprojPath = Join-Path $root 'src\RdpManager\RdpManager.csproj'
+
+# Note della release: la sezione «## X.Y.Z» di CHANGELOG.md (se c'è) seguita dalle istruzioni di installazione.
+function Get-ReleaseNotes([string]$ver) {
+    $section = ''
+    $changelog = Join-Path $root 'CHANGELOG.md'
+    if (Test-Path $changelog) {
+        $text = [IO.File]::ReadAllText($changelog, [Text.Encoding]::UTF8)
+        $m = [regex]::Match($text, '(?ms)^## ' + [regex]::Escape($ver) + '\s*$(.*?)(?=^## |\z)')
+        if ($m.Success) { $section = $m.Groups[1].Value.Trim() + "`n`n" }
+    }
+    if (-not $section) { $section = "RdpManager $ver.`n`n" }
+    return $section +
+           "**Installazione:** scarica ed esegui RdpManager-Setup-$ver.exe (per utente, non servono diritti di amministratore; si installa sopra la versione precedente).`n" +
+           "RdpManager-$ver-win-x64.exe è la versione portatile, senza installazione.`n" +
+           "Le connessioni salvate in %APPDATA%\RdpManager restano anche aggiornando o disinstallando."
+}
 
 function Run([string]$what, [scriptblock]$cmd) {
     Write-Host "==> $what" -ForegroundColor Cyan
@@ -92,12 +108,13 @@ Run "Push del tag $tag" { git push origin $tag }
 
 # ---------- release ----------
 if (-not $Notes) {
-    $Notes = "RdpManager $Version.`n`n" +
-             "Installazione: scarica ed esegui RdpManager-Setup-$Version.exe (per utente, non servono diritti di amministratore; si installa sopra la versione precedente).`n" +
-             "RdpManager-$Version-win-x64.exe è la versione portatile, senza installazione.`n" +
-             "Le connessioni salvate in %APPDATA%\RdpManager restano anche aggiornando o disinstallando."
+    $Notes = Get-ReleaseNotes $Version
 }
-Run "Release $tag" { gh release create $tag $setup $portable --repo $repo --title "RdpManager $Version" --notes $Notes --verify-tag }
+# Le note passano da un file UTF-8: come argomento, PowerShell 5.1 rovinerebbe a capo, virgolette e accenti.
+$notesFile = Join-Path $env:TEMP "RdpManager-note-$Version.md"
+[IO.File]::WriteAllText($notesFile, $Notes, (New-Object Text.UTF8Encoding($false)))
+Run "Release $tag" { gh release create $tag $setup $portable --repo $repo --title "RdpManager $Version" --notes-file $notesFile --verify-tag }
+Remove-Item $notesFile -ErrorAction SilentlyContinue
 
 Write-Host ""
 Write-Host "Pubblicata: https://github.com/$repo/releases/tag/$tag" -ForegroundColor Green

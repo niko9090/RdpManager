@@ -58,7 +58,7 @@ Lo script, in ordine:
 4. pubblica l'exe unico e compila l'installer con `build-installer.ps1` → `dist\`;
 5. fa il commit «Versione 1.1.0», crea il tag `v1.1.0` e fa il push di `main` e del tag;
 6. crea la release su GitHub con `gh release create`, allegando `RdpManager-Setup-1.1.0.exe` e
-   `RdpManager-1.1.0-win-x64.exe` (note personalizzabili con `-Notes "..."`).
+   `RdpManager-1.1.0-win-x64.exe` (note: la sezione della versione in `CHANGELOG.md` più le istruzioni di installazione; oppure `-Notes "..."`).
 
 A ogni push il workflow `.github/workflows/ci.yml` ricompila ed esegue i test del Core su GitHub
 (scheda «Actions»); non pubblica nulla.
@@ -81,7 +81,7 @@ dotnet test RdpManager.sln -c Release
 dotnet run --project src/RdpManager
 ```
 
-I test (99 + 1 facoltativo; nel CI solo quelli del Core, con `--filter "Category!=UI"`) comprendono:
+I test (225 + 1 facoltativo; nel CI solo quelli del Core, con `--filter "Category!=UI"`) comprendono:
 - **Core**: salvataggio/ricaricamento JSON, cifratura DPAPI (nessuna password in chiaro nel JSON),
   lettura/generazione `.rdp`, cartelle (crea/rinomina/elimina), file temporaneo per mstsc;
 - **integrazione interfaccia** (`UiIntegrationTests`): aprono la finestra principale vera con il
@@ -388,4 +388,5 @@ build-installer.ps1       pubblicazione + installer → dist\
 verifica/                 script dei criteri di verifica e prova dell'installer
 .github/workflows/ci.yml  build e test del Core su GitHub a ogni push
 scripts/release.ps1       pubblicazione di una nuova versione (vedi «Pubblicare un aggiornamento»)
+CHANGELOG.md              novità di ogni versione (usate come note della release)
 ```

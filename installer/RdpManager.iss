@@ -1,6 +1,6 @@
 ; Installer di RdpManager (Inno Setup 6).
 ; Si compila con build-installer.ps1, che passa la versione e la cartella della pubblicazione:
-;   ISCC /DAppVersion=1.0.0 /DPublishDir=<cartella con RdpManager.exe> /O<cartella output> installer\RdpManager.iss
+;   ISCC /DAppVersion=1.1.0 /DPublishDir=<cartella con RdpManager.exe> /O<cartella output> installer\RdpManager.iss
 ;
 ; Installazione per utente, senza diritti di amministratore, in %LOCALAPPDATA%\Programs\RdpManager.
 ; AppId fisso: le versioni nuove si installano sopra le vecchie (stessa voce in «App installate»).
