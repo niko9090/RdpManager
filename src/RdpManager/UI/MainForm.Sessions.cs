@@ -335,7 +335,8 @@ public sealed partial class MainForm
     /// <summary>Salva l'immagine della sessione in Immagini\RdpManager e la copia negli appunti.</summary>
     private async Task SaveSnapshotAsync(RdpSessionView view)
     {
-        await Task.Delay(250); // il menu appena chiuso non deve finire nella foto
+        HideSwitchBar();
+        await Task.Delay(250); // il menu o la barra appena chiusi non devono finire nella foto
         using var bmp = view.CaptureSession();
         if (bmp is null)
         {
@@ -437,7 +438,9 @@ public sealed partial class MainForm
     /// <summary>Dall'hook di tastiera: vero se la combinazione è una scorciatoia (il tasto non arriva alla sessione).</summary>
     private bool OnHookKeyDown(KeyCombo combo)
     {
-        if (!_shortcuts.TryGetAction(combo, out var action))
+        // Con una finestra modale aperta (dialoghi, messaggi) la finestra principale è disabilitata:
+        // i tasti restano a quella finestra invece di cambiare sessione alle sue spalle.
+        if (!_shortcuts.TryGetAction(combo, out var action) || !NativeMethods.IsWindowEnabled(Handle))
             return false;
         BeginInvoke(() => ExecuteShortcut(action));
         return true;
