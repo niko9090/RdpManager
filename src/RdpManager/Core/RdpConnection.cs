@@ -10,6 +10,17 @@ public enum ResolutionMode
     Fixed,
 }
 
+/// <summary>Dove riprodurre l'audio della sessione remota (stessi valori di "audiomode" nei file .rdp).</summary>
+public enum AudioMode
+{
+    /// <summary>Audio riprodotto su questo PC.</summary>
+    Local = 0,
+    /// <summary>Audio lasciato sul PC remoto.</summary>
+    Remote = 1,
+    /// <summary>Nessun audio.</summary>
+    None = 2,
+}
+
 /// <summary>Una connessione desktop remoto salvata.</summary>
 public sealed class RdpConnection
 {
@@ -38,6 +49,33 @@ public sealed class RdpConnection
     public int DesktopHeight { get; set; } = 1080;
     public bool RedirectClipboard { get; set; } = true;
     public bool RedirectDrives { get; set; }
+
+    // --- Dalla 1.1: i valori predefiniti sono quelli usati per i file della 1.0.0 che non li contengono. ---
+
+    public AudioMode AudioMode { get; set; } = AudioMode.Local;
+    public bool RedirectPrinters { get; set; }
+    public bool RedirectMicrophone { get; set; }
+
+    /// <summary>La sessione usa tutti i monitor locali (come "use multimon" di mstsc).</summary>
+    public bool UseAllMonitors { get; set; }
+
+    /// <summary>Riconnessione automatica dopo una disconnessione non voluta, al massimo <see cref="AutoReconnectMaxAttempts"/> volte.</summary>
+    public bool AutoReconnect { get; set; }
+    public int AutoReconnectMaxAttempts { get; set; } = ReconnectPolicy.DefaultMaxAttempts;
+
+    public bool IsFavorite { get; set; }
+
+    /// <summary>Ultima connessione aperta (UTC), per l'elenco dei recenti; null = mai.</summary>
+    public DateTime? LastConnectedUtc { get; set; }
+
+    /// <summary>Colore della connessione, "#RRGGBB" (vedi <see cref="NormalizeColor"/>); null = nessuno.</summary>
+    public string? Color { get; set; }
+
+    /// <summary>Etichetta breve mostrata accanto al nome (es. "PROD").</summary>
+    public string Label { get; set; } = "";
+
+    /// <summary>Indirizzo MAC per il Wake-on-LAN, nella forma "AA:BB:CC:DD:EE:FF"; vuoto = non impostato.</summary>
+    public string MacAddress { get; set; } = "";
 
     /// <summary>Cartella dell'elenco; le sottocartelle si separano con '/', vuoto = radice.</summary>
     public string Group { get; set; } = "";
@@ -71,4 +109,20 @@ public sealed class RdpConnection
 
     public static string NormalizeGroup(string? group) =>
         string.Join('/', (group ?? "").Split(['/', '\\'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+
+    /// <summary>"#RRGGBB" maiuscolo da "#rgb", "#rrggbb" o "rrggbb"; null se vuoto o non valido.</summary>
+    public static string? NormalizeColor(string? color)
+    {
+        var hex = (color ?? "").Trim().TrimStart('#');
+        if (hex.Length == 3)
+            hex = string.Concat(hex.Select(ch => $"{ch}{ch}"));
+        return hex.Length == 6 && hex.All(Uri.IsHexDigit) ? "#" + hex.ToUpperInvariant() : null;
+    }
+
+    /// <summary>Stessa destinazione: host (senza distinzione di maiuscole), porta e utente.</summary>
+    public bool IsSameTarget(RdpConnection other) =>
+        Host.Trim().Equals(other.Host.Trim(), StringComparison.OrdinalIgnoreCase)
+        && Port == other.Port
+        && Username.Trim().Equals(other.Username.Trim(), StringComparison.OrdinalIgnoreCase)
+        && Domain.Trim().Equals(other.Domain.Trim(), StringComparison.OrdinalIgnoreCase);
 }

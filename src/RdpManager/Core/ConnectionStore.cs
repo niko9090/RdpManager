@@ -6,7 +6,14 @@ namespace RdpManager.Core;
 /// <summary>Contenuto di connections.json.</summary>
 public sealed class ConnectionsDocument
 {
-    public int Version { get; set; } = 1;
+    /// <summary>Versione scritta da questa build: 1 = RdpManager 1.0.x, 2 = 1.1 (campi nuovi e impostazioni).</summary>
+    public const int CurrentVersion = 2;
+
+    /// <summary>Versione letta dal file; i file della 1.0.0 hanno 1 e si caricano con i valori predefiniti per i campi nuovi.</summary>
+    public int Version { get; set; } = CurrentVersion;
+
+    /// <summary>Impostazioni dell'app (assenti nei file della 1.0.0).</summary>
+    public AppSettings Settings { get; set; } = new();
 
     /// <summary>Cartelle create esplicitamente (anche vuote).</summary>
     public List<string> Groups { get; set; } = [];
@@ -66,6 +73,31 @@ public sealed class ConnectionsDocument
         return newPath;
     }
 
+    public RdpConnection? Find(Guid id) => Connections.FirstOrDefault(c => c.Id == id);
+
+    /// <summary>Connessioni della cartella e delle sue sottocartelle, nell'ordine dell'elenco ("Connetti tutta la cartella").</summary>
+    public IReadOnlyList<RdpConnection> ConnectionsInFolder(string folder)
+    {
+        folder = RdpConnection.NormalizeGroup(folder);
+        return Connections.Where(c => folder.Length == 0 || IsInFolder(c.Group, folder)).ToList();
+    }
+
+    public IReadOnlyList<RdpConnection> Favorites() =>
+        Connections.Where(c => c.IsFavorite)
+            .OrderBy(c => c.DisplayName, StringComparer.CurrentCultureIgnoreCase).ToList();
+
+    /// <summary>Le ultime <paramref name="max"/> connessioni aperte, dalla più recente.</summary>
+    public IReadOnlyList<RdpConnection> Recent(int max = 10) =>
+        Connections.Where(c => c.LastConnectedUtc is not null)
+            .OrderByDescending(c => c.LastConnectedUtc).Take(Math.Max(0, max)).ToList();
+
+    /// <summary>Annota l'apertura di una connessione per l'elenco dei recenti.</summary>
+    public void MarkConnected(Guid id, DateTime utcNow)
+    {
+        if (Find(id) is { } c)
+            c.LastConnectedUtc = DateTime.SpecifyKind(utcNow, DateTimeKind.Utc);
+    }
+
     /// <summary>Elimina la cartella e le sottocartelle; le connessioni contenute passano alla cartella superiore (non vengono cancellate).</summary>
     public string DeleteFolder(string path)
     {
@@ -108,9 +140,20 @@ public sealed class ConnectionStore
                   ?? new ConnectionsDocument();
         doc.Groups ??= [];
         doc.Connections ??= [];
+        doc.Settings ??= new AppSettings();
+        doc.Settings.Normalize();
         foreach (var c in doc.Connections)
         {
             c.Group = RdpConnection.NormalizeGroup(c.Group);
+            c.Name ??= "";
+            c.Host ??= "";
+            c.Username ??= "";
+            c.Domain ??= "";
+            c.Label ??= "";
+            c.MacAddress ??= "";
+            c.Color = RdpConnection.NormalizeColor(c.Color);
+            if (c.AutoReconnectMaxAttempts < 0)
+                c.AutoReconnectMaxAttempts = ReconnectPolicy.DefaultMaxAttempts;
             if (PasswordProtector.TryUnprotect(c.ProtectedPassword, out var plain))
             {
                 c.Password = plain;
@@ -126,7 +169,8 @@ public sealed class ConnectionStore
         ArgumentNullException.ThrowIfNull(doc);
         var toWrite = new ConnectionsDocument
         {
-            Version = doc.Version,
+            Version = ConnectionsDocument.CurrentVersion,
+            Settings = doc.Settings ?? new AppSettings(),
             Groups = doc.Groups.Select(RdpConnection.NormalizeGroup).Where(g => g.Length > 0)
                 .Distinct(StringComparer.CurrentCultureIgnoreCase).ToList(),
             Connections = doc.Connections.Select(c =>

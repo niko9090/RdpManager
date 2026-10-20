@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "groups": [
+    "Clienti",
+    "Clienti/Esempio Srl",
+    "Laboratorio vuoto"
+  ],
+  "connections": [
+    {
+      "id": "3f1c2d4e-0000-4000-8000-000000000001",
+      "name": "Server di prova",
+      "host": "srv01.example.test",
+      "port": 3390,
+      "username": "utente.prova",
+      "domain": "DOMINIO",
+      "protectedPassword": "AQIDBAUGBwgJCgsMDQ4PEA==",
+      "resolutionMode": "Fixed",
+      "desktopWidth": 1600,
+      "desktopHeight": 900,
+      "redirectClipboard": false,
+      "redirectDrives": true,
+      "group": "Clienti/Esempio Srl"
+    },
+    {
+      "id": "3f1c2d4e-0000-4000-8000-000000000002",
+      "name": "",
+      "host": "192.0.2.10",
+      "port": 3389,
+      "username": "",
+      "domain": "",
+      "resolutionMode": "FitToWindow",
+      "desktopWidth": 1920,
+      "desktopHeight": 1080,
+      "redirectClipboard": true,
+      "redirectDrives": false,
+      "group": ""
+    }
+  ]
+}

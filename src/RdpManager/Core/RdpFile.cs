@@ -57,6 +57,15 @@ public static class RdpFile
             (settings.TryGetValue("drivestoredirect", out var drives) && drives.Length > 0)
             || (TryInt(settings, "redirectdrives", out var rd) && rd != 0);
 
+        if (TryInt(settings, "audiomode", out var audio) && Enum.IsDefined(typeof(AudioMode), audio))
+            c.AudioMode = (AudioMode)audio;
+        if (TryInt(settings, "redirectprinters", out var printers))
+            c.RedirectPrinters = printers != 0;
+        if (TryInt(settings, "audiocapturemode", out var mic))
+            c.RedirectMicrophone = mic != 0;
+        if (TryInt(settings, "use multimon", out var multimon))
+            c.UseAllMonitors = multimon != 0;
+
         if (settings.TryGetValue("password 51", out var pwd))
             c.Password = PasswordProtector.TryUnprotectFromRdpFile(pwd);
 
@@ -81,7 +90,7 @@ public static class RdpFile
             Line("domain", 's', c.Domain);
 
         Line("screen mode id", 'i', 1);
-        Line("use multimon", 'i', 0);
+        Line("use multimon", 'i', c.UseAllMonitors ? 1 : 0);
         if (c.ResolutionMode == ResolutionMode.Fixed)
         {
             Line("desktopwidth", 'i', c.DesktopWidth);
@@ -96,6 +105,9 @@ public static class RdpFile
         Line("redirectclipboard", 'i', c.RedirectClipboard ? 1 : 0);
         if (c.RedirectDrives)
             Line("drivestoredirect", 's', "*");
+        Line("audiomode", 'i', (int)c.AudioMode);
+        Line("audiocapturemode", 'i', c.RedirectMicrophone ? 1 : 0);
+        Line("redirectprinters", 'i', c.RedirectPrinters ? 1 : 0);
         Line("authentication level", 'i', 2);
         Line("enablecredsspsupport", 'i', 1);
         Line("autoreconnection enabled", 'i', 1);
