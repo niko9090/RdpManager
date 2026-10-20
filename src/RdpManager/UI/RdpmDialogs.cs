@@ -71,7 +71,7 @@ public sealed class RdpmExportDialog : Form
 public sealed class RdpmImportDialog : Form
 {
     private readonly RadioButton _merge = new() { Text = "Unisci: aggiungi solo le connessioni che mancano", AutoSize = true, Checked = true };
-    private readonly RadioButton _replace = new() { Text = "Sostituisci: l'elenco attuale viene cancellato", AutoSize = true };
+    private readonly RadioButton _replace = new() { Text = "Sostituisci: le connessioni attuali vengono cancellate (profili e testi rapidi restano)", AutoSize = true };
 
     public RdpmImportDialog(int incoming, int current, bool hasPasswords)
     {
