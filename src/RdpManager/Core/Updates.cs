@@ -22,8 +22,23 @@ public static class AppInfo
     internal static Version Normalize(Version v) => new(v.Major, v.Minor, Math.Max(v.Build, 0));
 }
 
+/// <summary>File allegato a una release (nome, indirizzo di scaricamento, dimensione in byte).</summary>
+public sealed record ReleaseAsset(string Name, string DownloadUrl, long Size);
+
 /// <summary>Dati essenziali di una release GitHub.</summary>
-public sealed record ReleaseInfo(string Tag, Version Version, string PageUrl, string? Name);
+public sealed record ReleaseInfo(string Tag, Version Version, string PageUrl, string? Name)
+{
+    public IReadOnlyList<ReleaseAsset> Assets { get; init; } = [];
+
+    /// <summary>L'installer della release: "RdpManager-Setup-X.Y.Z.exe" (senza distinguere maiuscole).</summary>
+    public ReleaseAsset? SetupAsset =>
+        Assets.FirstOrDefault(a => a.Name.Equals($"RdpManager-Setup-{Version.ToString(3)}.exe", StringComparison.OrdinalIgnoreCase))
+        ?? Assets.FirstOrDefault(a => a.Name.StartsWith("RdpManager-Setup-", StringComparison.OrdinalIgnoreCase)
+                                      && a.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
+
+    public ReleaseAsset? ChecksumsAsset =>
+        Assets.FirstOrDefault(a => a.Name.Equals(Sha256Sums.FileName, StringComparison.OrdinalIgnoreCase));
+}
 
 public enum UpdateCheckStatus { UpToDate, NewerAvailable, Unavailable }
 
@@ -85,7 +100,7 @@ public static class UpdateChecker
             if (tag is null || version is null || url is null
                 || !Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
                 return null;
-            return new ReleaseInfo(tag, version, url, Str(root, "name"));
+            return new ReleaseInfo(tag, version, url, Str(root, "name")) { Assets = ParseAssets(root) };
         }
         catch (JsonException)
         {
@@ -119,7 +134,29 @@ public static class UpdateChecker
         : IsNewer(latest.Version, current) ? new UpdateCheckResult(UpdateCheckStatus.NewerAvailable, latest)
         : new UpdateCheckResult(UpdateCheckStatus.UpToDate);
 
+    /// <summary>Allegati con indirizzo https; gli altri si ignorano.</summary>
+    private static List<ReleaseAsset> ParseAssets(JsonElement root)
+    {
+        var list = new List<ReleaseAsset>();
+        if (!root.TryGetProperty("assets", out var assets) || assets.ValueKind != JsonValueKind.Array)
+            return list;
+        foreach (var a in assets.EnumerateArray())
+        {
+            if (a.ValueKind != JsonValueKind.Object)
+                continue;
+            var name = Str(a, "name");
+            var url = Str(a, "browser_download_url");
+            if (string.IsNullOrWhiteSpace(name) || url is null
+                || !Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
+                continue;
+            long size = a.TryGetProperty("size", out var s) && s.ValueKind == JsonValueKind.Number && s.TryGetInt64(out var n) ? n : 0;
+            list.Add(new ReleaseAsset(name, url, size));
+        }
+        return list;
+    }
+
     private static string? Str(JsonElement e, string name) =>
+
         e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
 
     private static bool Bool(JsonElement e, string name) =>

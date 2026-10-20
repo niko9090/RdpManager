@@ -1,5 +1,14 @@
 namespace RdpManager.Core;
 
+/// <summary>Tema dei colori dell'interfaccia.</summary>
+public enum AppTheme
+{
+    /// <summary>Segue l'impostazione di Windows «Modalità app» (chiaro o scuro).</summary>
+    System,
+    Light,
+    Dark,
+}
+
 public enum SidebarMode
 {
     /// <summary>Barra laterale sempre visibile accanto alle sessioni.</summary>
@@ -28,6 +37,28 @@ public sealed class AppSettings
     /// </summary>
     public Dictionary<string, string> Shortcuts { get; set; } = [];
 
+    // --- Dalla 1.2 ---
+
+    public AppTheme Theme { get; set; } = AppTheme.System;
+
+    /// <summary>Icona nell'area di notifica con il menu delle connessioni.</summary>
+    public bool ShowTrayIcon { get; set; } = true;
+
+    /// <summary>Chiudendo la finestra l'app resta nell'area di notifica invece di uscire.</summary>
+    public bool CloseToTray { get; set; }
+
+    /// <summary>
+    /// Scorciatoia globale (RegisterHotKey) che richiama l'app da qualunque programma; stringa vuota = disattivata.
+    /// Serve Ctrl o Alt (vedi <see cref="GlobalHotkey"/>).
+    /// </summary>
+    public string GlobalHotkey { get; set; } = Core.GlobalHotkey.DefaultText;
+
+    /// <summary>Si annotano inizio, fine, durata e motivo di ogni sessione (history.json).</summary>
+    public bool HistoryEnabled { get; set; } = true;
+
+    /// <summary>Divisione della vista affiancata: frazione della larghezza per la sessione di sinistra.</summary>
+    public double SplitRatio { get; set; } = SplitLayout.DefaultRatio;
+
     public ShortcutMap GetShortcuts() => ShortcutMap.FromSettings(Shortcuts);
 
     public void SetShortcuts(ShortcutMap map) => Shortcuts = map.ToSettings();
@@ -42,5 +73,14 @@ public sealed class AppSettings
             PreferredMonitor = null;
         if (!Enum.IsDefined(SidebarMode))
             SidebarMode = SidebarMode.Pinned;
+        if (!Enum.IsDefined(Theme))
+            Theme = AppTheme.System;
+        // null = file della 1.0/1.1 senza il campo: si usa il predefinito; "" = disattivata dall'utente.
+        if (GlobalHotkey is null)
+            GlobalHotkey = Core.GlobalHotkey.DefaultText;
+        else if (GlobalHotkey.Length > 0 && !Core.GlobalHotkey.TryParse(GlobalHotkey, out _))
+            GlobalHotkey = Core.GlobalHotkey.DefaultText;
+        SplitRatio = SplitLayout.ClampRatio(SplitRatio);
+
     }
 }

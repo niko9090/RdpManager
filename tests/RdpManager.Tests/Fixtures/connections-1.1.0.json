@@ -1,0 +1,72 @@
+{
+  "version": 2,
+  "settings": {
+    "preferredMonitor": "\\\\.\\DISPLAY2",
+    "sidebarMode": "AutoHide",
+    "reopenSessionsOnStartup": true,
+    "openSessions": [
+      "7a2b0c11-0000-4000-8000-000000000002",
+      "7a2b0c11-0000-4000-8000-000000000001"
+    ],
+    "shortcuts": {
+      "NextSession": "Ctrl+Alt+PagGiù",
+      "ToggleSidebar": ""
+    }
+  },
+  "groups": [
+    "Clienti",
+    "Clienti/Esempio Srl",
+    "Laboratorio"
+  ],
+  "connections": [
+    {
+      "id": "7a2b0c11-0000-4000-8000-000000000001",
+      "name": "Server di prova",
+      "host": "srv01.example.test",
+      "port": 3390,
+      "username": "utente.prova",
+      "domain": "DOMINIO",
+      "protectedPassword": "AQIDBAUGBwgJCgsMDQ4PEA==",
+      "resolutionMode": "Fixed",
+      "desktopWidth": 1600,
+      "desktopHeight": 900,
+      "redirectClipboard": false,
+      "redirectDrives": true,
+      "audioMode": "Remote",
+      "redirectPrinters": true,
+      "redirectMicrophone": true,
+      "useAllMonitors": true,
+      "autoReconnect": true,
+      "autoReconnectMaxAttempts": 3,
+      "isFavorite": true,
+      "lastConnectedUtc": "2026-10-20T18:30:00Z",
+      "color": "#2E86DE",
+      "label": "PROD",
+      "macAddress": "02:00:5E:10:00:01",
+      "group": "Clienti/Esempio Srl"
+    },
+    {
+      "id": "7a2b0c11-0000-4000-8000-000000000002",
+      "name": "",
+      "host": "192.0.2.20",
+      "port": 3389,
+      "username": "",
+      "domain": "",
+      "resolutionMode": "FitToWindow",
+      "desktopWidth": 1920,
+      "desktopHeight": 1080,
+      "redirectClipboard": true,
+      "redirectDrives": false,
+      "audioMode": "Local",
+      "redirectPrinters": false,
+      "redirectMicrophone": false,
+      "useAllMonitors": false,
+      "autoReconnect": false,
+      "autoReconnectMaxAttempts": 5,
+      "isFavorite": false,
+      "label": "",
+      "macAddress": "",
+      "group": "Laboratorio"
+    }
+  ]
+}

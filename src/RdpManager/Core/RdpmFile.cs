@@ -23,13 +23,17 @@ public enum ImportMode
 /// <param name="Added">Connessioni aggiunte.</param>
 /// <param name="Skipped">Doppioni non importati.</param>
 /// <param name="Removed">Connessioni tolte (solo in sostituzione).</param>
-public sealed record ImportResult(int Added, int Skipped, int Removed);
+/// <param name="ProfilesAdded">Profili di credenziali aggiunti.</param>
+/// <param name="QuickTextsAdded">Testi rapidi aggiunti.</param>
+public sealed record ImportResult(int Added, int Skipped, int Removed, int ProfilesAdded = 0, int QuickTextsAdded = 0);
 
 /// <summary>
 /// Esportazione e importazione delle connessioni in un file .rdpm (JSON).
 /// Le password non vengono mai scritte in chiaro: si escludono, oppure si cifrano con AES-GCM
 /// usando una chiave ricavata dalla password del file con PBKDF2-SHA256.
 /// Le password DPAPI di connections.json non si esportano: valgono solo per l'utente Windows che le ha create.
+/// Dalla 1.2 il file contiene anche i profili di credenziali (le loro password seguono le stesse regole) e i testi rapidi;
+/// la 1.1 legge questi file ignorando le parti nuove.
 /// </summary>
 public static class RdpmFile
 {
@@ -50,9 +54,17 @@ public static class RdpmFile
         Converters = { new JsonStringEnumConverter() },
     };
 
+    /// <summary>Esporta connessioni, cartelle, profili di credenziali e testi rapidi del documento.</summary>
+    public static string Export(ConnectionsDocument doc, string? filePassword = null, int iterations = DefaultIterations)
+    {
+        ArgumentNullException.ThrowIfNull(doc);
+        return Export(doc.Connections, doc.AllGroups(), filePassword, iterations, doc.CredentialProfiles, doc.QuickTexts);
+    }
+
     /// <param name="filePassword">null o vuota = password escluse; altrimenti le password vengono cifrate con questa.</param>
     public static string Export(IEnumerable<RdpConnection> connections, IEnumerable<string>? groups = null,
-        string? filePassword = null, int iterations = DefaultIterations)
+        string? filePassword = null, int iterations = DefaultIterations,
+        IEnumerable<CredentialProfile>? profiles = null, IEnumerable<QuickText>? quickTexts = null)
     {
         ArgumentNullException.ThrowIfNull(connections);
         var file = new RdpmDocument
@@ -92,6 +104,17 @@ public static class RdpmFile
                     : null;
                 file.Connections.Add(new RdpmEntry { Connection = copy, EncryptedPassword = sealedPassword });
             }
+            foreach (var p in profiles ?? [])
+            {
+                var copy = p.Clone();
+                copy.Password = null;
+                copy.ProtectedPassword = null;
+                string? sealedPassword = key is not null && !string.IsNullOrEmpty(p.Password)
+                    ? Seal(key, Encoding.UTF8.GetBytes(p.Password), ProfileContext(p.Id))
+                    : null;
+                file.CredentialProfiles.Add(new RdpmProfileEntry { Profile = copy, EncryptedPassword = sealedPassword });
+            }
+            file.QuickTexts = (quickTexts ?? []).Select(t => t.Clone()).ToList();
         }
         finally
         {
@@ -104,6 +127,9 @@ public static class RdpmFile
     public static void Save(string path, IEnumerable<RdpConnection> connections, IEnumerable<string>? groups = null,
         string? filePassword = null) =>
         File.WriteAllText(path, Export(connections, groups, filePassword), new UTF8Encoding(false));
+
+    public static void Save(string path, ConnectionsDocument doc, string? filePassword = null) =>
+        File.WriteAllText(path, Export(doc, filePassword), new UTF8Encoding(false));
 
     /// <summary>Vero se il file contiene password cifrate e quindi serve la password del file.</summary>
     /// <exception cref="InvalidDataException">Il contenuto non è un file .rdpm valido.</exception>
@@ -153,7 +179,30 @@ public static class RdpmFile
                 c.Domain ??= "";
                 c.Label ??= "";
                 c.MacAddress ??= "";
+                c.GatewayHost ??= "";
                 doc.Connections.Add(c);
+            }
+            foreach (var entry in file.CredentialProfiles ?? [])
+            {
+                if (entry?.Profile is not { } p)
+                    continue;
+                p.Repair();
+                p.ProtectedPassword = null;
+                p.Password = null;
+                if (entry.EncryptedPassword is { } sealedPassword && key is not null)
+                {
+                    if (!TryOpen(key, sealedPassword, ProfileContext(p.Id), out var plain))
+                        throw new InvalidDataException($"La password del profilo «{p.DisplayName}» è danneggiata.");
+                    p.Password = Encoding.UTF8.GetString(plain);
+                }
+                doc.CredentialProfiles.Add(p);
+            }
+            foreach (var t in file.QuickTexts ?? [])
+            {
+                if (t is null)
+                    continue;
+                t.Repair();
+                doc.QuickTexts.Add(t);
             }
             return doc;
         }
@@ -182,11 +231,42 @@ public static class RdpmFile
             removed = target.Connections.Count;
             target.Connections = [];
             target.Groups = [];
+            target.CredentialProfiles = [];
         }
+
+        // Profili: un doppione (stesso Id, o stesso nome/utente/dominio) non si aggiunge e le connessioni importate
+        // che lo usavano vengono collegate a quello già presente.
+        var profileMap = new Dictionary<Guid, Guid>();
+        int profilesAdded = 0;
+        foreach (var p in imported.CredentialProfiles)
+        {
+            var existing = target.CredentialProfiles.FirstOrDefault(e => e.Id == p.Id)
+                           ?? target.CredentialProfiles.FirstOrDefault(e => e.IsSameAs(p));
+            if (existing is not null)
+            {
+                if (!existing.HasPassword && !string.IsNullOrEmpty(p.Password))
+                    existing.Password = p.Password;
+                profileMap[p.Id] = existing.Id;
+                continue;
+            }
+            target.CredentialProfiles.Add(p);
+            profileMap[p.Id] = p.Id;
+            profilesAdded++;
+        }
+        // Un riferimento a un profilo che non è nel file resta solo se il profilo esiste già qui.
+        Guid? MapProfile(Guid? id) =>
+            id is not Guid g ? null
+            : profileMap.TryGetValue(g, out var mapped) ? mapped
+            : target.FindProfile(g) is not null ? g
+            : null;
 
         int added = 0, skipped = 0;
         foreach (var c in imported.Connections)
         {
+            c.CredentialProfileId = MapProfile(c.CredentialProfileId);
+            c.GatewayProfileId = MapProfile(c.GatewayProfileId);
+            if (c.GatewayCredentials == GatewayCredentialsSource.Profile && c.GatewayProfileId is null)
+                c.GatewayCredentials = GatewayCredentialsSource.SameAsConnection;
             var existing = target.Connections.FirstOrDefault(e => e.Id == c.Id || e.IsSameTarget(c));
             if (existing is not null)
             {
@@ -201,9 +281,19 @@ public static class RdpmFile
         }
         foreach (var g in imported.Groups)
             target.AddFolder("", g);
+
+        // Testi rapidi: si aggiungono quelli che mancano (stesso Id o stesso testo); non si tolgono mai.
+        int quickTextsAdded = 0;
+        foreach (var t in imported.QuickTexts)
+        {
+            if (target.QuickTexts.Any(e => e.Id == t.Id || e.Text == t.Text))
+                continue;
+            target.QuickTexts.Add(t);
+            quickTextsAdded++;
+        }
         if (mode == ImportMode.Replace)
             target.Settings.OpenSessions.RemoveAll(id => target.Find(id) is null);
-        return new ImportResult(added, skipped, removed);
+        return new ImportResult(added, skipped, removed, profilesAdded, quickTextsAdded);
     }
 
     private static RdpmDocument ReadDocument(string json)
@@ -223,6 +313,9 @@ public static class RdpmFile
             throw new InvalidDataException($"Il file .rdpm è di una versione più recente ({file.Version}): aggiorna RdpManager.");
         return file;
     }
+
+    /// <summary>Contesto autenticato della password di un profilo: diverso da quello delle connessioni, così non si scambiano.</summary>
+    private static string ProfileContext(Guid id) => "profile:" + id;
 
     private static byte[] DeriveKey(string password, byte[] salt, int iterations) =>
         Rfc2898DeriveBytes.Pbkdf2(Encoding.UTF8.GetBytes(password), salt, iterations, HashAlgorithmName.SHA256, KeySize);
@@ -283,7 +376,16 @@ public static class RdpmFile
         public RdpmEncryption? Encryption { get; set; }
         public List<string> Groups { get; set; } = [];
         public List<RdpmEntry> Connections { get; set; } = [];
+        public List<RdpmProfileEntry> CredentialProfiles { get; set; } = [];
+        public List<QuickText> QuickTexts { get; set; } = [];
     }
+
+    private sealed class RdpmProfileEntry
+    {
+        public CredentialProfile? Profile { get; set; }
+        public string? EncryptedPassword { get; set; }
+    }
+
 
     private sealed class RdpmEncryption
     {

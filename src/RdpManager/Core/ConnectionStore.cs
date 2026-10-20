@@ -4,12 +4,15 @@ using System.Text.Json.Serialization;
 namespace RdpManager.Core;
 
 /// <summary>Contenuto di connections.json.</summary>
-public sealed class ConnectionsDocument
+public sealed partial class ConnectionsDocument
 {
-    /// <summary>Versione scritta da questa build: 1 = RdpManager 1.0.x, 2 = 1.1 (campi nuovi e impostazioni).</summary>
-    public const int CurrentVersion = 2;
+    /// <summary>
+    /// Versione scritta da questa build: 1 = RdpManager 1.0.x, 2 = 1.1 (campi nuovi e impostazioni),
+    /// 3 = 1.2 (profili di credenziali, gateway, testi rapidi).
+    /// </summary>
+    public const int CurrentVersion = 3;
 
-    /// <summary>Versione letta dal file; i file della 1.0.0 hanno 1 e si caricano con i valori predefiniti per i campi nuovi.</summary>
+    /// <summary>Versione letta dal file; i file della 1.0.0 e 1.1.0 hanno 1 e 2 e si caricano con i valori predefiniti per i campi nuovi.</summary>
     public int Version { get; set; } = CurrentVersion;
 
     /// <summary>Impostazioni dell'app (assenti nei file della 1.0.0).</summary>
@@ -142,8 +145,26 @@ public sealed class ConnectionStore
         doc.Connections ??= [];
         doc.Settings ??= new AppSettings();
         doc.Settings.Normalize();
+        doc.CredentialProfiles ??= [];
+        doc.CredentialProfiles.RemoveAll(p => p is null);
+        foreach (var p in doc.CredentialProfiles)
+        {
+            p.Repair();
+            if (PasswordProtector.TryUnprotect(p.ProtectedPassword, out var profilePassword))
+            {
+                p.Password = profilePassword;
+                p.ProtectedPassword = null;
+            }
+        }
+        doc.QuickTexts ??= [];
+        doc.QuickTexts.RemoveAll(t => t is null);
+        foreach (var t in doc.QuickTexts)
+            t.Repair();
         foreach (var c in doc.Connections)
         {
+            c.GatewayHost ??= "";
+            if (!Enum.IsDefined(c.GatewayCredentials))
+                c.GatewayCredentials = GatewayCredentialsSource.SameAsConnection;
             c.Group = RdpConnection.NormalizeGroup(c.Group);
             c.Name ??= "";
             c.Host ??= "";
@@ -181,6 +202,15 @@ public sealed class ConnectionStore
                 copy.Password = null;
                 return copy;
             }).ToList(),
+            CredentialProfiles = doc.CredentialProfiles.Select(p =>
+            {
+                var copy = p.Clone();
+                if (!string.IsNullOrEmpty(p.Password))
+                    copy.ProtectedPassword = PasswordProtector.Protect(p.Password);
+                copy.Password = null;
+                return copy;
+            }).ToList(),
+            QuickTexts = doc.QuickTexts.Select(t => t.Clone()).ToList(),
         };
 
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(FilePath))!);

@@ -21,6 +21,15 @@ public enum AudioMode
     None = 2,
 }
 
+/// <summary>Credenziali per il Remote Desktop Gateway.</summary>
+public enum GatewayCredentialsSource
+{
+    /// <summary>Le stesse della connessione (o del suo profilo).</summary>
+    SameAsConnection,
+    /// <summary>Quelle del profilo <see cref="RdpConnection.GatewayProfileId"/>.</summary>
+    Profile,
+}
+
 /// <summary>Una connessione desktop remoto salvata.</summary>
 public sealed class RdpConnection
 {
@@ -80,6 +89,29 @@ public sealed class RdpConnection
     /// <summary>Cartella dell'elenco; le sottocartelle si separano con '/', vuoto = radice.</summary>
     public string Group { get; set; } = "";
 
+    // --- Dalla 1.2: assenti nei file 1.0/1.1, i predefiniti lasciano la connessione com'era. ---
+
+    /// <summary>
+    /// Profilo di credenziali condiviso (<see cref="CredentialProfile"/>): se impostato e presente, utente, dominio e
+    /// password vengono dal profilo invece che dalla connessione (vedi <see cref="ConnectionsDocument.ResolveCredentials"/>).
+    /// </summary>
+    public Guid? CredentialProfileId { get; set; }
+
+    /// <summary>Passa da un Remote Desktop Gateway (<see cref="GatewayHost"/>).</summary>
+    public bool UseGateway { get; set; }
+
+    /// <summary>Host del gateway, anche "host:porta".</summary>
+    public string GatewayHost { get; set; } = "";
+
+    public GatewayCredentialsSource GatewayCredentials { get; set; } = GatewayCredentialsSource.SameAsConnection;
+
+    /// <summary>Profilo per il gateway quando <see cref="GatewayCredentials"/> è <see cref="GatewayCredentialsSource.Profile"/>.</summary>
+    public Guid? GatewayProfileId { get; set; }
+
+    /// <summary>Vero se il gateway è attivo e ha un host.</summary>
+    [JsonIgnore]
+    public bool HasGateway => UseGateway && !string.IsNullOrWhiteSpace(GatewayHost);
+
     [JsonIgnore]
     public string DisplayName => string.IsNullOrWhiteSpace(Name) ? Host : Name;
 
@@ -97,12 +129,12 @@ public sealed class RdpConnection
         return copy;
     }
 
-    /// <summary>Ricerca veloce: tutte le parole devono comparire in nome, host, utente, dominio o cartella.</summary>
+    /// <summary>Ricerca veloce: tutte le parole devono comparire in nome, host, utente, dominio, cartella o etichetta.</summary>
     public bool Matches(string? query)
     {
         if (string.IsNullOrWhiteSpace(query))
             return true;
-        var haystack = string.Join('\n', Name, Host, Username, Domain, Group, Port.ToString());
+        var haystack = string.Join('\n', Name, Host, Username, Domain, Group, Label, Port.ToString());
         return query.Split(' ', StringSplitOptions.RemoveEmptyEntries)
             .All(word => haystack.Contains(word, StringComparison.OrdinalIgnoreCase));
     }

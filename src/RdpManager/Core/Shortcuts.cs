@@ -10,6 +10,10 @@ public enum ShortcutAction
     Session1, Session2, Session3, Session4, Session5, Session6, Session7, Session8, Session9,
     ToggleFullScreen,
     ToggleSidebar,
+    // Dalla 1.2
+    Overview,
+    QuickSearch,
+    ToggleSplitView,
 }
 
 /// <summary>Una combinazione di tasti: modificatori Ctrl/Alt/Maiusc più un tasto.</summary>
@@ -194,6 +198,9 @@ public sealed class ShortcutMap
             [ShortcutAction.PreviousSession] = new(true, true, false, Keys.Left),
             [ShortcutAction.ToggleFullScreen] = new(true, true, false, Keys.Enter),
             [ShortcutAction.ToggleSidebar] = new(true, true, false, Keys.B),
+            [ShortcutAction.Overview] = new(true, true, false, Keys.G),
+            [ShortcutAction.QuickSearch] = new(true, true, false, Keys.Space),
+            [ShortcutAction.ToggleSplitView] = new(true, true, false, Keys.S),
         };
         for (int n = 1; n <= 9; n++)
             d[SessionAction(n)] = new(true, true, false, Keys.D0 + n);
@@ -213,6 +220,10 @@ public sealed class ShortcutMap
         ShortcutAction.PreviousSession => "Sessione precedente",
         ShortcutAction.ToggleFullScreen => "Schermo intero sì/no",
         ShortcutAction.ToggleSidebar => "Mostra/nascondi barra laterale",
+        ShortcutAction.Overview => "Panoramica delle sessioni",
+        ShortcutAction.QuickSearch => "Ricerca rapida",
+        ShortcutAction.ToggleSplitView => "Vista affiancata sì/no",
+
         _ when SessionNumber(action) is int n => $"Vai alla sessione {n}",
         _ => action.ToString(),
     };

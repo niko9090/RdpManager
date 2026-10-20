@@ -6,6 +6,9 @@ namespace RdpManager.Core;
 /// <summary>Lettura e generazione di file .rdp (formato "chiave:tipo:valore" di mstsc).</summary>
 public static class RdpFile
 {
+    /// <summary>Valori di "gatewayusagemethod": 1 = usa sempre il gateway, 2 = solo se il PC non è raggiungibile direttamente.</summary>
+    public const int GatewayUsageAlways = 1, GatewayUsageDetect = 2;
+
     public static RdpConnection Load(string path) =>
         Parse(File.ReadAllText(path), Path.GetFileNameWithoutExtension(path));
 
@@ -69,6 +72,18 @@ public static class RdpFile
         if (settings.TryGetValue("password 51", out var pwd))
             c.Password = PasswordProtector.TryUnprotectFromRdpFile(pwd);
 
+        // Remote Desktop Gateway: attivo se c'è un host e il metodo è "usa sempre" (1) o "solo se serve" (2).
+        if (settings.TryGetValue("gatewayhostname", out var gateway) && gateway.Length > 0)
+        {
+            c.GatewayHost = gateway;
+            int usage = TryInt(settings, "gatewayusagemethod", out var u) ? u : GatewayUsageAlways;
+            c.UseGateway = usage is GatewayUsageAlways or GatewayUsageDetect;
+            // promptcredentialonce:1 = le stesse credenziali per gateway e PC remoto (predefinito di mstsc).
+            c.GatewayCredentials = TryInt(settings, "promptcredentialonce", out var once) && once == 0
+                ? GatewayCredentialsSource.Profile
+                : GatewayCredentialsSource.SameAsConnection;
+        }
+
         c.Name = string.IsNullOrWhiteSpace(name) ? c.Host : name.Trim();
         return c;
     }
@@ -112,6 +127,14 @@ public static class RdpFile
         Line("enablecredsspsupport", 'i', 1);
         Line("autoreconnection enabled", 'i', 1);
         Line("prompt for credentials", 'i', 0);
+        if (c.HasGateway)
+        {
+            Line("gatewayhostname", 's', c.GatewayHost.Trim());
+            Line("gatewayusagemethod", 'i', GatewayUsageAlways);
+            Line("gatewayprofileusagemethod", 'i', 1);
+            Line("gatewaycredentialssource", 'i', 4);
+            Line("promptcredentialonce", 'i', c.GatewayCredentials == GatewayCredentialsSource.SameAsConnection ? 1 : 0);
+        }
         if (includePassword && !string.IsNullOrEmpty(c.Password))
             Line("password 51", 'b', PasswordProtector.ProtectForRdpFile(c.Password));
         return sb.ToString();
