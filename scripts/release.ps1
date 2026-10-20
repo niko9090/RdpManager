@@ -71,7 +71,9 @@ $ErrorActionPreference = 'Stop'
 if ($releaseExists) { throw "La release $tag esiste già su GitHub" }
 
 # ---------- versione ----------
-$csproj = Get-Content -Raw $csprojPath
+# Lettura esplicita in UTF-8: Get-Content di Windows PowerShell 5.1 leggerebbe il file (senza BOM) come ANSI
+# e, riscrivendolo, rovinerebbe gli accenti dei commenti (successo con la 1.2.0).
+$csproj = [IO.File]::ReadAllText($csprojPath, [Text.Encoding]::UTF8)
 $current = [regex]::Match($csproj, '<Version>([^<]+)</Version>').Groups[1].Value
 if (-not $current) { throw "<Version> non trovato in $csprojPath" }
 $changed = $current -ne $Version
