@@ -36,7 +36,8 @@ internal sealed class UpdateOfferForm : Form
         };
         _notes.Text = string.IsNullOrWhiteSpace(release.Notes)
             ? "Le novità sono nella pagina della release."
-            : release.Notes.ReplaceLineEndings("\r\n");
+            : PlainText(release.Notes);
+        Shown += (_, _) => { _notes.SelectionStart = 0; _notes.SelectionLength = 0; AcceptButton?.NotifyDefault(true); };
 
         var now = new Button { Text = "Aggiorna ora", AutoSize = true };
         var onExit = new Button { Text = "Alla chiusura", AutoSize = true };
@@ -78,6 +79,15 @@ internal sealed class UpdateOfferForm : Form
         Choice = choice;
         Close();
         Chosen?.Invoke(this, choice);
+    }
+
+    /// <summary>Le note della release sono Markdown: senza «**», «`» e «#» si leggono meglio in una casella di testo.</summary>
+    internal static string PlainText(string markdown)
+    {
+        var lines = markdown.ReplaceLineEndings("\n").Split('\n')
+            .Select(l => l.TrimStart().StartsWith('#') ? l.TrimStart().TrimStart('#').Trim().ToUpperInvariant() : l)
+            .Select(l => l.Replace("**", "").Replace("`", ""));
+        return string.Join("\r\n", lines).Trim();
     }
 
     /// <summary>In basso a destra della finestra principale.</summary>

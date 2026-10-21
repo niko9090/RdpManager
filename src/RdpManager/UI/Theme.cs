@@ -140,6 +140,12 @@ internal static class ThemeManager
             case TabControl tabs:
                 ThemeTabs(tabs, p);
                 break;
+            case LinkLabel link:
+                link.LinkColor = p.IsDark ? Color.FromArgb(120, 170, 255) : Color.FromArgb(0, 0, 255);
+                link.ActiveLinkColor = p.IsDark ? Color.FromArgb(170, 200, 255) : Color.Red;
+                link.BackColor = MapBack(link.BackColor, p);
+                link.ForeColor = MapFore(link.ForeColor, p);
+                break;
             default:
                 c.BackColor = MapBack(c.BackColor, p);
                 c.ForeColor = MapFore(c.ForeColor, p);
@@ -180,6 +186,8 @@ internal static class ThemeManager
             tabs.DrawItem += DrawTabItem;
         }
         tabs.DrawMode = p.IsDark ? TabDrawMode.OwnerDrawFixed : TabDrawMode.Normal;
+        // Disegnate a mano le linguette hanno un margine in più: con quello predefinito il testo si tronca.
+        tabs.Padding = p.IsDark ? new Point(14, 4) : new Point(6, 3);
         tabs.Invalidate();
     }
 

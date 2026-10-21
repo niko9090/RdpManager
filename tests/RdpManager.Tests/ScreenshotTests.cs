@@ -114,8 +114,37 @@ public sealed class ScreenshotTests : IDisposable
                     Save(edit, Path.Combine(outDir, "6-connessione-profilo-gateway.png"));
                 }
 
+                // 1.3: sessione disconnessa con la spiegazione dell'errore (host inesistente → DNS).
+                PumpUntil(() => views[3].State == SessionState.Disconnected, 30_000);
+                form.Tabs.SelectedIndex = 3;
+                Pump(400);
+                Save(form, Path.Combine(outDir, "7-errore-spiegato.png"));
+
+                using (var settings = new SettingsDialog(form.Document.Settings.Clone()) { StartPosition = FormStartPosition.Manual, Location = new Point(80, 80) })
+                {
+                    settings.Show();
+                    var tabs = settings.Controls.OfType<TabControl>().First();
+                    tabs.SelectedIndex = 2;
+                    Pump(400);
+                    Save(settings, Path.Combine(outDir, "8-impostazioni-avvio-aggiornamenti.png"));
+                }
+
+                var setup = Path.Combine(_dir, "RdpManager-Setup-9.9.9.exe");
+                File.WriteAllText(setup, "finto");
+                var release = new ReleaseInfo("v9.9.9", new Version(9, 9, 9), "https://github.com/niko9090/RdpManager/releases/tag/v9.9.9", null)
+                {
+                    Notes = string.Join(Environment.NewLine, "**Esempio di novità**", "- Panoramica più veloce", "- Correzioni varie"),
+                };
+                form.PortableOverride = false;
+                form.Updates.Accept(release, new UpdateDownloadResult(UpdateDownloadStatus.Verified, setup, "ok", Sha256Sums.ComputeHex(setup)));
+                form.ShowUpdateOffer();
+                Pump(500);
+                Save(form.UpdateOffer!, Path.Combine(outDir, "9-avviso-aggiornamento.png"));
+                form.UpdateOffer!.Finish(UpdateChoice.Later);
+
                 foreach (var v in views.Where(v => v.State == SessionState.Connected))
                     v.SetStateForTests(SessionState.Disconnected, "Disconnessa");
+                form.StartInstaller = _ => { };
                 form.ExitApp();
                 Pump(200);
             }
@@ -148,6 +177,17 @@ public sealed class ScreenshotTests : IDisposable
             g.CopyFromScreen(b.Location, Point.Empty, b.Size);
         }
         bmp.Save(path, ImageFormat.Png);
+    }
+
+    private static bool PumpUntil(Func<bool> condition, int ms)
+    {
+        var sw = Stopwatch.StartNew();
+        while (!condition() && sw.ElapsedMilliseconds < ms)
+        {
+            Application.DoEvents();
+            Thread.Sleep(15);
+        }
+        return condition();
     }
 
     private static void Pump(int ms)
