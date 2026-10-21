@@ -1,6 +1,40 @@
 # Novità di RdpManager
 
+## 1.4.0
+
+**Spazi di lavoro**
+- Salvano le sessioni aperte con il loro layout (ordine delle schede, scheda in primo piano, monitor,
+  schermo intero, vista affiancata) e le riaprono con un clic dal menu «Spazi di lavoro» o con una
+  scorciatoia propria.
+
+**Blocco con PIN**
+- PIN di 4-12 cifre salvato solo come impronta PBKDF2 con salt. Blocco con Ctrl+Alt+L, dal menu o dopo
+  un tempo di inattività (predefinito 10 minuti); con il PIN impostato l'app parte bloccata.
+- Da bloccata: finestre nascoste, password di nuovo cifrate e non lette, nessuna sessione nuova.
+- «Ho dimenticato il PIN»: le connessioni restano, le password salvate si cancellano e vanno reinserite.
+
+**Sessioni**
+- Profili di qualità per connessione: automatico, rete locale, connessione lenta (colore, sfondo,
+  animazioni, temi, compressione), anche nei file .rdp importati ed esportati.
+- Sessione tenuta sveglia: segnale periodico contro le disconnessioni per inattività.
+
+**Elenco e importazione**
+- Selezione multipla (Ctrl+clic, Maiusc+clic) con azioni di gruppo: connetti, sposta in cartella,
+  assegna un profilo di credenziali, elimina con conferma.
+- Importazione da CSV con anteprima e associazione delle colonne (separatore ; o ,, virgolette,
+  UTF-8 o Excel), righe non valide e doppioni esclusi.
+- F1: riepilogo di tutte le scorciatoie.
+
+**Altro**
+- Corretto: la Panoramica poteva far comparire un errore se lo schermo non era copiabile (per esempio
+  con la sessione di Windows bloccata).
+- docs/firma-signpath.md: dati e workflow pronti (disattivato) per chiedere la firma gratuita SignPath.
+
+Un connections.json dalla 1.0.0 alla 1.3.0 si carica senza perdere nulla. Nessun hook di tastiera,
+installer a cartella come nella 1.3.
+
 ## 1.3.0
+
 
 **Antivirus (priorità di questa versione)**
 - Su diversi PC l'antivirus bloccava l'installer o l'app. Microsoft Defender in locale non trova minacce

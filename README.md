@@ -16,6 +16,10 @@ Dalla 1.3: meno motivi di allarme per gli **antivirus** (niente hook di tastiera
 metadati e manifest, vedi «Antivirus e firma»), **aggiornamento automatico con conferma**, messaggi di
 errore di connessione con **causa probabile e soluzione**, **Impostazioni** con aggiornamenti e log,
 riordino delle connessioni **trascinandole**, impostazioni dell'app nei `.rdpm` e **log** a rotazione.
+Dalla 1.4: **spazi di lavoro** (connessioni e layout riaperti con un clic o una scorciatoia), **blocco
+con PIN** (anche dopo un tempo di inattività), **profili di qualità** per connessione, sessione **tenuta
+sveglia**, **selezione multipla** con azioni di gruppo, importazione da **CSV** con anteprima e riepilogo
+delle scorciatoie con **F1**.
 Le novità di ogni versione sono in [CHANGELOG.md](CHANGELOG.md).
 
 Le sessioni usano il controllo ActiveX Desktop remoto di Windows (`mstscax.dll`, classe
@@ -132,7 +136,7 @@ dotnet test RdpManager.sln -c Release
 dotnet run --project src/RdpManager
 ```
 
-I test (339 + 2 facoltativi; nel CI solo quelli del Core, con `--filter "Category!=UI"`) comprendono:
+I test (371 + 2 facoltativi; nel CI solo quelli del Core, con `--filter "Category!=UI"`) comprendono:
 - **Core**: salvataggio/ricaricamento JSON, cifratura DPAPI (nessuna password in chiaro nel JSON),
   lettura/generazione `.rdp`, cartelle (crea/rinomina/elimina), file temporaneo per mstsc; dalla 1.2
   profili di credenziali (risoluzione, cifratura, `.rdpm` senza password in chiaro, unione senza
@@ -300,6 +304,25 @@ prove precedenti.
 | 11 | La volta dopo: «Alla chiusura», poi chiudi l'app | L'aggiornamento si installa alla chiusura e l'app non si riapre. |
 | 12 | Con la versione portatile: *Aiuto → Controlla aggiornamenti* | Propone di aprire la pagina della release (non si aggiorna da sola). |
 
+## Prova manuale 1.4
+
+Da fare su un PC dove RdpManager 1.3.0 è installato, con almeno due PC remoti.
+
+| # | Passo | Risultato atteso |
+|---|---|---|
+| 1 | Lascia che la 1.3.0 proponga l'aggiornamento e scegli «Aggiorna ora» | Si aggiorna in silenzio e si riapre; connessioni, profili, impostazioni e ordine dell'elenco ci sono ancora. |
+| 2 | Apri tre sessioni, metti due affiancate (Ctrl+Alt+S); *Spazi di lavoro → Salva lo spazio attuale* «Mattina» | Lo spazio compare nel menu con il numero di connessioni. |
+| 3 | Chiudi tutto; *Spazi di lavoro → Mattina* | Si riaprono le tre sessioni nello stesso ordine, con le due affiancate (e schermo intero/monitor se c'erano). |
+| 4 | *Spazi di lavoro → Gestisci → Scorciatoia…* `Ctrl+Alt+Maiusc+1`; chiudi tutto e premila (anche col clic dentro una sessione) | Lo spazio si riapre. |
+| 5 | *File → Impostazioni → Avvio, blocco e aggiornamenti → Imposta PIN…*; poi **Ctrl+Alt+L** | La finestra sparisce e compare la schermata del PIN a tutto schermo; il menu dell'icona di notifica porta solo alla schermata. |
+| 6 | PIN sbagliato più volte, poi quello giusto | «PIN sbagliato»; dopo 5 errori attese crescenti; con il PIN giusto tornano finestra e sessioni, ancora connesse. |
+| 7 | Imposta «Blocca dopo 1 minuto» e non toccare il PC | Dopo un minuto RdpManager si blocca da solo. |
+| 8 | Alla schermata del PIN: *Ho dimenticato il PIN* → conferma | Il PIN è tolto, le connessioni restano, le password salvate vanno reinserite (alla connessione vengono chieste). |
+| 9 | Modifica una connessione: *Qualità → Connessione lenta*, *Tieni sveglia la sessione*; connetti | Desktop remoto a 16 bit senza sfondo né animazioni; la sessione non si chiude dopo un lungo periodo senza usarla. |
+| 10 | Ctrl+clic su tre connessioni, clic destro | Solo le azioni di gruppo: connetti, sposta in cartella, assegna profilo, elimina (con l'elenco dei nomi nella conferma). |
+| 11 | *File → Importa connessioni da CSV* con un file di Excel (separatore `;`, accenti) | Anteprima con le colonne riconosciute, righe escluse spiegate; si importano solo quelle valide e senza doppioni. |
+| 12 | **F1** fuori dalla sessione | Riepilogo di tutte le scorciatoie, divise per sezione, comprese quelle degli spazi di lavoro. |
+
 ## Cosa è stato provato e cosa no
 
 - **Provato automaticamente** (`dotnet test`): modello, salvataggio JSON e cifratura DPAPI, file `.rdp`,
@@ -427,7 +450,48 @@ Windows Sandbox.
   password del file; importando con «Unisci» un profilo già presente (stesso nome, utente e dominio) non
   si duplica e le connessioni importate usano quello esistente.
 
+### Spazi di lavoro (1.4)
+
+- *Spazi di lavoro → Salva lo spazio attuale…*: salva con un nome le sessioni aperte (nell'ordine delle
+  schede), la scheda in primo piano, il monitor, lo schermo intero e la vista affiancata (con la sua
+  divisione). Salvando con un nome già usato lo spazio si aggiorna.
+- Si riapre dal menu *Spazi di lavoro* o con la sua **scorciatoia** (*Gestisci → Scorciatoia…*, es.
+  `Ctrl+Alt+Maiusc+1`, valida anche dentro la sessione con RdpManager in primo piano). Le sessioni già
+  aperte restano; le connessioni eliminate nel frattempo si saltano.
+- *Gestisci*: rinomina, scorciatoia, elimina, ordine nel menu.
+
+### Blocco con PIN (1.4)
+
+- *File → Impostazioni → Avvio, blocco e aggiornamenti → Imposta PIN…* (da 4 a 12 cifre). Si salva solo
+  un'impronta **PBKDF2-SHA256 con salt**, mai il PIN.
+- **Ctrl+Alt+L** o *File → Blocca RdpManager* bloccano subito; con *Blocca dopo N minuti di inattività*
+  (predefinito 10, 0 = solo a mano) si blocca da solo. Con il PIN impostato RdpManager parte già bloccato.
+- Da bloccato: finestre nascoste (le sessioni restano connesse), password salvate **di nuovo cifrate** in
+  memoria e non lette finché non si sblocca, nessuna sessione nuova né riconnessione, scorciatoie ferme.
+  Dopo 5 PIN sbagliati si attende sempre di più.
+- **Ho dimenticato il PIN**: dopo la conferma il PIN è tolto e le password salvate (connessioni e profili)
+  si cancellano; le connessioni restano e le password andranno reinserite.
+
+### Qualità, sessione sveglia, selezione multipla, CSV (1.4)
+
+- **Qualità** (nella modifica della connessione): *Automatica* (decide il client misurando la rete, come
+  prima), *Rete locale* (32 bit, tutti gli effetti), *Connessione lenta* (16 bit, niente sfondo,
+  animazioni, temi e trascinamento con contenuto, compressione). Vale anche per *Apri con mstsc* e nei file
+  `.rdp` importati ed esportati (`connection type`, `session bpp`, `disable wallpaper`…).
+- **Tieni sveglia la sessione**: il controllo manda un segnale ogni minuto, così router e firewall non
+  chiudono la sessione per inattività.
+- **Selezione multipla**: Ctrl+clic aggiunge o toglie, Maiusc+clic seleziona un intervallo. Con più
+  connessioni selezionate il clic destro offre solo le **azioni di gruppo**: connetti, sposta in una
+  cartella (anche nuova), assegna un profilo di credenziali, elimina (la conferma elenca i nomi). Invio le
+  connette, Canc le elimina.
+- **Importa connessioni da CSV** (menu File): file con intestazione, separatore `;` o `,` riconosciuto da
+  solo, campi tra virgolette, testo UTF-8 o come lo salva Excel. Le colonne si associano in automatico dal
+  nome (*Nome, Host/Indirizzo/Server, Porta, Utente, Dominio, Cartella, Etichetta, MAC*) e si cambiano
+  nell'anteprima, che mostra le righe escluse (senza host, porta o MAC non validi, doppioni).
+- **F1**: riepilogo di tutte le scorciatoie (in sessione, globali, degli spazi di lavoro e della finestra).
+
 ### Riordino, errori di connessione e impostazioni (1.3)
+
 
 - **Riordino**: trascina una connessione su un'altra per metterla prima di lei (anche in un'altra
   cartella), su una cartella per metterla in fondo. Da lì l'elenco segue l'ordine scelto a mano;
@@ -565,6 +629,8 @@ Impostazioni* (clic sulla casella, poi la combinazione; serve Ctrl o Alt; Canc l
 | Ctrl+Alt+G | Panoramica delle sessioni connesse |
 | Ctrl+Alt+Spazio | ricerca rapida |
 | Ctrl+Alt+S | vista affiancata sì/no |
+| Ctrl+Alt+L | blocca RdpManager (serve un PIN) |
+| scelta in *Spazi di lavoro → Gestisci* | apri uno spazio di lavoro |
 
 Fuori dall'app, da qualunque programma: **Ctrl+Alt+Maiusc+R** riporta in primo piano RdpManager
 (scorciatoia globale, si cambia nelle impostazioni).
@@ -586,6 +652,8 @@ Nell'app:
 | Ctrl+F | ricerca |
 | Ctrl+I | importa file .rdp |
 | Ctrl+H | cronologia delle connessioni |
+| **F1** | riepilogo di tutte le scorciatoie |
+| Ctrl+clic, Maiusc+clic | selezione multipla nell'elenco (poi Invio, Canc o clic destro per le azioni di gruppo) |
 | Ctrl+, | impostazioni |
 | Invio | connetti la connessione selezionata |
 | F5 / F11 | riconnetti / schermo intero |
@@ -599,8 +667,8 @@ remoto (così Ctrl+N, F5 ecc. funzionano nelle app remote).
 
 - Connessioni, cartelle, profili di credenziali, testi rapidi e impostazioni (scorciatoie, monitor,
   barra laterale, tema, sessioni da riaprire): `%APPDATA%\RdpManager\connections.json` (menu *File →
-  Apri cartella dei dati*). Un file della 1.0.0 o della 1.1.0 si carica senza perdite: i campi nuovi
-  prendono i valori predefiniti.
+  Apri cartella dei dati*), insieme agli spazi di lavoro e all'impronta del PIN (mai il PIN). Un file
+  dalla 1.0.0 alla 1.3.0 si carica senza perdite: i campi nuovi prendono i valori predefiniti.
 - Cronologia delle sessioni: `%APPDATA%\RdpManager\history.json` (nomi, host, orari e motivi; niente
   utenti né password).
 - Per provare con un elenco a parte: `RdpManager.exe --dati C:\percorso\prova.json`.
@@ -635,4 +703,5 @@ verifica/                 script dei criteri di verifica e prova dell'installer
 scripts/release.ps1       pubblicazione di una nuova versione (vedi «Pubblicare un aggiornamento»)
 CHANGELOG.md              novità di ogni versione (usate come note della release)
 docs/falsi-positivi.md    antivirus: diagnosi, segnalazione dei falsi positivi, firma futura
+docs/firma-signpath.md    firma gratuita SignPath per i progetti open source (preparata, non richiesta)
 ```
