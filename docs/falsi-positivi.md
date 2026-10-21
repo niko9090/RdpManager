@@ -29,7 +29,10 @@ Microsoft Defender (firme 1.461.135.0), scansione personalizzata del singolo fil
 |---|---|---|
 | `RdpManager-Setup-1.2.0.exe` (release) | nessuna minaccia | 0 |
 | `RdpManager-1.2.0-win-x64.exe` (release) | nessuna minaccia | 0 |
-| `RdpManager-Setup-1.3.0.exe` e `RdpManager.exe` a cartella | nessuna minaccia (vedi CHANGELOG 1.3.0) | 0 |
+| `RdpManager-Setup-1.3.0.exe` (build di rilascio) | nessuna minaccia | 0 |
+| `RdpManager-1.3.0-win-x64.exe` (portatile) e `RdpManager.exe` a cartella | nessuna minaccia | 0 |
+
+Nella dll della 1.3.0 la funzione `SetWindowsHookEx` non compare più (controllato con una ricerca nel file).
 
 Nessuna firma statica di Defender riconosce i file come nocivi: i blocchi visti su altri PC vengono quasi
 certamente dalla **reputazione** (SmartScreen, «file scaricato raramente», editore sconosciuto) e
