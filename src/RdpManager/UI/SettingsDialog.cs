@@ -16,6 +16,11 @@ public sealed class SettingsDialog : Form
     private readonly CheckBox _closeToTray = new() { Text = "Chiudendo la finestra resta nell'area di notifica", AutoSize = true };
     private readonly ShortcutBox _globalHotkey = new() { Width = 200 };
     private readonly CheckBox _history = new() { Text = "Annota inizio, fine e motivo di ogni sessione", AutoSize = true };
+    private readonly RadioButton _updAuto = new() { Text = "Automatici con conferma: scarica e verifica in sottofondo, poi chiede", AutoSize = true };
+    private readonly RadioButton _updNotify = new() { Text = "Solo avviso nella barra di stato", AutoSize = true };
+    private readonly RadioButton _updOff = new() { Text = "Spenti (resta «Aiuto › Controlla aggiornamenti»)", AutoSize = true };
+    private readonly CheckBox _verboseLog = new() { Text = "Log dettagliato (anche gli indirizzi dei PC; mai le password)", AutoSize = true };
+    private readonly CheckBox _manualOrder = new() { Text = "Ordine delle connessioni scelto trascinandole (altrimenti per nome)", AutoSize = true };
     private readonly IReadOnlyList<ScreenInfo> _screens = Screens.All();
 
     private static readonly (AppTheme Theme, string Text)[] ThemeChoices =
@@ -67,9 +72,24 @@ public sealed class SettingsDialog : Form
         _autoHide.Checked = !_pinned.Checked;
         general.Controls.Add(Group("Barra laterale", Flow(_pinned, _autoHide)));
 
+        _manualOrder.Checked = settings.ConnectionOrder == ConnectionOrder.Manual;
+        general.Controls.Add(Group("Elenco", _manualOrder));
+
+        // ---------- Avvio e aggiornamenti ----------
+        var startup = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Dock = DockStyle.Fill };
         _reopen.Checked = settings.ReopenSessionsOnStartup;
+        startup.Controls.Add(Group("Avvio", _reopen));
+        _updAuto.Checked = settings.UpdateMode == UpdateMode.AutomaticWithConfirmation;
+        _updNotify.Checked = settings.UpdateMode == UpdateMode.NotifyOnly;
+        _updOff.Checked = settings.UpdateMode == UpdateMode.Off;
+        startup.Controls.Add(Group("Aggiornamenti", _updAuto, _updNotify, _updOff,
+            Note("Controllo all'avvio e ogni 24 ore. L'installer si usa solo se il suo SHA256 coincide con SHA256SUMS.txt della release; l'installazione chiede sempre conferma. La versione portatile apre la pagina della release.")));
         _history.Checked = settings.HistoryEnabled;
-        general.Controls.Add(Group("Avvio e cronologia", _reopen, _history));
+        _verboseLog.Checked = settings.VerboseLog;
+        var openLogs = new Button { Text = "Apri la cartella dei log", AutoSize = true };
+        openLogs.Click += (_, _) => OpenFolder(AppLog.Default?.Directory ?? AppLog.DefaultDirectory);
+        startup.Controls.Add(Group("Cronologia e log", _history, _verboseLog,
+            Note(@"Log a rotazione in %LOCALAPPDATA%\RdpManager\logs (5 file da 1 MB)."), openLogs));
 
         // ---------- Scorciatoie ----------
         var keys = new TableLayoutPanel { ColumnCount = 2, AutoSize = true };
@@ -89,14 +109,17 @@ public sealed class SettingsDialog : Form
         };
         var shortcuts = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Dock = DockStyle.Fill };
         shortcuts.Controls.Add(Group("Scorciatoie (valgono anche dentro la sessione remota)", keys,
-            Note("Clic su una casella e premi la combinazione (con Ctrl o Alt). Canc la disattiva."), defaults));
+            Note("Clic su una casella e premi la combinazione (con Ctrl o Alt). Canc la disattiva."),
+            Note("Funzionano con RegisterHotKey solo mentre RdpManager è in primo piano: nessun hook di tastiera (dalla 1.3). Se un altro programma usa già una combinazione, la barra di stato lo dice."),
+            defaults));
 
         var tabs = new TabControl { Dock = DockStyle.Fill };
         tabs.TabPages.Add(Page("Generale", general));
         tabs.TabPages.Add(Page("Scorciatoie", shortcuts));
+        tabs.TabPages.Add(Page("Avvio e aggiornamenti", startup));
         // Il TabControl non si adatta da solo al contenuto: la pagina più grande decide la dimensione.
-        var size = new Size(Math.Max(general.PreferredSize.Width, shortcuts.PreferredSize.Width) + 24,
-            Math.Max(general.PreferredSize.Height, shortcuts.PreferredSize.Height) + 48);
+        Control[] pages = [general, shortcuts, startup];
+        var size = new Size(pages.Max(p => p.PreferredSize.Width) + 24, pages.Max(p => p.PreferredSize.Height) + 48);
         tabs.Size = size;
         tabs.Dock = DockStyle.None;
 
@@ -111,6 +134,18 @@ public sealed class SettingsDialog : Form
         Controls.Add(tabs);
         Controls.Add(buttons);
         ThemeManager.Apply(this);
+    }
+
+    private static void OpenFolder(string dir)
+    {
+        try
+        {
+            Directory.CreateDirectory(dir);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe") { ArgumentList = { dir }, UseShellExecute = false });
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+        {
+        }
     }
 
     private static TabPage Page(string title, Control content)
@@ -169,6 +204,9 @@ public sealed class SettingsDialog : Form
         _settings.CloseToTray = _tray.Checked && _closeToTray.Checked;
         _settings.GlobalHotkey = _globalHotkey.Combo.IsEmpty ? "" : _globalHotkey.Combo.ToString();
         _settings.HistoryEnabled = _history.Checked;
+        _settings.VerboseLog = _verboseLog.Checked;
+        _settings.UpdateMode = _updOff.Checked ? UpdateMode.Off : _updNotify.Checked ? UpdateMode.NotifyOnly : UpdateMode.AutomaticWithConfirmation;
+        _settings.ConnectionOrder = _manualOrder.Checked ? ConnectionOrder.Manual : ConnectionOrder.Alphabetical;
     }
 
     /// <summary>Casella che registra una combinazione di tasti invece di testo.</summary>

@@ -89,6 +89,12 @@ public sealed class AppSettings
 
     public ConnectionOrder ConnectionOrder { get; set; } = ConnectionOrder.Alphabetical;
 
+    /// <summary>
+    /// Impostato prima di un aggiornamento con «Aggiorna ora»: al prossimo avvio si riaprono le sessioni di
+    /// <see cref="OpenSessions"/> anche se la riapertura all'avvio è spenta, poi torna falso.
+    /// </summary>
+    public bool ReopenOnceAfterUpdate { get; set; }
+
     public ShortcutMap GetShortcuts() => ShortcutMap.FromSettings(Shortcuts);
 
     /// <summary>
@@ -99,6 +105,7 @@ public sealed class AppSettings
         var copy = Clone();
         copy.PreferredMonitor = null;
         copy.OpenSessions = [];
+        copy.ReopenOnceAfterUpdate = false;
         return copy;
     }
 
@@ -124,6 +131,17 @@ public sealed class AppSettings
         ConnectionOrder = src.ConnectionOrder;
         PreferredMonitor = monitor;
         OpenSessions = open;
+    }
+
+    /// <summary>
+    /// Sessioni da riaprire all'avvio: quelle salvate se la riapertura è attiva o se c'è appena stato un
+    /// aggiornamento (in quel caso il segnale si consuma). Lista vuota = nessuna.
+    /// </summary>
+    public IReadOnlyList<Guid> TakeSessionsToReopen()
+    {
+        bool once = ReopenOnceAfterUpdate;
+        ReopenOnceAfterUpdate = false;
+        return ReopenSessionsOnStartup || once ? OpenSessions.ToList() : [];
     }
 
     /// <summary>Copia indipendente (elenchi compresi), per i dialoghi che si possono annullare.</summary>

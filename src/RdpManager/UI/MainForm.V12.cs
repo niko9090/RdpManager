@@ -657,98 +657,199 @@ public sealed partial class MainForm
             _tray.Dispose();
             _tray = null;
         }
-        if (_pendingInstaller is { } installer)
-        {
-            // Di nuovo, subito prima dell'avvio: il file potrebbe essere stato cambiato dopo lo scaricamento.
-            if (_pendingInstallerHash is not { } hash || !File.Exists(installer) || !Sha256Sums.Verify(installer, hash))
-            {
-                MessageBox.Show("L'installer scaricato non corrisponde più allo SHA256 verificato: non viene avviato.",
-                    "Aggiornamento", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-            try
-            {
-                Process.Start(new ProcessStartInfo(installer) { UseShellExecute = true });
-            }
-            catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
-            {
-                MessageBox.Show("Impossibile avviare l'installer: " + ex.Message, "Aggiornamento", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
+        // «Aggiorna ora» (con riavvio) o «Alla chiusura» (senza): solo un installer ancora verificato.
+        if (_installNowRequested || _updates.InstallOnExit)
+            StartVerifiedInstaller(relaunch: _installNowRequested);
     }
 
-    // ---------- aggiornamento con un clic ----------
+    // ---------- aggiornamento automatico con conferma ----------
 
     private static readonly HttpClient DownloadHttp = new() { Timeout = TimeSpan.FromMinutes(15) };
-    private string? _pendingInstaller, _pendingInstallerHash;
-    private bool _updating;
+    private readonly AutoUpdatePlanner _updates = new();
+    private readonly System.Windows.Forms.Timer _updateTimer = new() { Interval = 60 * 60 * 1000 };
+    private UpdateOfferForm? _updateOffer;
+    private bool _updating, _installNowRequested, _closingForUpdate;
 
-    /// <summary>Propone l'aggiornamento: scaricarlo e verificarlo, oppure aprire la pagina della release.</summary>
-    private async Task OfferUpdateAsync(ReleaseInfo release)
+    internal AutoUpdatePlanner Updates => _updates;
+    internal UpdateOfferForm? UpdateOffer => _updateOffer is { IsDisposed: false } f ? f : null;
+
+    /// <summary>Avvio dell'installer (le prove automatiche lo sostituiscono per non eseguire nulla).</summary>
+    internal Action<ProcessStartInfo> StartInstaller { get; set; } = psi => Process.Start(psi);
+
+    /// <summary>Per le prove: forza installata (false) o portatile (true); null = come è davvero.</summary>
+    internal bool? PortableOverride { get; set; }
+
+    /// <summary>Per le prove: risposta alla conferma di «Aggiorna ora» con sessioni aperte (null = chiede davvero).</summary>
+    internal Func<string, bool>? ConfirmOverride { get; set; }
+
+    /// <summary>Cartella degli aggiornamenti (le prove ne usano una temporanea).</summary>
+    internal string UpdateFolder { get; set; } = UpdateDownloader.DefaultFolder;
+
+    private bool IsPortable => PortableOverride ?? InstallLocation.IsPortable(Application.ExecutablePath);
+
+    private void InitAutoUpdate(bool checkOnStartup)
     {
-        var page = new TaskDialogPage
+        if (!checkOnStartup)
+            return;
+        // All'avvio e poi ogni 24 ore (il timer guarda ogni ora se il giorno è passato).
+        _updateTimer.Tick += async (_, _) =>
         {
-            Caption = "Aggiornamenti",
-            Heading = $"È disponibile RdpManager {release.Version.ToString(3)}",
-            Text = $"In uso: {AppInfo.VersionText}.\n\n«Aggiorna ora» scarica l'installer della release in una cartella temporanea, " +
-                   $"ne controlla lo SHA256 con {Sha256Sums.FileName} della stessa release e lo avvia solo dopo la tua conferma.",
-            Icon = TaskDialogIcon.Information,
+            if (_updates.IsCheckDue(DateTime.UtcNow))
+                await CheckForUpdatesAsync(manual: false);
+            else if (_doc.Settings.UpdateMode == UpdateMode.AutomaticWithConfirmation && _updates.ShouldOffer(DateTime.UtcNow))
+                ShowUpdateOffer();
         };
-        var update = new TaskDialogButton("Aggiorna ora");
-        var open = new TaskDialogButton("Apri la pagina");
-        page.Buttons.Add(update);
-        page.Buttons.Add(open);
-        page.Buttons.Add(TaskDialogButton.Cancel);
-        var answer = TaskDialog.ShowDialog(this, page);
-        if (answer == open)
-            OpenUrl(release.PageUrl);
-        else if (answer == update)
-            await DownloadAndInstallAsync(release);
+        _updateTimer.Start();
+        FormClosed += (_, _) => _updateTimer.Stop();
     }
 
-    private async Task DownloadAndInstallAsync(ReleaseInfo release)
+    /// <summary>
+    /// Dopo aver trovato una versione più nuova: versione installata e modalità automatica (o richiesta a mano) →
+    /// scarica in %LOCALAPPDATA%\RdpManager\updates, verifica lo SHA256 e, solo se coincide, propone l'aggiornamento.
+    /// </summary>
+    private async Task PrepareUpdateAsync(ReleaseInfo release, bool manual)
     {
-        if (_updating)
+        if (IsPortable)
+        {
+            // La versione portatile non si aggiorna da sola: si apre la pagina della release.
+            if (manual && MessageBox.Show(this, $"È disponibile RdpManager {release.Version.ToString(3)} (in uso: {AppInfo.VersionText}).\n\n" +
+                        "Questa è la versione portatile, che non si aggiorna da sola: aprire la pagina della release?",
+                    "Aggiornamenti", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
+                OpenUrl(release.PageUrl);
             return;
-        _updating = true;
-        UpdateDownloadResult result;
-        try
-        {
-            ShowNotice("Scaricamento dell'aggiornamento…");
-            var progress = new Progress<double>(p => { _notice.Text = $"Scaricamento dell'aggiornamento: {p:P0}"; _notice.Visible = true; });
-            result = await UpdateDownloader.DownloadAndVerifyAsync(DownloadHttp, release, progress: progress);
         }
-        catch (Exception ex)
+        if (_updates.ShouldDownload(release, AppInfo.Version))
         {
-            // Qualunque imprevisto (nome di file strano, errore del sistema): niente avvio e niente crash.
-            result = new UpdateDownloadResult(UpdateDownloadStatus.Failed, null, "Scaricamento non riuscito: " + ex.Message);
+            if (_updating)
+                return;
+            _updating = true;
+            UpdateDownloadResult result;
+            try
+            {
+                AppLog.Default?.Info($"Aggiornamento {release.Tag}: scaricamento e verifica");
+                if (manual)
+                    ShowNotice("Scaricamento dell'aggiornamento…");
+                var progress = new Progress<double>(p => { if (manual) { _notice.Text = $"Scaricamento dell'aggiornamento: {p:P0}"; _notice.Visible = true; } });
+                result = await UpdateDownloader.DownloadAndVerifyAsync(DownloadHttp, release, UpdateFolder, progress);
+            }
+            catch (Exception ex)
+            {
+                // Qualunque imprevisto (nome di file strano, errore del sistema): niente avvio e niente crash.
+                result = new UpdateDownloadResult(UpdateDownloadStatus.Failed, null, "Scaricamento non riuscito: " + ex.Message);
+            }
+            finally
+            {
+                _updating = false;
+            }
+            if (IsDisposed)
+                return;
+            if (!_updates.Accept(release, result))
+            {
+                AppLog.Default?.Warning($"Aggiornamento {release.Tag} non verificato: {result.Status}");
+                if (manual)
+                    MessageBox.Show(this, result.Message + "\n\nNon è stato avviato nulla. Puoi scaricare il Setup dalla pagina della release.",
+                        "Aggiornamento", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            AppLog.Default?.Info($"Aggiornamento {release.Tag} verificato con SHA256");
         }
-        finally
-        {
-            _updating = false;
-        }
-        if (IsDisposed)
+        if (_updates.Ready is { } ready)
+            UpdateDownloader.CleanFolder(Path.GetDirectoryName(ready.InstallerPath)!, keep: ready.InstallerPath);
+        if (manual || _updates.ShouldOffer(DateTime.UtcNow))
+            ShowUpdateOffer();
+    }
+
+    /// <summary>Avviso non modale con le novità e le tre scelte.</summary>
+    internal void ShowUpdateOffer()
+    {
+        if (_updates.Ready is not { } ready || IsDisposed)
             return;
-        if (!result.IsVerified)
+        if (UpdateOffer is { } open)
         {
-            ShowNotice("Aggiornamento non riuscito");
-            MessageBox.Show(this, result.Message + "\n\nNon è stato avviato nulla. Puoi scaricare il Setup dalla pagina della release.",
+            open.Activate();
+            return;
+        }
+        var form = new UpdateOfferForm(ready, AppInfo.VersionText);
+        form.PlaceOver(Bounds);
+        form.Chosen += (_, choice) => OnUpdateChoice(choice);
+        form.PageRequested += (_, _) => OpenUrl(ready.Release.PageUrl);
+        form.FormClosed += (_, _) => BeginInvoke(form.Dispose);
+        _updateOffer = form;
+        if (Visible)
+            form.Show(this);
+        else
+            form.Show();
+    }
+
+    private void OnUpdateChoice(UpdateChoice choice)
+    {
+        if (_updates.Ready is not { } ready)
+            return;
+        _updates.Choose(choice, DateTime.UtcNow);
+        AppLog.Default?.Info($"Aggiornamento {ready.Release.Tag}: scelta {choice}");
+        switch (choice)
+        {
+            case UpdateChoice.Later:
+                ShowNotice($"Aggiornamento a {ready.Release.Version.ToString(3)} rimandato: te lo ripropongo tra 24 ore o al prossimo avvio.");
+                break;
+            case UpdateChoice.OnExit:
+                ShowNotice($"RdpManager {ready.Release.Version.ToString(3)} si installerà quando chiudi l'app.");
+                break;
+            case UpdateChoice.Now:
+                BeginInvoke(InstallNow);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// «Aggiorna ora»: con sessioni aperte chiede conferma (verranno chiuse e riaperte), salva le sessioni per la
+    /// riapertura e chiude l'app; l'installer silenzioso parte alla chiusura e riapre RdpManager (/RELAUNCH=1).
+    /// </summary>
+    internal void InstallNow()
+    {
+        int open = AllViews.Count();
+        var question = $"Le {open} sessioni aperte verranno chiuse e, dopo l'aggiornamento, riaperte.\n\nAggiornare ora RdpManager?";
+        if (open > 0 && !(ConfirmOverride?.Invoke(question)
+                          ?? MessageBox.Show(this, question, "Aggiornamento", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes))
+            return;
+        if (_updates.VerifiedInstallerToRun() is null)
+        {
+            MessageBox.Show(this, "L'installer scaricato non corrisponde più allo SHA256 verificato ed è stato cancellato: non viene avviato nulla.",
                 "Aggiornamento", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
-        ShowNotice(result.Message);
-        if (MessageBox.Show(this, result.Message + "\n\nAvviare l'installazione ora? RdpManager si chiude (le sessioni connesse " +
-                                  "vengono disconnesse) e l'installer lo aggiorna; connessioni e impostazioni restano.",
-                "Aggiornamento", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
-            return;
-        _pendingInstaller = result.InstallerPath;
-        _pendingInstallerHash = result.Sha256;
+        _installNowRequested = _closingForUpdate = true;
         ExitApp();
         if (!IsDisposed && Visible)
         {
-            // Uscita annullata: l'installer non parte.
-            _pendingInstaller = _pendingInstallerHash = null;
-            ShowNotice("Aggiornamento rimandato: l'installer verificato resta in " + Path.GetDirectoryName(result.InstallerPath));
+            _installNowRequested = _closingForUpdate = false; // uscita annullata: non si installa
+            ShowNotice("Aggiornamento annullato.");
+        }
+    }
+
+    /// <summary>Ricontrolla lo SHA256 e avvia l'installer silenzioso; un file non verificato non si esegue mai.</summary>
+    private void StartVerifiedInstaller(bool relaunch)
+    {
+        var installer = _updates.VerifiedInstallerToRun();
+        if (installer is null)
+        {
+            AppLog.Default?.Warning("Installer non più verificato alla chiusura: non avviato");
+            return;
+        }
+        try
+        {
+            AppLog.Default?.Info($"Avvio dell'installer silenzioso (riapertura: {(relaunch ? "sì" : "no")})");
+            StartInstaller(new ProcessStartInfo(installer)
+            {
+                Arguments = InstallLocation.SilentArguments(relaunch),
+                UseShellExecute = true,
+                WorkingDirectory = Path.GetDirectoryName(installer)!,
+            });
+        }
+        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
+        {
+            AppLog.Default?.Error("Avvio dell'installer non riuscito", ex);
+            MessageBox.Show("Impossibile avviare l'installer: " + ex.Message, "Aggiornamento", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 

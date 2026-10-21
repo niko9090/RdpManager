@@ -79,7 +79,13 @@ public sealed partial class MainForm : Form
         _statusStrip.Items.Add(_status);
         _statusStrip.Items.Add(_notice);
         _statusStrip.Items.Add(_updateLabel);
-        _updateLabel.Click += async (_, _) => { if (_availableUpdate is { } r) await OfferUpdateAsync(r); };
+        _updateLabel.Click += async (_, _) =>
+        {
+            if (_updates.Ready is not null)
+                ShowUpdateOffer();
+            else if (_availableUpdate is { } r)
+                await PrepareUpdateAsync(r, manual: true);
+        };
         _noticeTimer.Tick += (_, _) => { _noticeTimer.Stop(); _notice.Visible = false; };
         if (checkUpdatesOnStartup)
             Shown += async (_, _) => await CheckForUpdatesAsync(manual: false);
@@ -95,6 +101,7 @@ public sealed partial class MainForm : Form
         LoadConnections();
         ApplySettings();
         InitV12();
+        InitAutoUpdate(checkUpdatesOnStartup);
         MstscLauncher.CleanupOldFiles();
 
         Load += (_, _) => PlaceOnPreferredMonitor();
@@ -207,11 +214,20 @@ public sealed partial class MainForm : Form
         view.DropDownItems.Add(new ToolStripSeparator());
         view.DropDownItems.Add(_monitorMenu);
         view.DropDownItems.Add(Item("Sposta la finestra sul monitor &successivo", Keys.None, (_, _) => MoveToNextMonitor()));
+        view.DropDownItems.Add(new ToolStripSeparator());
+        view.DropDownItems.Add(Item("Ordina le connessioni per &nome", Keys.None, (_, _) =>
+        {
+            _doc.SortAlphabetically();
+            SaveConnections();
+            RefreshTree();
+            ShowNotice("Connessioni in ordine di nome (trascinandole si torna all'ordine scelto a mano).");
+        }));
 
         var help = new ToolStripMenuItem("A&iuto");
         help.DropDownItems.Add(Item("&Scorciatoie da tastiera", Keys.None, (_, _) => ShowShortcutHelp()));
         help.DropDownItems.Add(Item("Controlla &aggiornamenti", Keys.None, async (_, _) => await CheckForUpdatesAsync(manual: true)));
         help.DropDownItems.Add(Item("Pagina del &progetto su GitHub", Keys.None, (_, _) => OpenUrl(AppInfo.RepositoryUrl)));
+        help.DropDownItems.Add(Item("Apri la cartella dei &log", Keys.None, (_, _) => OpenLogFolder()));
         help.DropDownItems.Add(new ToolStripSeparator());
         help.DropDownItems.Add(Item("&Informazioni", Keys.None, (_, _) => ShowAbout()));
 
@@ -324,14 +340,11 @@ public sealed partial class MainForm : Form
             if (e.Data?.GetData(typeof(TreeNode)) is not TreeNode { Tag: RdpConnection c })
                 return;
             var target = _tree.GetNodeAt(_tree.PointToClient(new Point(e.X, e.Y)));
-            c.Group = target?.Tag switch
+            if (DropConnection(c, target?.Tag))
             {
-                FolderTag f => f.Path,
-                RdpConnection other => other.Group,
-                _ => "",
-            };
-            SaveConnections();
-            RefreshTree(c);
+                SaveConnections();
+                RefreshTree(c);
+            }
         };
 
         _tabs.SelectedIndexChanged += (_, _) =>
@@ -359,6 +372,19 @@ public sealed partial class MainForm : Form
 
         FormClosing += OnFormClosing;
     }
+
+    /// <summary>
+    /// Connessione trascinata: su una cartella va in fondo a quella cartella, su un'altra connessione si mette prima
+    /// di lei (stessa cartella), sul vuoto va in fondo alla radice. L'elenco passa all'ordine manuale.
+    /// </summary>
+    internal bool DropConnection(RdpConnection moving, object? target) => target switch
+    {
+        FolderTag f => _doc.MoveConnection(moving.Id, null, f.Path),
+        RdpConnection other when other != moving => _doc.MoveConnection(moving.Id, other.Id, other.Group),
+        RdpConnection => false,
+        QuickTag or SectionTag => false, // Preferiti e Recenti hanno un ordine proprio
+        _ => _doc.MoveConnection(moving.Id, null, ""),
+    };
 
     private static string? CollapseKey(TreeNode? node) => node?.Tag switch
     {
@@ -455,8 +481,7 @@ public sealed partial class MainForm : Form
         }
         TreeNode? toSelect = null;
         var comparer = StringComparer.CurrentCultureIgnoreCase;
-        foreach (var c in _doc.Connections.Where(c => c.Matches(query) || (filtering && c.Label.Contains(query, StringComparison.CurrentCultureIgnoreCase)))
-                     .OrderBy(c => c.DisplayName, comparer))
+        foreach (var c in _doc.InDisplayOrder(_doc.Connections.Where(c => c.Matches(query))))
         {
             var node = ConnectionNode(c, c);
             FolderNodes(c.Group).Add(node);
@@ -740,12 +765,14 @@ public sealed partial class MainForm : Form
             return;
         }
         string? password;
+        bool includeSettings;
         using (var options = new RdpmExportDialog(_doc.Connections.Count))
         {
             ThemeManager.Apply(options);
             if (options.ShowDialog(this) != DialogResult.OK)
                 return;
             password = options.FilePassword;
+            includeSettings = options.IncludeSettings;
         }
         using var save = new SaveFileDialog
         {
@@ -757,7 +784,7 @@ public sealed partial class MainForm : Form
         try
         {
             Cursor = Cursors.WaitCursor;
-            RdpmFile.Save(save.FileName, _doc, password);
+            RdpmFile.Save(save.FileName, _doc, password, includeSettings);
         }
         catch (Exception ex)
         {
@@ -771,8 +798,9 @@ public sealed partial class MainForm : Form
         int withPassword = password is null ? 0
             : _doc.Connections.Count(c => !string.IsNullOrEmpty(c.Password)) + _doc.CredentialProfiles.Count(p => !string.IsNullOrEmpty(p.Password));
         var profiles = _doc.CredentialProfiles.Count > 0 ? $", {_doc.CredentialProfiles.Count} profili" : "";
-        ShowNotice($"Esportate {_doc.Connections.Count} connessioni{profiles} in {Path.GetFileName(save.FileName)}" +
+        ShowNotice($"Esportate {_doc.Connections.Count} connessioni{profiles}{(includeSettings ? " e le impostazioni" : "")} in {Path.GetFileName(save.FileName)}" +
                    (password is null ? " (senza password)" : $" ({withPassword} password cifrate)"));
+        AppLog.Default?.Info($"Esportazione .rdpm: {_doc.Connections.Count} connessioni, impostazioni {(includeSettings ? "sì" : "no")}, password {(password is null ? "escluse" : "cifrate")}");
     }
 
     private void ImportRdpm()
@@ -818,15 +846,24 @@ public sealed partial class MainForm : Form
         }
 
         ImportMode mode;
+        bool applySettings;
         using (var dlg = new RdpmImportDialog(imported.Connections.Count, _doc.Connections.Count,
-                   imported.Connections.Any(c => c.HasPassword) || imported.CredentialProfiles.Any(p => p.HasPassword)))
+                   imported.Connections.Any(c => c.HasPassword) || imported.CredentialProfiles.Any(p => p.HasPassword),
+                   imported.SettingsIncluded))
         {
             ThemeManager.Apply(dlg);
             if (dlg.ShowDialog(this) != DialogResult.OK)
                 return;
             mode = dlg.Mode;
+            applySettings = dlg.ApplySettings;
         }
-        var result = RdpmFile.ApplyImport(_doc, imported, mode);
+        var result = RdpmFile.ApplyImport(_doc, imported, mode, applySettings);
+        if (result.SettingsApplied)
+        {
+            ApplySettings();
+            ApplyTheme();
+            ApplySystemIntegration();
+        }
         SaveConnections();
         RefreshTree();
         var text = $"Aggiunte {result.Added} connessioni";
@@ -838,6 +875,9 @@ public sealed partial class MainForm : Form
             text += $", {result.ProfilesAdded} profili di credenziali";
         if (result.QuickTextsAdded > 0)
             text += $", {result.QuickTextsAdded} testi rapidi";
+        if (result.SettingsApplied)
+            text += "; impostazioni dell'app applicate";
+        AppLog.Default?.Info($"Importazione .rdpm: {result.Added} aggiunte, {result.Skipped} doppioni, {result.Removed} sostituite, impostazioni {(result.SettingsApplied ? "applicate" : "no")}");
         MessageBox.Show(this, text + ".", "Importa", MessageBoxButtons.OK, MessageBoxIcon.Information);
         if (_backgroundChecks)
             _ = CheckReachabilityAsync(_doc.Connections.ToList());
@@ -965,6 +1005,10 @@ public sealed partial class MainForm : Form
     /// </summary>
     private async Task CheckForUpdatesAsync(bool manual)
     {
+        var mode = _doc.Settings.UpdateMode;
+        if (!manual && mode == UpdateMode.Off)
+            return;
+        _updates.MarkChecked(DateTime.UtcNow);
         var result = await UpdateChecker.CheckAsync(Http, AppInfo.Version, TimeSpan.FromSeconds(manual ? 15 : 5));
         if (IsDisposed)
             return;
@@ -972,16 +1016,19 @@ public sealed partial class MainForm : Form
         {
             _availableUpdate = release;
             _updateLabel.Text = $"È disponibile la versione {release.Version.ToString(3)} — clic per aggiornare";
-
             _updateLabel.ToolTipText = release.PageUrl;
             _updateLabel.Visible = true;
+            AppLog.Default?.Info($"Aggiornamento disponibile: {release.Tag}");
+            // Automatico con conferma: scarica e verifica in sottofondo, poi chiede (versione installata).
+            if (!manual && mode == UpdateMode.AutomaticWithConfirmation && !IsPortable)
+                await PrepareUpdateAsync(release, manual: false);
         }
         if (!manual)
             return;
         switch (result.Status)
         {
             case UpdateCheckStatus.NewerAvailable:
-                await OfferUpdateAsync(result.Release!);
+                await PrepareUpdateAsync(result.Release!, manual: true);
                 break;
             case UpdateCheckStatus.UpToDate:
                 MessageBox.Show(this, $"RdpManager {AppInfo.VersionText} è la versione più recente.", "Aggiornamenti",
@@ -999,6 +1046,13 @@ public sealed partial class MainForm : Form
     {
         if (Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps)
             Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
+    }
+
+    private static void OpenLogFolder()
+    {
+        var dir = AppLog.Default?.Directory ?? AppLog.DefaultDirectory;
+        Directory.CreateDirectory(dir);
+        Process.Start(new ProcessStartInfo("explorer.exe") { ArgumentList = { dir }, UseShellExecute = false });
     }
 
     private void OpenDataFolder()

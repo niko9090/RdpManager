@@ -61,6 +61,8 @@ public sealed partial class MainForm
     private void ApplySettings()
     {
         _shortcuts = _doc.Settings.GetShortcuts();
+        if (AppLog.Default is { } log)
+            log.Verbose = _doc.Settings.VerboseLog;
         if (Form.ActiveForm == this || NativeMethods.IsOwnProcessForeground())
             RegisterSessionHotkeys();
         _fullScreenItem.ShortcutKeyDisplayString = $"F11, {_shortcuts[ShortcutAction.ToggleFullScreen]}";
@@ -392,9 +394,16 @@ public sealed partial class MainForm
 
     private void ReopenSessions()
     {
-        if (!_doc.Settings.ReopenSessionsOnStartup)
-            return;
-        foreach (var id in _doc.Settings.OpenSessions.ToList())
+        bool afterUpdate = _doc.Settings.ReopenOnceAfterUpdate;
+        var ids = _doc.Settings.TakeSessionsToReopen();
+        if (afterUpdate)
+        {
+            SaveConnections(); // il segnale «dopo l'aggiornamento» vale una volta sola
+            AppLog.Default?.Info($"Riavvio dopo l'aggiornamento a {AppInfo.VersionText}: riapro {ids.Count} sessioni");
+            if (ids.Count > 0)
+                ShowNotice($"RdpManager aggiornato alla {AppInfo.VersionText}: riapro le sessioni di prima.");
+        }
+        foreach (var id in ids)
             if (_doc.Find(id) is { } c)
                 OpenSession(c);
     }
@@ -405,19 +414,24 @@ public sealed partial class MainForm
             return;
         var views = AllViews.ToList();
         int connected = views.Count(v => v.State == SessionState.Connected);
-        if (connected > 0 && e.CloseReason == CloseReason.UserClosing &&
+        // Con «Aggiorna ora» la conferma è già stata chiesta (e le sessioni si riaprono dopo).
+        if (connected > 0 && e.CloseReason == CloseReason.UserClosing && !_closingForUpdate &&
             MessageBox.Show(this, $"Ci sono {connected} sessioni connesse. Disconnetterle e uscire?", "Esci",
                 MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
         {
             e.Cancel = true;
-            _pendingInstaller = null;
             return;
         }
         Overview?.Close();
         foreach (var v in views)
             EndHistory(v, "Uscita da RdpManager");
         // Si ricordano le sessioni aperte (nell'ordine delle schede) per riaprirle al prossimo avvio.
-        var open = _doc.Settings.ReopenSessionsOnStartup ? views.Select(v => v.Connection.Id).ToList() : [];
+        var open = _doc.Settings.ReopenSessionsOnStartup || _closingForUpdate ? views.Select(v => v.Connection.Id).ToList() : [];
+        if (_closingForUpdate && open.Count > 0 && !_doc.Settings.ReopenOnceAfterUpdate)
+        {
+            _doc.Settings.ReopenOnceAfterUpdate = true;
+            _doc.Settings.OpenSessions = [];   // forza il salvataggio qui sotto
+        }
         if (!open.SequenceEqual(_doc.Settings.OpenSessions))
         {
             _doc.Settings.OpenSessions = open;
@@ -995,5 +1009,6 @@ public sealed partial class MainForm
     internal Control SwitchBarControl => _switchBar;
 
     internal void SetSidebarModeForTests(SidebarMode mode) => SetSidebarMode(mode);
+    internal void RefreshTreeForTests() => RefreshTree();
     internal void ShowSidebarForTests() => ShowSidebar(focusSearch: false);
 }

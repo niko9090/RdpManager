@@ -322,6 +322,19 @@ public sealed class V13CoreTests : IDisposable
     }
 
     [Fact]
+    public void AfterAnUpdate_SessionsAreReopenedOnce_EvenWithReopenOff()
+    {
+        var a = Guid.NewGuid();
+        var s = new AppSettings { ReopenSessionsOnStartup = false, OpenSessions = [a], ReopenOnceAfterUpdate = true };
+        Assert.Equal([a], s.TakeSessionsToReopen());
+        Assert.False(s.ReopenOnceAfterUpdate);
+        Assert.Empty(s.TakeSessionsToReopen());      // la volta dopo no
+        s.ReopenSessionsOnStartup = true;
+        Assert.Equal([a], s.TakeSessionsToReopen()); // con la riapertura attiva sempre
+        Assert.False(new AppSettings { ReopenOnceAfterUpdate = true }.ForExport().ReopenOnceAfterUpdate);
+    }
+
+    [Fact]
     public void ReleaseNotesAreReadFromTheApi()
     {
         var r = UpdateChecker.ParseLatestRelease("""

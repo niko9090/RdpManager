@@ -9,6 +9,10 @@ public sealed class RdpmExportDialog : Form
     private readonly RadioButton _with = new() { Text = "Con le password, cifrate con una password del file", AutoSize = true };
     private readonly TextBox _password = new() { Width = 240, UseSystemPasswordChar = true, Enabled = false };
     private readonly TextBox _confirm = new() { Width = 240, UseSystemPasswordChar = true, Enabled = false };
+    private readonly CheckBox _settings = new()
+    {
+        Text = "Includi le impostazioni dell'app (scorciatoie, tema, aggiornamenti…)", AutoSize = true, Margin = new Padding(3, 10, 3, 3),
+    };
 
     public RdpmExportDialog(int count)
     {
@@ -36,6 +40,12 @@ public sealed class RdpmExportDialog : Form
         {
             Text = "Cifratura AES-GCM. Senza la password del file le password salvate non si possono leggere: conservala a parte.",
             AutoSize = true, ForeColor = SystemColors.GrayText, MaximumSize = new Size(380, 0), Margin = new Padding(20, 3, 3, 3),
+        });
+        layout.Controls.Add(_settings);
+        layout.Controls.Add(new Label
+        {
+            Text = "Senza il monitor scelto e le sessioni da riaprire, che valgono solo per questo PC. Nessuna password.",
+            AutoSize = true, ForeColor = SystemColors.GrayText, MaximumSize = new Size(380, 0), Margin = new Padding(20, 0, 3, 3),
         });
 
         var ok = new Button { Text = "Esporta…", DialogResult = DialogResult.OK, AutoSize = true };
@@ -65,6 +75,8 @@ public sealed class RdpmExportDialog : Form
 
     /// <summary>null = password escluse dal file.</summary>
     public string? FilePassword => _with.Checked ? _password.Text : null;
+
+    public bool IncludeSettings => _settings.Checked;
 }
 
 /// <summary>Importazione da .rdpm: unione senza doppioni o sostituzione dell'elenco.</summary>
@@ -72,8 +84,12 @@ public sealed class RdpmImportDialog : Form
 {
     private readonly RadioButton _merge = new() { Text = "Unisci: aggiungi solo le connessioni che mancano", AutoSize = true, Checked = true };
     private readonly RadioButton _replace = new() { Text = "Sostituisci: le connessioni attuali vengono cancellate (profili e testi rapidi restano)", AutoSize = true };
+    private readonly CheckBox _applySettings = new()
+    {
+        Text = "Applica anche le impostazioni dell'app contenute nel file", AutoSize = true, Margin = new Padding(3, 10, 3, 3), Visible = false,
+    };
 
-    public RdpmImportDialog(int incoming, int current, bool hasPasswords)
+    public RdpmImportDialog(int incoming, int current, bool hasPasswords, bool hasSettings = false)
     {
         Text = "Importa connessioni";
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -97,6 +113,8 @@ public sealed class RdpmImportDialog : Form
             AutoSize = true, ForeColor = SystemColors.GrayText, MaximumSize = new Size(380, 0), Margin = new Padding(20, 0, 3, 6),
         });
         layout.Controls.Add(_replace);
+        _applySettings.Visible = hasSettings;
+        layout.Controls.Add(_applySettings);
 
         var ok = new Button { Text = "Importa", DialogResult = DialogResult.OK, AutoSize = true };
         var cancel = new Button { Text = "Annulla", DialogResult = DialogResult.Cancel, AutoSize = true };
@@ -118,6 +136,8 @@ public sealed class RdpmImportDialog : Form
     }
 
     public ImportMode Mode => _replace.Checked ? ImportMode.Replace : ImportMode.Merge;
+
+    public bool ApplySettings => _applySettings.Visible && _applySettings.Checked;
 }
 
 /// <summary>Richiesta della password del file .rdpm.</summary>

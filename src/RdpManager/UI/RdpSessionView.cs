@@ -138,6 +138,15 @@ public sealed class RdpSessionView : UserControl
     /// <summary>Codice esteso (ExtendedDisconnectReason) dell'ultima disconnessione, se disponibile.</summary>
     public int? LastExtendedDisconnectReason { get; private set; }
 
+    /// <summary>Spiegazione dell'ultima disconnessione (causa probabile e cosa fare); null se non c'è stata.</summary>
+    public ConnectionErrorInfo? LastError { get; private set; }
+
+    /// <summary>Testo lungo per il riquadro della sessione disconnessa (spiegazione dell'errore).</summary>
+    private string? _errorDetail;
+
+    /// <summary>Testo mostrato al posto della sessione disconnessa (per le prove automatiche).</summary>
+    internal string MessageText => _message.Text;
+
     /// <summary>Vero mentre il controllo mostra l'avviso sull'identità/certificato del server.</summary>
     public bool AuthenticationWarningVisible { get; private set; }
 
@@ -575,20 +584,27 @@ public sealed class RdpSessionView : UserControl
         {
             try { LastExtendedDisconnectReason = (int)_rdp.Ocx.ExtendedDisconnectReason; } catch (Exception) { }
         }
+        var info = ConnectionErrors.Explain(reason, LastExtendedDisconnectReason, Connection.HasGateway);
+        LastError = info;
         string text = DisconnectReasons.Describe(reason);
+        string? native = null;
         if (!DisconnectReasons.IsUserInitiated(reason) && _rdp is not null)
         {
             // Descrizione localizzata fornita dal controllo stesso, se disponibile.
             try
             {
                 dynamic ocx = _rdp.Ocx;
-                string? native = ocx.GetErrorDescription((uint)reason, (uint)ocx.ExtendedDisconnectReason);
-                if (!string.IsNullOrWhiteSpace(native))
-                    text = native.Trim();
+                string? described = ocx.GetErrorDescription((uint)reason, (uint)ocx.ExtendedDisconnectReason);
+                if (!string.IsNullOrWhiteSpace(described))
+                    text = native = described.Trim();
             }
             catch (Exception) { }
         }
 
+        _errorDetail = info.ToMessage() +
+                       (native is not null && native != info.Title ? $"\n\nMessaggio di Windows: {native}" : "");
+        AppLog.Default?.Connection(LogLevel.Info, "Disconnessa", Connection,
+            $"codice {reason}" + (LastExtendedDisconnectReason is int ext and > 0 ? $", esteso {ext}" : "") + $", {info.Kind}");
         if (!_closing && ReconnectPolicy.ShouldReconnect(Connection, reason, _reconnectAttempts))
         {
             _reconnectAttempts++;
@@ -617,7 +633,13 @@ public sealed class RdpSessionView : UserControl
         _stateLabel.ToolTipText = text;
         ApplyStateColor();
         _reconnectButton.Enabled = state != SessionState.Connecting;
-        _message.Text = state == SessionState.Disconnected ? text + "\n\nPremi «Riconnetti» (F5) oppure «Apri con mstsc»." : "";
+        if (state != SessionState.Disconnected)
+            _errorDetail = null;
+        _message.Text = state == SessionState.Disconnected
+            ? (_errorDetail ?? text) + "\n\nPremi «Riconnetti» (F5) oppure «Apri con mstsc»."
+            : "";
+        if (state == SessionState.Connected)
+            AppLog.Default?.Connection(LogLevel.Info, "Connessa", Connection);
         if (_rdp is not null)
             _rdp.Visible = state != SessionState.Disconnected;
         StateChanged?.Invoke(this, EventArgs.Empty);
