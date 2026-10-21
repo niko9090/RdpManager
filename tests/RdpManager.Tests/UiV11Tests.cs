@@ -222,11 +222,11 @@ public sealed class UiV11Tests(ITestOutputHelper output) : IDisposable
     }
 
     /// <summary>
-    /// Tastiera vera (SendInput) con il fuoco nella finestra interna del controllo RDP: senza l'hook di
-    /// tastiera i tasti andrebbero al controllo e non arriverebbero mai a WinForms.
+    /// Tastiera vera (SendInput) con il fuoco nella finestra interna del controllo RDP: le scorciatoie sono registrate
+    /// con RegisterHotKey mentre l'app è in primo piano (nessun hook di tastiera, tolto nella 1.3).
     /// </summary>
     [Fact]
-    public void KeyboardHook_CtrlAltRightTypedInsideTheRemoteSessionSwitchesTab()
+    public void RegisterHotKey_CtrlAltRightTypedInsideTheRemoteSessionSwitchesTab()
     {
         WithMainForm(StoreWith(SlowRefusal("Uno"), SlowRefusal("Due")), form =>
         {
@@ -237,7 +237,7 @@ public sealed class UiV11Tests(ITestOutputHelper output) : IDisposable
             Pump(TimeSpan.FromMilliseconds(200));
 
             WindowAttention.BringToFront(form);
-            if (!PumpUntil(() => form.HookInstalled && IsOwnForeground(), TimeSpan.FromSeconds(3)))
+            if (!PumpUntil(() => IsOwnForeground() && form.SessionHotkeysRegistered, TimeSpan.FromSeconds(3)))
             {
                 output.WriteLine("Windows non ha dato il primo piano alla finestra di prova: parte con tastiera vera non eseguita.");
                 return;
@@ -251,8 +251,17 @@ public sealed class UiV11Tests(ITestOutputHelper output) : IDisposable
             Assert.True(PumpUntil(() => form.Tabs.SelectedIndex == 1, TimeSpan.FromSeconds(3)),
                 $"Ctrl+Alt+Destra non ha cambiato scheda (scorciatoie eseguite: {form.ShortcutsExecuted - before})");
             Assert.Equal(before + 1, form.ShortcutsExecuted);
+
+            // Fuori dal primo piano le combinazioni tornano libere per gli altri programmi.
+            PostActivateApp(form, active: false);
+            Assert.True(PumpUntil(() => !form.SessionHotkeysRegistered, TimeSpan.FromSeconds(2)));
         });
     }
+
+    private static void PostActivateApp(Form form, bool active) =>
+        SendMessage(form.Handle, 0x001C /* WM_ACTIVATEAPP */, active ? 1 : 0, 0);
+
+    [DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr hWnd, int msg, nint wParam, nint lParam);
 
     /// <summary>Tastiera vera: Ctrl+Tab con il fuoco nell'elenco passa dal filtro dei messaggi e cambia scheda.</summary>
     [Fact]

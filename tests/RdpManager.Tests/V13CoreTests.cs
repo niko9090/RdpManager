@@ -125,7 +125,7 @@ public sealed class V13CoreTests : IDisposable
         var source = new ConnectionsDocument { Connections = [c] };
         source.Settings.Theme = AppTheme.Dark;
         source.Settings.UpdateMode = UpdateMode.NotifyOnly;
-        source.Settings.UseLowLevelKeyboardHook = true;
+        source.Settings.VerboseLog = true;
         source.Settings.PreferredMonitor = @"\\.\DISPLAY3";
         source.Settings.OpenSessions = [c.Id];
         var map = source.Settings.GetShortcuts();
@@ -152,7 +152,7 @@ public sealed class V13CoreTests : IDisposable
         Assert.True(applied.SettingsApplied);
         Assert.Equal(AppTheme.Dark, target2.Settings.Theme);
         Assert.Equal(UpdateMode.NotifyOnly, target2.Settings.UpdateMode);
-        Assert.True(target2.Settings.UseLowLevelKeyboardHook);
+        Assert.True(target2.Settings.VerboseLog);
         Assert.Equal("Ctrl+Alt+O", target2.Settings.GetShortcuts()[ShortcutAction.Overview].ToString());
         Assert.Equal(@"\\.\DISPLAY1", target2.Settings.PreferredMonitor); // vale per questo PC
         Assert.Empty(target2.Settings.OpenSessions);
@@ -361,7 +361,6 @@ public sealed class V13CoreTests : IDisposable
             Assert.Equal((AppTheme.Dark, true, "Ctrl+Alt+Maiusc+F12", false, 0.35), (s.Theme, s.CloseToTray, s.GlobalHotkey, s.HistoryEnabled, s.SplitRatio));
             Assert.Equal("Ctrl+Alt+O", s.GetShortcuts()[ShortcutAction.Overview].ToString());
             // Campi nuovi della 1.3: valori predefiniti.
-            Assert.False(s.UseLowLevelKeyboardHook);
             Assert.Equal(UpdateMode.AutomaticWithConfirmation, s.UpdateMode);
             Assert.False(s.VerboseLog);
             Assert.Equal(ConnectionOrder.Alphabetical, s.ConnectionOrder);
@@ -382,7 +381,7 @@ public sealed class V13CoreTests : IDisposable
     {
         var doc = new ConnectionStore(Fixture(version)).Load();
         Assert.Equal(2, doc.Connections.Count);
-        Assert.False(doc.Settings.UseLowLevelKeyboardHook);
+        Assert.False(doc.Settings.VerboseLog);
         Assert.Equal(UpdateMode.AutomaticWithConfirmation, doc.Settings.UpdateMode);
         Assert.Equal(ConnectionOrder.Alphabetical, doc.Settings.ConnectionOrder);
     }

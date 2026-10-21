@@ -74,7 +74,6 @@ public sealed partial class MainForm : Form
         BuildImages();
         _tree.ImageList = _treeImages;
         _tabs.ImageList = _stateImages;
-        _hook = new KeyboardHook(OnHookKeyDown);
 
         BuildLayout();
         _statusStrip.Items.Add(_status);

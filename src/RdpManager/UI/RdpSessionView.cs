@@ -473,6 +473,9 @@ public sealed class RdpSessionView : UserControl
             adv.ClearTextPassword = c.Password;
 
         Try(() => ocx.SecuredSettings2.AudioRedirectionMode = (int)c.AudioMode);
+        // Le combinazioni di Windows (Alt+Tab, tasto Windows…) restano al PC locale e il controllo non installa un
+        // proprio hook di tastiera: le scorciatoie dell'app (RegisterHotKey) arrivano sempre a RdpManager.
+        Try(() => ocx.SecuredSettings2.KeyboardHookMode = 0);
 
         // Proprietà delle versioni più recenti dell'interfaccia: se mancano si prosegue.
         Try(() =>

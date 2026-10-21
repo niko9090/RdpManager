@@ -2,31 +2,17 @@ using System.Runtime.InteropServices;
 
 namespace RdpManager.UI;
 
-/// <summary>Funzioni di user32/shcore usate dall'interfaccia (hook di tastiera, digitazione, DPI dei monitor).</summary>
+/// <summary>Funzioni di user32/shcore usate dall'interfaccia (scorciatoie, digitazione, DPI dei monitor).</summary>
 internal static class NativeMethods
 {
-    public const int WH_KEYBOARD_LL = 13;
     public const int WM_KEYDOWN = 0x0100, WM_SYSKEYDOWN = 0x0104;
     public const int WM_ACTIVATEAPP = 0x001C;
-    public const int VK_SHIFT = 0x10, VK_CONTROL = 0x11, VK_MENU = 0x12;
 
     public const uint INPUT_KEYBOARD = 1;
     public const uint KEYEVENTF_KEYUP = 0x0002, KEYEVENTF_UNICODE = 0x0004;
 
-    /// <summary>Segno messo in dwExtraInfo sui tasti inviati dall'app stessa, che l'hook deve ignorare.</summary>
+    /// <summary>Segno messo in dwExtraInfo sui tasti inviati dall'app stessa (digitazione nella sessione).</summary>
     public static readonly IntPtr OwnInputMarker = new(0x52444D31); // "RDM1"
-
-    public delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct KBDLLHOOKSTRUCT
-    {
-        public uint vkCode;
-        public uint scanCode;
-        public uint flags;
-        public uint time;
-        public IntPtr dwExtraInfo;
-    }
 
     [StructLayout(LayoutKind.Sequential)]
     public struct KEYBDINPUT
@@ -60,22 +46,6 @@ internal static class NativeMethods
         public uint type;
         public InputUnion u;
     }
-
-    [DllImport("user32.dll", SetLastError = true)]
-    public static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    public static extern bool UnhookWindowsHookEx(IntPtr hhk);
-
-    [DllImport("user32.dll")]
-    public static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
-
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
-    public static extern IntPtr GetModuleHandle(string? lpModuleName);
-
-    [DllImport("user32.dll")]
-    public static extern short GetAsyncKeyState(int vKey);
 
     [DllImport("user32.dll")]
     public static extern IntPtr GetForegroundWindow();
@@ -133,7 +103,6 @@ internal static class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
-    public static bool IsKeyDown(int vk) => (GetAsyncKeyState(vk) & 0x8000) != 0;
 
     /// <summary>Vero se la finestra in primo piano appartiene a questo processo.</summary>
     public static bool IsOwnProcessForeground()

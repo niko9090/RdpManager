@@ -1,4 +1,6 @@
-﻿# Pubblica RdpManager (self-contained, file unico, win-x64) e compila l'installer Inno Setup.
+﻿# Pubblica RdpManager (self-contained, win-x64) e compila l'installer Inno Setup.
+# L'installer contiene la pubblicazione a cartella (RdpManager.exe con le sue librerie, nessun exe unico
+# compresso: è meno sospetta per gli antivirus). La versione portatile resta un exe unico, non compresso.
 # Risultato in dist\:
 #   RdpManager-Setup-<versione>.exe          installer per utente (senza diritti di amministratore)
 #   RdpManager-<versione>-win-x64.exe        eseguibile portatile
@@ -27,13 +29,20 @@ if ($ExpectedVersion -and ($ExpectedVersion.TrimStart('v') -ne $version)) {
 Write-Host "RdpManager $version"
 
 $publishDir = Join-Path $root 'artifacts\publish'
+$portableDir = Join-Path $root 'artifacts\portable'
 $dist = Join-Path $root 'dist'
-if (Test-Path $publishDir) { Remove-Item -Recurse -Force $publishDir }
+foreach ($d in $publishDir, $portableDir) { if (Test-Path $d) { Remove-Item -Recurse -Force $d } }
 New-Item -ItemType Directory -Force $dist | Out-Null
 
-dotnet publish $project -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o $publishDir
-if ($LASTEXITCODE -ne 0) { throw "dotnet publish non riuscito ($LASTEXITCODE)" }
-$exe = Join-Path $publishDir 'RdpManager.exe'
+# Per l'installer: a cartella.
+dotnet publish $project -c Release -r win-x64 --self-contained -p:PublishSingleFile=false -o $publishDir
+if ($LASTEXITCODE -ne 0) { throw "dotnet publish (cartella) non riuscito ($LASTEXITCODE)" }
+if (-not (Test-Path (Join-Path $publishDir 'RdpManager.exe'))) { throw "Manca RdpManager.exe in $publishDir" }
+
+# Versione portatile: exe unico senza compressione.
+dotnet publish $project -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=false -o $portableDir
+if ($LASTEXITCODE -ne 0) { throw "dotnet publish (portatile) non riuscito ($LASTEXITCODE)" }
+$exe = Join-Path $portableDir 'RdpManager.exe'
 if (-not (Test-Path $exe)) { throw "Manca $exe dopo la pubblicazione" }
 
 $iscc = (Get-Command ISCC.exe -ErrorAction SilentlyContinue).Source

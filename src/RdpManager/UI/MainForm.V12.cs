@@ -22,7 +22,7 @@ public sealed partial class MainForm
         _trayMenu.Opening += (_, e) => { FillTrayMenu(); e.Cancel = false; };
         FormClosed += OnFormClosedV12;
         HandleCreated += (_, _) => RegisterGlobalHotkey();
-        HandleDestroyed += (_, _) => UnregisterGlobalHotkey();
+        HandleDestroyed += (_, _) => { UnregisterGlobalHotkey(); UnregisterSessionHotkeys(); };
         ApplyTheme();
         ApplySystemIntegration();
     }
@@ -649,6 +649,7 @@ public sealed partial class MainForm
     private void OnFormClosedV12(object? sender, FormClosedEventArgs e)
     {
         UnregisterGlobalHotkey();
+        UnregisterSessionHotkeys();
         _overviewTimer.Stop();
         if (_tray is not null)
         {

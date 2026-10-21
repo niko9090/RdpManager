@@ -15,7 +15,6 @@ public sealed partial class MainForm
     private readonly ToolStripButton _pinButton = new("A comparsa") { Alignment = ToolStripItemAlignment.Right, CheckOnClick = false };
     private readonly ToolTip _tips = new();
     private readonly System.Windows.Forms.Timer _edgeTimer = new() { Interval = 120 };
-    private readonly KeyboardHook _hook;
     private ShortcutMap _shortcuts = new();
 
     private bool _fullScreen;
@@ -62,6 +61,8 @@ public sealed partial class MainForm
     private void ApplySettings()
     {
         _shortcuts = _doc.Settings.GetShortcuts();
+        if (Form.ActiveForm == this || NativeMethods.IsOwnProcessForeground())
+            RegisterSessionHotkeys();
         _fullScreenItem.ShortcutKeyDisplayString = $"F11, {_shortcuts[ShortcutAction.ToggleFullScreen]}";
         _sidebarItem.ShortcutKeyDisplayString = _shortcuts[ShortcutAction.ToggleSidebar].ToString();
         _nextSessionItem.ShortcutKeyDisplayString = _shortcuts[ShortcutAction.NextSession].ToString();
@@ -79,7 +80,8 @@ public sealed partial class MainForm
     {
         var copy = _doc.Settings.Clone();
         // Le combinazioni premute nella finestra servono a registrare le scorciatoie (anche quella globale).
-        _hook.Suspended = true;
+        _sessionHotkeysSuspended = true;
+        UnregisterSessionHotkeys();
         UnregisterGlobalHotkey();
         bool ok;
         try
@@ -89,7 +91,7 @@ public sealed partial class MainForm
         }
         finally
         {
-            _hook.Suspended = false;
+            _sessionHotkeysSuspended = false;
         }
         if (!ok)
         {
@@ -164,9 +166,6 @@ public sealed partial class MainForm
             _doc.MarkConnected(view.Connection.Id, DateTime.UtcNow);
             _reach[view.Connection.Id] = ReachabilityStatus.Reachable;
             SaveConnections();
-            // Il controllo RDP installa un proprio hook di tastiera: il nostro torna davanti.
-            if (_hook.IsInstalled)
-                TryInstallHook();
             RefreshTree();
         }
         else
@@ -424,7 +423,7 @@ public sealed partial class MainForm
             _doc.Settings.OpenSessions = open;
             SaveConnections();
         }
-        _hook.Uninstall();
+        UnregisterSessionHotkeys();
         _edgeTimer.Stop();
         _reachTimer.Stop();
         foreach (var form in _detached.ToList())
@@ -502,18 +501,7 @@ public sealed partial class MainForm
         Disposed += (_, _) => Application.RemoveMessageFilter(_shortcutFilter);
     }
 
-    /// <summary>Dall'hook di tastiera: vero se la combinazione è una scorciatoia (il tasto non arriva alla sessione).</summary>
-    private bool OnHookKeyDown(KeyCombo combo)
-    {
-        // Con una finestra modale aperta (dialoghi, messaggi) la finestra principale è disabilitata:
-        // i tasti restano a quella finestra invece di cambiare sessione alle sue spalle.
-        if (!_shortcuts.TryGetAction(combo, out var action) || !NativeMethods.IsWindowEnabled(Handle))
-            return false;
-        BeginInvoke(() => ExecuteShortcut(action));
-        return true;
-    }
-
-    /// <summary>Quante scorciatoie sono arrivate dall'hook o dai menu (per le prove automatiche).</summary>
+    /// <summary>Quante scorciatoie sono state eseguite (da tastiera o dai menu), per le prove automatiche.</summary>
     internal int ShortcutsExecuted { get; private set; }
 
     internal void ExecuteShortcut(ShortcutAction action)
@@ -560,38 +548,85 @@ public sealed partial class MainForm
         }
     }
 
-    private void TryInstallHook()
+    // ---------- scorciatoie dentro la sessione (RegisterHotKey, nessun hook di tastiera) ----------
+
+    /// <summary>Id delle scorciatoie registrate con RegisterHotKey: 0x100 + valore dell'azione.</summary>
+    private const int SessionHotkeyBase = 0x100;
+    private readonly List<int> _sessionHotkeys = [];
+    private bool _sessionHotkeysSuspended;
+
+    /// <summary>Vero se le scorciatoie delle sessioni sono registrate (app in primo piano).</summary>
+    internal bool SessionHotkeysRegistered => _sessionHotkeys.Count > 0;
+
+    /// <summary>
+    /// Registra le scorciatoie configurabili con RegisterHotKey mentre l'app è in primo piano: così funzionano anche
+    /// con il fuoco nella sessione remota (il controllo RDP ha KeyboardHookMode = 0), senza un hook di tastiera
+    /// (WH_KEYBOARD_LL, tolto nella 1.3 perché alcuni antivirus lo segnalano). Si tolgono appena l'app perde il
+    /// primo piano.
+    /// </summary>
+    private void RegisterSessionHotkeys()
     {
-        try
+        UnregisterSessionHotkeys();
+        if (_sessionHotkeysSuspended || !IsHandleCreated || IsDisposed)
+            return;
+        var failed = new List<string>();
+        foreach (var (action, combo) in _shortcuts.All)
         {
-            _hook.Install();
+            if (combo.IsEmpty)
+                continue;
+            var (mods, vk) = GlobalHotkey.ToNative(combo);
+            int id = SessionHotkeyBase + (int)action;
+            if (NativeMethods.RegisterHotKey(Handle, id, mods, vk))
+                _sessionHotkeys.Add(id);
+            else
+                failed.Add(combo.ToString());
         }
-        catch (System.ComponentModel.Win32Exception ex)
+        if (failed.Count > 0 && !_hotkeyConflictShown)
         {
-            ShowNotice("Scorciatoie dentro la sessione non disponibili: " + ex.Message);
+            _hotkeyConflictShown = true;
+            ShowNotice("Scorciatoie già usate da un altro programma: " + string.Join(", ", failed.Distinct()));
         }
+    }
+
+    private bool _hotkeyConflictShown;
+
+    private void UnregisterSessionHotkeys()
+    {
+        if (IsHandleCreated)
+            foreach (var id in _sessionHotkeys)
+                NativeMethods.UnregisterHotKey(Handle, id);
+        _sessionHotkeys.Clear();
     }
 
     protected override void WndProc(ref Message m)
     {
-        // L'hook di tastiera esiste solo mentre l'app è in primo piano.
+        // Le scorciatoie registrate esistono solo mentre l'app è in primo piano.
         if (m.Msg == NativeMethods.WM_ACTIVATEAPP)
         {
             if (m.WParam != IntPtr.Zero)
-                TryInstallHook();
+                RegisterSessionHotkeys();
             else
-                _hook.Uninstall();
+                UnregisterSessionHotkeys();
         }
-        // Scorciatoia globale (RegisterHotKey): riporta l'app in primo piano da qualunque programma.
-        if (m.Msg == NativeMethods.WM_HOTKEY && m.WParam == (IntPtr)HotkeyId)
+        if (m.Msg == NativeMethods.WM_HOTKEY)
         {
-            RestoreFromTray();
-            return;
+            int id = (int)m.WParam;
+            // Scorciatoia globale (RegisterHotKey): riporta l'app in primo piano da qualunque programma.
+            if (id == HotkeyId)
+            {
+                RestoreFromTray();
+                return;
+            }
+            if (id >= SessionHotkeyBase && Enum.IsDefined((ShortcutAction)(id - SessionHotkeyBase)))
+            {
+                // Con un dialogo aperto la finestra principale è disabilitata: niente cambi di sessione alle sue spalle.
+                if (NativeMethods.IsWindowEnabled(Handle))
+                    ExecuteShortcut((ShortcutAction)(id - SessionHotkeyBase));
+                return;
+            }
         }
         base.WndProc(ref m);
     }
-
-    internal bool HookInstalled => _hook.IsInstalled;
 
     // ---------- schermo intero dell'app ----------
 

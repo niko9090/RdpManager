@@ -81,13 +81,6 @@ public sealed class AppSettings
 
     // --- Dalla 1.3 ---
 
-    /// <summary>
-    /// Hook di tastiera di basso livello (WH_KEYBOARD_LL) per le scorciatoie dentro la sessione. Spento di serie:
-    /// le scorciatoie usano RegisterHotKey mentre l'app è in primo piano; l'hook serve solo se quello non basta
-    /// (e alcuni antivirus lo considerano sospetto).
-    /// </summary>
-    public bool UseLowLevelKeyboardHook { get; set; }
-
     /// <summary>Aggiornamenti automatici con conferma (predefinito), solo avviso o spenti.</summary>
     public UpdateMode UpdateMode { get; set; } = UpdateMode.AutomaticWithConfirmation;
 
@@ -126,7 +119,6 @@ public sealed class AppSettings
         GlobalHotkey = src.GlobalHotkey;
         HistoryEnabled = src.HistoryEnabled;
         SplitRatio = src.SplitRatio;
-        UseLowLevelKeyboardHook = src.UseLowLevelKeyboardHook;
         UpdateMode = src.UpdateMode;
         VerboseLog = src.VerboseLog;
         ConnectionOrder = src.ConnectionOrder;

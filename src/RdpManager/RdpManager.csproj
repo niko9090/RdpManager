@@ -15,11 +15,21 @@
     <Version>1.2.0</Version>
     <AssemblyVersion>$(Version).0</AssemblyVersion>
     <FileVersion>$(Version).0</FileVersion>
+    <!-- Metadati dell'exe (Dettagli nelle proprietà del file): servono anche agli antivirus per riconoscerlo. -->
     <Company>niko9090</Company>
-    <Copyright>niko9090</Copyright>
-    <!-- Con un RuntimeIdentifier (dotnet publish -r win-x64) l'output è un unico .exe -->
-    <PublishSingleFile Condition="'$(RuntimeIdentifier)' != ''">true</PublishSingleFile>
-    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <Copyright>Copyright © 2026 niko9090 - https://github.com/niko9090/RdpManager</Copyright>
+    <AssemblyTitle>RdpManager - gestore di desktop remoti a schede</AssemblyTitle>
+    <Description>Gestore di connessioni Desktop remoto (RDP) con sessioni in schede</Description>
+    <NeutralLanguage>it-IT</NeutralLanguage>
+    <RepositoryUrl>https://github.com/niko9090/RdpManager</RepositoryUrl>
+    <!-- Avvio con i diritti dell'utente (asInvoker), dichiarato per Windows 10/11. -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!--
+      Pubblicazione a cartella (dotnet publish -r win-x64 con self-contained): è quella che va nell'installer.
+      L'exe portatile a file unico si chiede esplicitamente con -p:PublishSingleFile=true (vedi build-installer.ps1);
+      mai compresso (EnableCompressionInSingleFile resta spento).
+    -->
+    <IncludeNativeLibrariesForSelfExtract Condition="'$(PublishSingleFile)' == 'true'">true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
 
   <ItemGroup>
