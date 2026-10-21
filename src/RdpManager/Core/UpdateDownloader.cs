@@ -86,7 +86,29 @@ public static class UpdateDownloader
     /// <summary>Limite di sicurezza sulla dimensione dell'installer.</summary>
     public const long MaxInstallerBytes = 500L * 1024 * 1024;
 
-    public static string DefaultFolder => Path.Combine(Path.GetTempPath(), "RdpManager", "aggiornamento");
+    /// <summary>%LOCALAPPDATA%\RdpManager\updates: qui si scarica e si verifica l'installer.</summary>
+    public static string DefaultFolder => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RdpManager", "updates");
+
+    /// <summary>
+    /// Toglie dalla cartella degli aggiornamenti tutto tranne <paramref name="keep"/> (file vecchi, scaricamenti
+    /// interrotti o non verificati). Restituisce quanti file ha cancellato.
+    /// </summary>
+    public static int CleanFolder(string folder, string? keep = null)
+    {
+        if (!Directory.Exists(folder))
+            return 0;
+        int n = 0;
+        foreach (var f in Directory.GetFiles(folder))
+        {
+            if (keep is not null && string.Equals(Path.GetFullPath(f), Path.GetFullPath(keep), StringComparison.OrdinalIgnoreCase))
+                continue;
+            TryDelete(f);
+            if (!File.Exists(f))
+                n++;
+        }
+        return n;
+    }
 
     public static async Task<UpdateDownloadResult> DownloadAndVerifyAsync(HttpClient http, ReleaseInfo release,
         string? folder = null, IProgress<double>? progress = null, CancellationToken cancellationToken = default)

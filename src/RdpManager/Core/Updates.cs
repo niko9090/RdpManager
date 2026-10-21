@@ -30,6 +30,9 @@ public sealed record ReleaseInfo(string Tag, Version Version, string PageUrl, st
 {
     public IReadOnlyList<ReleaseAsset> Assets { get; init; } = [];
 
+    /// <summary>Testo della release (le note, cioè la sezione del CHANGELOG), da mostrare prima di aggiornare.</summary>
+    public string Notes { get; init; } = "";
+
     /// <summary>L'installer della release: "RdpManager-Setup-X.Y.Z.exe" (senza distinguere maiuscole).</summary>
     public ReleaseAsset? SetupAsset =>
         Assets.FirstOrDefault(a => a.Name.Equals($"RdpManager-Setup-{Version.ToString(3)}.exe", StringComparison.OrdinalIgnoreCase))
@@ -100,7 +103,7 @@ public static class UpdateChecker
             if (tag is null || version is null || url is null
                 || !Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
                 return null;
-            return new ReleaseInfo(tag, version, url, Str(root, "name")) { Assets = ParseAssets(root) };
+            return new ReleaseInfo(tag, version, url, Str(root, "name")) { Assets = ParseAssets(root), Notes = Str(root, "body") ?? "" };
         }
         catch (JsonException)
         {

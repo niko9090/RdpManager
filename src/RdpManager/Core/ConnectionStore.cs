@@ -8,9 +8,9 @@ public sealed partial class ConnectionsDocument
 {
     /// <summary>
     /// Versione scritta da questa build: 1 = RdpManager 1.0.x, 2 = 1.1 (campi nuovi e impostazioni),
-    /// 3 = 1.2 (profili di credenziali, gateway, testi rapidi).
+    /// 3 = 1.2 (profili di credenziali, gateway, testi rapidi), 4 = 1.3 (impostazioni nuove, ordine manuale).
     /// </summary>
-    public const int CurrentVersion = 3;
+    public const int CurrentVersion = 4;
 
     /// <summary>Versione letta dal file; i file della 1.0.0 e 1.1.0 hanno 1 e 2 e si caricano con i valori predefiniti per i campi nuovi.</summary>
     public int Version { get; set; } = CurrentVersion;
@@ -83,6 +83,47 @@ public sealed partial class ConnectionsDocument
     {
         folder = RdpConnection.NormalizeGroup(folder);
         return Connections.Where(c => folder.Length == 0 || IsInFolder(c.Group, folder)).ToList();
+    }
+
+    /// <summary>Connessioni nell'ordine dell'elenco: per nome, oppure quello scelto trascinandole.</summary>
+    public IEnumerable<RdpConnection> InDisplayOrder(IEnumerable<RdpConnection> connections) =>
+        Settings.ConnectionOrder == ConnectionOrder.Manual
+            ? connections.OrderBy(c => Connections.IndexOf(c))
+            : connections.OrderBy(c => c.DisplayName, StringComparer.CurrentCultureIgnoreCase);
+
+    /// <summary>
+    /// Sposta una connessione trascinata: nella cartella <paramref name="group"/>, prima di <paramref name="before"/>
+    /// (o in fondo se null). L'elenco passa all'ordine manuale, partendo dall'ordine che si vedeva, così le altre
+    /// connessioni non saltano. Falso se non c'è nulla da spostare.
+    /// </summary>
+    public bool MoveConnection(Guid id, Guid? before, string group)
+    {
+        if (Find(id) is not { } moving || before == id)
+            return false;
+        group = RdpConnection.NormalizeGroup(group);
+        if (Settings.ConnectionOrder != ConnectionOrder.Manual)
+        {
+            Connections = InDisplayOrder(Connections).ToList();
+            Settings.ConnectionOrder = ConnectionOrder.Manual;
+        }
+        Connections.Remove(moving);
+        moving.Group = group;
+        int index = before is Guid b ? Connections.FindIndex(c => c.Id == b) : -1;
+        if (index < 0)
+        {
+            // In fondo alla cartella: dopo l'ultima connessione della stessa cartella (o in fondo all'elenco).
+            int last = Connections.FindLastIndex(c => c.Group.Equals(group, StringComparison.CurrentCultureIgnoreCase));
+            index = last < 0 ? Connections.Count : last + 1;
+        }
+        Connections.Insert(index, moving);
+        return true;
+    }
+
+    /// <summary>Torna all'ordine per nome (l'ordine del file resta quello manuale finché non lo si cambia).</summary>
+    public void SortAlphabetically()
+    {
+        Connections = Connections.OrderBy(c => c.DisplayName, StringComparer.CurrentCultureIgnoreCase).ToList();
+        Settings.ConnectionOrder = ConnectionOrder.Alphabetical;
     }
 
     public IReadOnlyList<RdpConnection> Favorites() =>

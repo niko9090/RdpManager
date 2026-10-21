@@ -9,6 +9,26 @@ public enum AppTheme
     Dark,
 }
 
+/// <summary>Come si aggiorna l'app.</summary>
+public enum UpdateMode
+{
+    /// <summary>Controllo all'avvio e ogni 24 ore, scaricamento e verifica in sottofondo, installazione dopo la conferma.</summary>
+    AutomaticWithConfirmation,
+    /// <summary>Solo un avviso nella barra di stato; si aggiorna dal menu Aiuto.</summary>
+    NotifyOnly,
+    /// <summary>Nessun controllo automatico (resta «Aiuto → Controlla aggiornamenti»).</summary>
+    Off,
+}
+
+/// <summary>Ordine delle connessioni nell'elenco.</summary>
+public enum ConnectionOrder
+{
+    /// <summary>Per nome.</summary>
+    Alphabetical,
+    /// <summary>Quello scelto trascinando le connessioni (ordine del file).</summary>
+    Manual,
+}
+
 public enum SidebarMode
 {
     /// <summary>Barra laterale sempre visibile accanto alle sessioni.</summary>
@@ -59,7 +79,60 @@ public sealed class AppSettings
     /// <summary>Divisione della vista affiancata: frazione della larghezza per la sessione di sinistra.</summary>
     public double SplitRatio { get; set; } = SplitLayout.DefaultRatio;
 
+    // --- Dalla 1.3 ---
+
+    /// <summary>
+    /// Hook di tastiera di basso livello (WH_KEYBOARD_LL) per le scorciatoie dentro la sessione. Spento di serie:
+    /// le scorciatoie usano RegisterHotKey mentre l'app è in primo piano; l'hook serve solo se quello non basta
+    /// (e alcuni antivirus lo considerano sospetto).
+    /// </summary>
+    public bool UseLowLevelKeyboardHook { get; set; }
+
+    /// <summary>Aggiornamenti automatici con conferma (predefinito), solo avviso o spenti.</summary>
+    public UpdateMode UpdateMode { get; set; } = UpdateMode.AutomaticWithConfirmation;
+
+    /// <summary>Log dettagliato: anche i messaggi di diagnosi, con gli host (mai password).</summary>
+    public bool VerboseLog { get; set; }
+
+    public ConnectionOrder ConnectionOrder { get; set; } = ConnectionOrder.Alphabetical;
+
     public ShortcutMap GetShortcuts() => ShortcutMap.FromSettings(Shortcuts);
+
+    /// <summary>
+    /// Copia da esportare in un .rdpm: senza ciò che vale solo per questo PC (monitor scelto, sessioni da riaprire).
+    /// </summary>
+    public AppSettings ForExport()
+    {
+        var copy = Clone();
+        copy.PreferredMonitor = null;
+        copy.OpenSessions = [];
+        return copy;
+    }
+
+    /// <summary>Prende le impostazioni portabili di <paramref name="other"/>; monitor e sessioni da riaprire restano.</summary>
+    public void ApplyPortable(AppSettings other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        var monitor = PreferredMonitor;
+        var open = OpenSessions;
+        var src = other.Clone();
+        src.Normalize();
+        SidebarMode = src.SidebarMode;
+        ReopenSessionsOnStartup = src.ReopenSessionsOnStartup;
+        Shortcuts = src.Shortcuts;
+        Theme = src.Theme;
+        ShowTrayIcon = src.ShowTrayIcon;
+        CloseToTray = src.CloseToTray;
+        GlobalHotkey = src.GlobalHotkey;
+        HistoryEnabled = src.HistoryEnabled;
+        SplitRatio = src.SplitRatio;
+        UseLowLevelKeyboardHook = src.UseLowLevelKeyboardHook;
+        UpdateMode = src.UpdateMode;
+        VerboseLog = src.VerboseLog;
+        ConnectionOrder = src.ConnectionOrder;
+        PreferredMonitor = monitor;
+        OpenSessions = open;
+    }
 
     /// <summary>Copia indipendente (elenchi compresi), per i dialoghi che si possono annullare.</summary>
     public AppSettings Clone()
@@ -90,6 +163,10 @@ public sealed class AppSettings
         else if (GlobalHotkey.Length > 0 && !Core.GlobalHotkey.TryParse(GlobalHotkey, out _))
             GlobalHotkey = Core.GlobalHotkey.DefaultText;
         SplitRatio = SplitLayout.ClampRatio(SplitRatio);
+        if (!Enum.IsDefined(ConnectionOrder))
+            ConnectionOrder = ConnectionOrder.Alphabetical;
+        if (!Enum.IsDefined(UpdateMode))
+            UpdateMode = UpdateMode.AutomaticWithConfirmation;
 
     }
 }

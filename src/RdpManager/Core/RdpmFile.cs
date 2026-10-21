@@ -28,7 +28,9 @@ public enum ImportMode
 /// <param name="Removed">Connessioni tolte (solo in sostituzione).</param>
 /// <param name="ProfilesAdded">Profili di credenziali aggiunti.</param>
 /// <param name="QuickTextsAdded">Testi rapidi aggiunti.</param>
-public sealed record ImportResult(int Added, int Skipped, int Removed, int ProfilesAdded = 0, int QuickTextsAdded = 0);
+/// <param name="SettingsApplied">Le impostazioni dell'app contenute nel file sono state applicate.</param>
+public sealed record ImportResult(int Added, int Skipped, int Removed, int ProfilesAdded = 0, int QuickTextsAdded = 0,
+    bool SettingsApplied = false);
 
 /// <summary>
 /// Esportazione e importazione delle connessioni in un file .rdpm (JSON).
@@ -57,17 +59,24 @@ public static class RdpmFile
         Converters = { new JsonStringEnumConverter() },
     };
 
-    /// <summary>Esporta connessioni, cartelle, profili di credenziali e testi rapidi del documento.</summary>
-    public static string Export(ConnectionsDocument doc, string? filePassword = null, int iterations = DefaultIterations)
+    /// <summary>
+    /// Esporta connessioni, cartelle, profili di credenziali e testi rapidi del documento; con
+    /// <paramref name="includeSettings"/> anche le impostazioni dell'app (scorciatoie, tema…), senza ciò che vale
+    /// solo per questo PC (monitor, sessioni da riaprire). Le impostazioni non contengono password.
+    /// </summary>
+    public static string Export(ConnectionsDocument doc, string? filePassword = null, int iterations = DefaultIterations,
+        bool includeSettings = false)
     {
         ArgumentNullException.ThrowIfNull(doc);
-        return Export(doc.Connections, doc.AllGroups(), filePassword, iterations, doc.CredentialProfiles, doc.QuickTexts);
+        return Export(doc.Connections, doc.AllGroups(), filePassword, iterations, doc.CredentialProfiles, doc.QuickTexts,
+            includeSettings ? doc.Settings.ForExport() : null);
     }
 
     /// <param name="filePassword">null o vuota = password escluse; altrimenti le password vengono cifrate con questa.</param>
     public static string Export(IEnumerable<RdpConnection> connections, IEnumerable<string>? groups = null,
         string? filePassword = null, int iterations = DefaultIterations,
-        IEnumerable<CredentialProfile>? profiles = null, IEnumerable<QuickText>? quickTexts = null)
+        IEnumerable<CredentialProfile>? profiles = null, IEnumerable<QuickText>? quickTexts = null,
+        AppSettings? settings = null)
     {
         ArgumentNullException.ThrowIfNull(connections);
         var file = new RdpmDocument
@@ -78,6 +87,7 @@ public static class RdpmFile
             App = $"RdpManager {AppInfo.VersionText}",
             Groups = (groups ?? []).Select(RdpConnection.NormalizeGroup).Where(g => g.Length > 0)
                 .Distinct(StringComparer.CurrentCultureIgnoreCase).ToList(),
+            Settings = settings,
         };
 
         byte[]? key = null;
@@ -131,8 +141,8 @@ public static class RdpmFile
         string? filePassword = null) =>
         File.WriteAllText(path, Export(connections, groups, filePassword), new UTF8Encoding(false));
 
-    public static void Save(string path, ConnectionsDocument doc, string? filePassword = null) =>
-        File.WriteAllText(path, Export(doc, filePassword), new UTF8Encoding(false));
+    public static void Save(string path, ConnectionsDocument doc, string? filePassword = null, bool includeSettings = false) =>
+        File.WriteAllText(path, Export(doc, filePassword, includeSettings: includeSettings), new UTF8Encoding(false));
 
     /// <summary>Vero se il file contiene password cifrate e quindi serve la password del file.</summary>
     /// <exception cref="InvalidDataException">Il contenuto non è un file .rdpm valido.</exception>
@@ -162,6 +172,12 @@ public static class RdpmFile
         try
         {
             var doc = new ConnectionsDocument { Groups = file.Groups ?? [] };
+            if (file.Settings is { } settings)
+            {
+                settings.Normalize();
+                doc.Settings = settings;
+                doc.SettingsIncluded = true;
+            }
             foreach (var entry in file.Connections ?? [])
             {
                 if (entry?.Connection is not { } c)
@@ -224,7 +240,9 @@ public static class RdpmFile
     /// In unione salta i doppioni (stesso Id o stessa destinazione host/porta/utente/dominio, anche dentro il file stesso);
     /// in sostituzione rimpiazza connessioni e cartelle.
     /// </summary>
-    public static ImportResult ApplyImport(ConnectionsDocument target, ConnectionsDocument imported, ImportMode mode)
+    /// <param name="applySettings">Applica anche le impostazioni dell'app contenute nel file (se ci sono).</param>
+    public static ImportResult ApplyImport(ConnectionsDocument target, ConnectionsDocument imported, ImportMode mode,
+        bool applySettings = false)
     {
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(imported);
@@ -293,9 +311,12 @@ public static class RdpmFile
             target.QuickTexts.Add(t);
             quickTextsAdded++;
         }
+        bool settingsApplied = applySettings && imported.SettingsIncluded;
+        if (settingsApplied)
+            target.Settings.ApplyPortable(imported.Settings);
         if (mode == ImportMode.Replace)
             target.Settings.OpenSessions.RemoveAll(id => target.Find(id) is null);
-        return new ImportResult(added, skipped, removed, profilesAdded, quickTextsAdded);
+        return new ImportResult(added, skipped, removed, profilesAdded, quickTextsAdded, settingsApplied);
     }
 
     private static RdpmDocument ReadDocument(string json)
@@ -380,6 +401,7 @@ public static class RdpmFile
         public List<RdpmEntry> Connections { get; set; } = [];
         public List<RdpmProfileEntry> CredentialProfiles { get; set; } = [];
         public List<QuickText> QuickTexts { get; set; } = [];
+        public AppSettings? Settings { get; set; }
     }
 
     private sealed class RdpmProfileEntry

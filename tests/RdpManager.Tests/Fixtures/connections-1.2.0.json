@@ -1,0 +1,101 @@
+{
+  "version": 3,
+  "settings": {
+    "sidebarMode": "Pinned",
+    "reopenSessionsOnStartup": false,
+    "openSessions": [],
+    "shortcuts": {
+      "Overview": "Ctrl+Alt+O"
+    },
+    "theme": "Dark",
+    "showTrayIcon": true,
+    "closeToTray": true,
+    "globalHotkey": "Ctrl+Alt+Maiusc+F12",
+    "historyEnabled": false,
+    "splitRatio": 0.35
+  },
+  "groups": [
+    "Sedi",
+    "Sedi/Nord"
+  ],
+  "connections": [
+    {
+      "id": "9c3d1e22-0000-4000-8000-000000000001",
+      "name": "Server con gateway",
+      "host": "srv-interno.example.test",
+      "port": 3389,
+      "username": "",
+      "domain": "",
+      "resolutionMode": "FitToWindow",
+      "desktopWidth": 1920,
+      "desktopHeight": 1080,
+      "redirectClipboard": true,
+      "redirectDrives": false,
+      "audioMode": "Local",
+      "redirectPrinters": false,
+      "redirectMicrophone": false,
+      "useAllMonitors": false,
+      "autoReconnect": true,
+      "autoReconnectMaxAttempts": 4,
+      "isFavorite": true,
+      "color": "#8E44AD",
+      "label": "GW",
+      "macAddress": "",
+      "group": "Sedi/Nord",
+      "credentialProfileId": "9c3d1e22-0000-4000-8000-0000000000a1",
+      "useGateway": true,
+      "gatewayHost": "gw.example.test:8443",
+      "gatewayCredentials": "Profile",
+      "gatewayProfileId": "9c3d1e22-0000-4000-8000-0000000000a2"
+    },
+    {
+      "id": "9c3d1e22-0000-4000-8000-000000000002",
+      "name": "PC semplice",
+      "host": "192.0.2.30",
+      "port": 3390,
+      "username": "utente",
+      "domain": "",
+      "protectedPassword": "AQIDBAUGBwgJCgsMDQ4PEA==",
+      "resolutionMode": "Fixed",
+      "desktopWidth": 1280,
+      "desktopHeight": 800,
+      "redirectClipboard": false,
+      "redirectDrives": true,
+      "audioMode": "None",
+      "redirectPrinters": true,
+      "redirectMicrophone": true,
+      "useAllMonitors": true,
+      "autoReconnect": false,
+      "autoReconnectMaxAttempts": 3,
+      "isFavorite": false,
+      "label": "",
+      "macAddress": "02:00:5E:10:00:02",
+      "group": "Sedi",
+      "useGateway": false,
+      "gatewayHost": "",
+      "gatewayCredentials": "SameAsConnection"
+    }
+  ],
+  "credentialProfiles": [
+    {
+      "id": "9c3d1e22-0000-4000-8000-0000000000a1",
+      "name": "Amministratore",
+      "username": "admin",
+      "domain": "UFFICIO",
+      "protectedPassword": "AQIDBAUGBwgJCgsMDQ4PEQ=="
+    },
+    {
+      "id": "9c3d1e22-0000-4000-8000-0000000000a2",
+      "name": "Gateway",
+      "username": "gw-user",
+      "domain": "UFFICIO"
+    }
+  ],
+  "quickTexts": [
+    {
+      "id": "9c3d1e22-0000-4000-8000-0000000000b1",
+      "name": "Configurazione IP",
+      "text": "ipconfig /all\n"
+    }
+  ]
+}

@@ -65,6 +65,10 @@ public sealed record ResolvedCredentials(string Username, string Domain, string?
 
 public sealed partial class ConnectionsDocument
 {
+    /// <summary>Vero se il documento viene da un .rdpm che conteneva anche le impostazioni dell'app (non si salva).</summary>
+    [JsonIgnore]
+    public bool SettingsIncluded { get; set; }
+
     /// <summary>Profili di credenziali condivisi (dalla 1.2).</summary>
     public List<CredentialProfile> CredentialProfiles { get; set; } = [];
 
