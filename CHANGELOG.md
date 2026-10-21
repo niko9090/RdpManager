@@ -1,6 +1,46 @@
 # Novità di RdpManager
 
+## 1.3.0
+
+**Antivirus (priorità di questa versione)**
+- Su diversi PC l'antivirus bloccava l'installer o l'app. Microsoft Defender in locale non trova minacce
+  (né nella 1.2.0 né nella 1.3.0): il problema è la reputazione dei file non firmati e l'analisi
+  euristica. Per ridurre i segnali sospetti:
+  - **tolto l'hook di tastiera** (WH_KEYBOARD_LL): le scorciatoie dentro la sessione funzionano con
+    RegisterHotKey, solo mentre RdpManager è in primo piano;
+  - l'installer contiene il programma **a cartella**, non più un exe unico compresso (la versione
+    portatile resta un exe unico, non compresso);
+  - **metadati** completi nell'exe e nell'installer, manifest **asInvoker**, nessun offuscamento.
+- Nuovo **docs/falsi-positivi.md**: testo pronto per segnalare il falso positivo a Microsoft e agli
+  altri antivirus, e istruzioni per una futura firma del codice (Azure Trusted Signing o SignPath).
+
+**Aggiornamento automatico con conferma**
+- All'avvio e ogni 24 ore controlla l'ultima release, scarica l'installer in
+  %LOCALAPPDATA%\RdpManager\updates e ne verifica lo SHA256 con SHA256SUMS.txt; i file non validi
+  vengono cancellati.
+- Solo dopo la verifica compare un avviso con le novità e tre scelte: «Aggiorna ora» (chiude le
+  sessioni, installa in silenzio e riapre l'app con le stesse sessioni), «Alla chiusura», «Più tardi».
+- Nelle Impostazioni: automatici con conferma (predefinito), solo avviso, spenti. La versione portatile
+  apre la pagina della release.
+
+**Migliorie**
+- Errori di connessione spiegati: causa probabile e cosa fare (DNS, PC spento, password sbagliata,
+  account bloccato, certificato, gateway…).
+- Impostazioni in tre schede: Generale, Scorciatoie, Avvio e aggiornamenti.
+- Riordino delle connessioni trascinandole (ordine manuale, oppure per nome).
+- Esportazione e importazione .rdpm anche delle impostazioni dell'app (a scelta).
+- Log a rotazione in %LOCALAPPDATA%\RdpManager\logs, senza password né indirizzi dei PC (questi solo
+  con il log dettagliato).
+
+Un connections.json della 1.0.0, 1.1.0 o 1.2.0 si carica senza perdere nulla.
+
+Da provare a mano (vedi «Prova manuale 1.3» nel README): installazione sopra la 1.2.0 sui PC dove
+l'antivirus bloccava, aggiornamento automatico verso la versione successiva, messaggi di errore con PC
+veri. La prova di aggiornamento silenzioso (verifica/installer.ps1 -Aggiornamento) va lanciata su un PC
+pulito.
+
 ## 1.2.0
+
 
 **Trovare e vedere le sessioni**
 - Panoramica (Ctrl+Alt+G): griglia di miniature dal vivo delle sessioni connesse, anche a schermo

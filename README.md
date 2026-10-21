@@ -11,8 +11,12 @@ Dalla 1.2: **Panoramica** con le miniature delle sessioni connesse (**Ctrl+Alt+G
 (Ctrl+Alt+Spazio), **vista affiancata** di due sessioni, **profili di credenziali** condivisi,
 **Remote Desktop Gateway** per connessione, **testi rapidi**, icona nell'**area di notifica** con una
 scorciatoia globale, **tema scuro**, **cronologia** delle connessioni, **aggiornamento con un clic**
-verificato con SHA256 e importazione dalla cronologia di mstsc. Le novità di ogni versione sono in
-[CHANGELOG.md](CHANGELOG.md).
+verificato con SHA256 e importazione dalla cronologia di mstsc.
+Dalla 1.3: meno motivi di allarme per gli **antivirus** (niente hook di tastiera, installer a cartella,
+metadati e manifest, vedi «Antivirus e firma»), **aggiornamento automatico con conferma**, messaggi di
+errore di connessione con **causa probabile e soluzione**, **Impostazioni** con aggiornamenti e log,
+riordino delle connessioni **trascinandole**, impostazioni dell'app nei `.rdpm` e **log** a rotazione.
+Le novità di ogni versione sono in [CHANGELOG.md](CHANGELOG.md).
 
 Le sessioni usano il controllo ActiveX Desktop remoto di Windows (`mstscax.dll`, classe
 `MsRdpClient*NotSafeForScripting`), ospitato da una sottoclasse di `AxHost` scritta nel codice
@@ -28,32 +32,59 @@ Repository: <https://github.com/niko9090/RdpManager>
    - L'installazione è **per utente** e non chiede diritti di amministratore: il programma va in
      `%LOCALAPPDATA%\Programs\RdpManager`, con il collegamento nel menu Start (icona sul desktop
      facoltativa).
-   - Windows SmartScreen può avvisare che l'editore è sconosciuto (l'installer non è firmato):
-     «Ulteriori informazioni» → «Esegui comunque».
+   - Windows SmartScreen o l'antivirus possono avvisare o bloccare l'installer (non è firmato):
+     vedi «Antivirus e firma» qui sotto.
+   - Dalla 1.3 l'installer contiene il programma **a cartella** (`RdpManager.exe` con le librerie
+     .NET), non più un exe unico compresso.
 3. In alternativa `RdpManager-X.Y.Z-win-x64.exe` è la versione **portatile**: un solo file da
-   avviare, senza installazione.
+   avviare, senza installazione (exe unico **non compresso**). Non si aggiorna da sola: quando c'è
+   una versione nuova apre la pagina della release.
 
 Per installare una versione nuova basta eseguire il nuovo Setup: si installa sopra la precedente.
 La disinstallazione (da «App installate» di Windows) rimuove solo il programma: **le connessioni
 salvate in `%APPDATA%\RdpManager` restano**.
 
+## Antivirus e firma
+
+RdpManager non è firmato, quindi SmartScreen e alcuni antivirus possono bloccarlo, soprattutto nei primi
+giorni dopo una release. Il 21/10/2026 Microsoft Defender in locale (`MpCmdRun.exe -Scan -ScanType 3`) non
+ha trovato minacce né nella 1.2.0 né nella 1.3.0: i blocchi vengono dalla reputazione e dall'analisi
+euristica. Dalla 1.3 l'app evita i comportamenti che queste analisi guardano:
+
+- **nessun hook di tastiera** (`WH_KEYBOARD_LL` tolto): le scorciatoie dentro la sessione usano
+  `RegisterHotKey`, solo mentre RdpManager è in primo piano;
+- installer con il programma **a cartella** invece di un exe unico autoestraente;
+- **metadati** completi (azienda, prodotto, descrizione, copyright, versione) nell'exe e nell'installer;
+- manifest con **`asInvoker`**: non chiede mai i diritti di amministratore;
+- nessun offuscamento; l'aggiornamento chiede sempre conferma ed esegue solo installer verificati.
+
+Il testo pronto per segnalare il falso positivo a Microsoft
+(<https://www.microsoft.com/wdsi/filesubmission>) e agli altri antivirus, e le istruzioni per una
+futura **firma del codice** (Azure Trusted Signing o SignPath, senza segreti nel repository), sono in
+[docs/falsi-positivi.md](docs/falsi-positivi.md).
+
 ## Aggiornamenti
 
-**Come avvisa l'app.** Dal menu **Aiuto → Controlla aggiornamenti** RdpManager legge l'ultima
-release su GitHub; se è più recente della versione in uso propone **Aggiorna ora**, **Apri la
-pagina** o Annulla. Se manca la rete o GitHub non risponde lo dice con un messaggio, senza
-bloccarsi. Inoltre all'avvio fa lo stesso controllo una volta, in background e con un timeout di 5
-secondi: se trova una versione nuova lo segnala nella barra di stato in basso (clic = stessa
-proposta), altrimenti tace.
+Si scelgono in *File → Impostazioni → Avvio e aggiornamenti*:
 
-**Aggiornamento con un clic (dalla 1.2).** «Aggiorna ora» scarica `RdpManager-Setup-X.Y.Z.exe`
-dell'ultima release in una cartella temporanea (`%TEMP%\RdpManager\aggiornamento`) e ne calcola lo
-SHA256, che deve coincidere con la riga dello stesso file in **`SHA256SUMS.txt`** allegato alla
-release. Solo se coincide chiede conferma; con il sì RdpManager si chiude (le sessioni connesse
-vengono disconnesse, dopo la solita conferma) e avvia l'installer, che si installa sopra la
-versione in uso tenendo connessioni e impostazioni. Se la release non ha `SHA256SUMS.txt`, se il
-file non vi compare o se l'hash è diverso, il file scaricato viene cancellato e **non si avvia
-nulla**: resta la strada della pagina della release.
+- **Automatici con conferma** (predefinito): all'avvio e poi ogni 24 ore RdpManager controlla l'ultima
+  release su GitHub (in sottofondo, con un timeout). Se è più nuova scarica `RdpManager-Setup-X.Y.Z.exe` in
+  `%LOCALAPPDATA%\RdpManager\updates` e ne calcola lo SHA256, che deve coincidere con la riga dello stesso
+  file in **`SHA256SUMS.txt`** allegato alla release; i file non validi vengono cancellati. Solo dopo la
+  verifica compare un **avviso non modale** con le novità della release e tre scelte:
+  - **Aggiorna ora**: se ci sono sessioni aperte chiede conferma (verranno chiuse e poi riaperte), salva le
+    sessioni aperte, chiude l'app e avvia l'installer in silenzio
+    (`/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER /RELAUNCH=1`); a installazione finita
+    RdpManager si riapre con le stesse sessioni;
+  - **Alla chiusura**: installa nello stesso modo quando chiudi l'app, senza riaprirla;
+  - **Più tardi**: lo ripropone dopo 24 ore o al prossimo avvio.
+- **Solo avviso**: segnala la versione nuova nella barra di stato; clic = stesso avviso.
+- **Spenti**: nessun controllo automatico.
+
+Dal menu **Aiuto → Controlla aggiornamenti** si controlla a mano in ogni modalità. Subito prima di
+avviare l'installer lo SHA256 viene **ricontrollato**: se il file è cambiato non si avvia nulla. La
+versione **portatile** non si aggiorna da sola: apre la pagina della release. Connessioni, impostazioni e
+cronologia restano sempre.
 
 ## Pubblicare un aggiornamento
 
@@ -70,7 +101,7 @@ Lo script, in ordine:
 2. scrive la versione in `<Version>` di `src/RdpManager/RdpManager.csproj` (l'unico punto in cui
    sta: app, installer e controllo aggiornamenti la leggono da lì);
 3. compila ed esegue tutti i test;
-4. pubblica l'exe unico e compila l'installer con `build-installer.ps1` → `dist\`, insieme a
+4. pubblica a cartella e compila l'installer con `build-installer.ps1` → `dist\` (più l'exe portatile), insieme a
    `SHA256SUMS.txt` (SHA256 dei due file, formato di `sha256sum`), e controlla che corrisponda;
 5. fa il commit «Versione 1.2.0» (se la versione nel csproj è cambiata), crea il tag `v1.2.0` e fa il
    push di `main` e del tag;
@@ -101,7 +132,7 @@ dotnet test RdpManager.sln -c Release
 dotnet run --project src/RdpManager
 ```
 
-I test (307 + 2 facoltativi; nel CI solo quelli del Core, con `--filter "Category!=UI"`) comprendono:
+I test (339 + 2 facoltativi; nel CI solo quelli del Core, con `--filter "Category!=UI"`) comprendono:
 - **Core**: salvataggio/ricaricamento JSON, cifratura DPAPI (nessuna password in chiaro nel JSON),
   lettura/generazione `.rdp`, cartelle (crea/rinomina/elimina), file temporaneo per mstsc; dalla 1.2
   profili di credenziali (risoluzione, cifratura, `.rdpm` senza password in chiaro, unione senza
@@ -249,6 +280,26 @@ avvertenze delle prove precedenti.
 | 18 | Esporta in `.rdpm` con password del file; importa su un altro PC | Profili e testi rapidi arrivano con le connessioni; le password del profilo solo con la password del file giusta. |
 | 19 | Quando esce la versione successiva: *Aiuto → Controlla aggiornamenti → Aggiorna ora* | Scarica il Setup, dice «verificato (SHA256 …)», chiede conferma, si chiude e l'installer aggiorna l'app tenendo i dati. |
 
+## Prova manuale 1.3
+
+Da fare su un PC dove RdpManager 1.2.0 è installato, con almeno due PC remoti. Stesse avvertenze delle
+prove precedenti.
+
+| # | Passo | Risultato atteso |
+|---|---|---|
+| 1 | Scarica `RdpManager-Setup-1.3.0.exe` ed eseguilo sopra la 1.2.0 | Nessun blocco dell'antivirus (al più l'avviso di SmartScreen); connessioni, profili, testi rapidi e impostazioni di prima ci sono ancora. |
+| 2 | Esplora file → `%LOCALAPPDATA%\Programs\RdpManager\RdpManager.exe` → Proprietà → Dettagli | Descrizione, prodotto, versione 1.3.0, copyright e azienda compilati; accanto c'è `RdpManager.dll` (installazione a cartella). |
+| 3 | Clic dentro una sessione connessa, **Ctrl+Alt+Destra** | Si passa all'altra sessione anche senza hook di tastiera (la barra di stato non segnala conflitti). |
+| 4 | Passa a un'altra app (es. Blocco note) e premi Ctrl+Alt+Destra | L'altra app riceve i tasti: le scorciatoie di RdpManager valgono solo con RdpManager in primo piano. |
+| 5 | Connessione con host sbagliato (es. `pc-inesistente`), poi con password sbagliata | Al posto della sessione: motivo, «Causa probabile» e «Cosa fare» adatti (nome non trovato / password sbagliata). |
+| 6 | Trascina una connessione sopra un'altra della stessa cartella, poi in un'altra cartella | Si mette prima di quella (o in fondo alla cartella); l'ordine resta dopo il riavvio. *Visualizza → Ordina per nome* torna all'ordine alfabetico. |
+| 7 | *File → Impostazioni*: tre schede; in *Avvio e aggiornamenti* attiva il log dettagliato, poi *Apri la cartella dei log* | Si apre `%LOCALAPPDATA%\RdpManager\logs`; in `rdpmanager.log` ci sono avvio e sessioni (con `c-xxxxxxxx`), mai password. |
+| 8 | *File → Esporta (.rdpm)* con *Includi le impostazioni*; su un altro PC importa con *Applica anche le impostazioni* | Arrivano anche tema, scorciatoie e modalità degli aggiornamenti; monitor e sessioni da riaprire restano quelli del PC. |
+| 9 | Quando esce la versione successiva, con due sessioni aperte: attendi l'avviso (o *Aiuto → Controlla aggiornamenti*) | Avviso non modale con le novità e «Aggiorna ora», «Alla chiusura», «Più tardi»; in `%LOCALAPPDATA%\RdpManager\updates` c'è solo l'installer verificato. |
+| 10 | «Aggiorna ora» | Chiede conferma dicendo che le 2 sessioni verranno chiuse e riaperte; l'app si chiude, si aggiorna da sola e si riapre con le stesse sessioni. |
+| 11 | La volta dopo: «Alla chiusura», poi chiudi l'app | L'aggiornamento si installa alla chiusura e l'app non si riapre. |
+| 12 | Con la versione portatile: *Aiuto → Controlla aggiornamenti* | Propone di aprire la pagina della release (non si aggiorna da sola). |
+
 ## Cosa è stato provato e cosa no
 
 - **Provato automaticamente** (`dotnet test`): modello, salvataggio JSON e cifratura DPAPI, file `.rdp`,
@@ -265,7 +316,17 @@ avvertenze delle prove precedenti.
   battitura, vista affiancata senza ricreare i controlli ActiveX, cronologia in `history.json`, tema
   scuro e ritorno al chiaro, testi rapidi nel menu, credenziali del profilo e del gateway passate alla
   sessione, menu dell'area di notifica, scorciatoia globale (messaggio WM_HOTKEY) e chiusura nell'area di
-  notifica. Lo stato «connessa» in queste prove è simulato.
+  notifica; 1.3: Ctrl+Alt+Destra digitato davvero dentro il controllo RDP con `RegisterHotKey` (senza
+  hook) e scorciatoie tolte quando l'app perde il primo piano, errore spiegato su una sessione che non trova
+  l'host, riordino trascinando, log senza password né host, avviso di aggiornamento con «Più tardi», «Alla
+  chiusura» e «Aggiorna ora» (sessioni salvate e riaperte, installer silenzioso con `/RELAUNCH=1`; nelle
+  prove l'installer non viene eseguito), installer manomesso mai avviato. Lo stato «connessa» in queste
+  prove è simulato.
+- **Antivirus**: scansione di Microsoft Defender sui file della 1.2.0 e della 1.3.0 (nessuna minaccia).
+- **Non provato in automatico**: la prova di aggiornamento silenzioso 1.2.0 → 1.3.0 di
+  `verifica/installer.ps1 -Aggiornamento` esiste ma va lanciata su un PC pulito (si ferma dove RdpManager è
+  già installato, come sul PC di sviluppo).
+
 - **Provato con clic e tasti veri** sull'app compilata (ottobre 2026, un monitor, connessioni finte):
   doppio clic sull'elenco, Ctrl+Alt+Invio dentro la sessione, barra in alto dal bordo e clic su una
   sessione, barra laterale a comparsa dal bordo sinistro a schermo intero, impostazioni, modifica.
@@ -278,15 +339,31 @@ avvertenze delle prove precedenti.
   Remote Desktop Gateway vero, testi rapidi digitati in un PC remoto, aggiornamento con un clic da una
   release vera (la verifica SHA256 è provata con un server finto).
 
-## Pubblicare un eseguibile unico
+## Pubblicare a mano (cartella o eseguibile unico)
 
 ```powershell
-dotnet publish src/RdpManager -c Release -r win-x64 --self-contained
+# a cartella (come nell'installer): RdpManager.exe con le librerie .NET
+dotnet publish src/RdpManager -c Release -r win-x64 --self-contained -o artifacts\publish
+# eseguibile unico portatile, non compresso
+dotnet publish src/RdpManager -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=false -o artifacts\portable
 ```
 
-Il risultato è un solo file `RdpManager.exe` in
-`src\RdpManager\bin\Release\net8.0-windows\win-x64\publish\`, copiabile su qualunque PC Windows x64.
-(Il progetto attiva `PublishSingleFile` automaticamente quando si indica un runtime con `-r`.)
+Entrambe girano su qualunque PC Windows x64 senza .NET installato. Dalla 1.3 il progetto non attiva più
+`PublishSingleFile` da solo: la pubblicazione a cartella dà meno allarmi agli antivirus.
+`build-installer.ps1` fa le due pubblicazioni e l'installer.
+
+### Prova dell'installer e dell'aggiornamento silenzioso
+
+```powershell
+# installazione, avvio per 5 s, disinstallazione
+powershell -NoProfile -ExecutionPolicy Bypass -File verifica/installer.ps1
+# aggiornamento silenzioso dalla versione vecchia (/RELAUNCH=1): dati intatti, versione nuova, app riaperta
+powershell -NoProfile -ExecutionPolicy Bypass -File verifica/installer.ps1 -Aggiornamento -SetupVecchio <RdpManager-Setup-1.2.0.exe>
+```
+
+Le due prove **si fermano** se RdpManager è già installato o se ci sono dati in `%APPDATA%\RdpManager`,
+per non toccare un'installazione e dei dati veri: vanno lanciate su un PC pulito, una macchina virtuale o
+Windows Sandbox.
 
 ## Uso
 
@@ -346,6 +423,21 @@ Il risultato è un solo file `RdpManager.exe` in
   password del file; importando con «Unisci» un profilo già presente (stesso nome, utente e dominio) non
   si duplica e le connessioni importate usano quello esistente.
 
+### Riordino, errori di connessione e impostazioni (1.3)
+
+- **Riordino**: trascina una connessione su un'altra per metterla prima di lei (anche in un'altra
+  cartella), su una cartella per metterla in fondo. Da lì l'elenco segue l'ordine scelto a mano;
+  *Visualizza → Ordina le connessioni per nome* (o l'opzione in *Impostazioni → Generale*) torna
+  all'ordine per nome.
+- **Errori di connessione spiegati**: quando una sessione si chiude per un errore, al suo posto compaiono
+  il motivo, la **causa probabile** e **cosa fare** (nome non trovato, PC spento o porta chiusa, password
+  sbagliata, account bloccato, certificato rifiutato, licenze, sessione presa da un altro accesso…), con
+  un consiglio in più se la connessione passa da un gateway; sotto c'è il messaggio originale di Windows.
+- **Impostazioni** (*File → Impostazioni*, Ctrl+,), in tre schede: *Generale* (tema, area di notifica e
+  scorciatoia globale, monitor, barra laterale, ordine dell'elenco), *Scorciatoie* (tutte le combinazioni,
+  con il ripristino dei predefiniti) e *Avvio e aggiornamenti* (riapertura delle sessioni, modalità degli
+  aggiornamenti, cronologia, log dettagliato e cartella dei log).
+
 ### Esportazione e importazione (.rdpm)
 
 - **File → Esporta connessioni (.rdpm)**: scrive tutte le connessioni e le cartelle in un file.
@@ -361,6 +453,10 @@ Il risultato è un solo file `RdpManager.exe` in
     (chiede conferma); profili di credenziali e testi rapidi restano, e quelli del file si aggiungono.
 - Serve per spostare l'elenco su un altro PC o un altro utente Windows: il `connections.json` non
   basta, perché le sue password DPAPI valgono solo per l'utente che le ha salvate.
+- **Impostazioni dell'app** (dalla 1.3): esportando si può spuntare *Includi le impostazioni dell'app*
+  (scorciatoie, tema, aggiornamenti, barra laterale…, senza monitor e sessioni da riaprire che valgono
+  solo per quel PC); importando un file che le contiene si sceglie se *applicarle*.
+
 
 ### Sessioni (schede)
 
@@ -469,9 +565,11 @@ Impostazioni* (clic sulla casella, poi la combinazione; serve Ctrl o Alt; Canc l
 Fuori dall'app, da qualunque programma: **Ctrl+Alt+Maiusc+R** riporta in primo piano RdpManager
 (scorciatoia globale, si cambia nelle impostazioni).
 
-Funzionano grazie a un hook di tastiera (`WH_KEYBOARD_LL`) che l'app installa **solo mentre è in
-primo piano** e toglie appena si passa a un'altra applicazione; i tasti che non sono scorciatoie
-proseguono normalmente. *Aiuto → Scorciatoie da tastiera* mostra quelle in uso.
+Dalla 1.3 funzionano con `RegisterHotKey`: l'app le registra **solo mentre è in primo piano** e le
+toglie appena si passa a un'altra applicazione, e il controllo RDP lascia le combinazioni di Windows al
+PC locale (`KeyboardHookMode = 0`). Non c'è più nessun hook di tastiera. Se un altro programma usa già
+una combinazione, la barra di stato lo dice: si cambia in *File → Impostazioni → Scorciatoie*.
+*Aiuto → Scorciatoie da tastiera* mostra quelle in uso.
 
 Nell'app:
 
@@ -501,7 +599,10 @@ remoto (così Ctrl+N, F5 ecc. funzionano nelle app remote).
   prendono i valori predefiniti.
 - Cronologia delle sessioni: `%APPDATA%\RdpManager\history.json` (nomi, host, orari e motivi; niente
   utenti né password).
-  Per provare con un elenco a parte: `RdpManager.exe --dati C:\percorso\prova.json`.
+- Per provare con un elenco a parte: `RdpManager.exe --dati C:\percorso\prova.json`.
+- **Log** (dalla 1.3): `%LOCALAPPDATA%\RdpManager\logs\rdpmanager.log`, a rotazione (fino a 5 file da
+  1 MB). Mai password; le connessioni compaiono solo con un identificativo anonimo (`c-1a2b3c4d`) e gli
+  indirizzi dei PC solo con il *log dettagliato* attivo. *Aiuto → Apri la cartella dei log*.
 - Le password (delle connessioni e dei profili) **non sono mai scritte in chiaro**: nel JSON c'è solo `protectedPassword`, cifrata
   con DPAPI (`ProtectedData`, ambito *CurrentUser*). Si può decifrare solo con lo stesso utente
   Windows sullo stesso PC; copiando il file su un altro PC le password andranno reinserite.
@@ -510,7 +611,8 @@ remoto (così Ctrl+N, F5 ecc. funzionano nelle app remote).
   comunque chiederla di nuovo.
 - L'app non scrive nel registro di Windows e non salva credenziali di sistema (niente `cmdkey`). Lo
   legge soltanto, in `HKCU`, per il tema «come Windows» e, quando lo chiedi, per la cronologia di mstsc.
-- L'aggiornamento con un clic scarica l'installer in `%TEMP%\RdpManager\aggiornamento`.
+- L'aggiornamento scarica e verifica l'installer in `%LOCALAPPDATA%\RdpManager\updates` (vi resta solo
+  l'ultimo installer verificato).
 
 
 ## Struttura
@@ -520,7 +622,7 @@ RdpManager.sln
 src/RdpManager/
   Core/   modello, salvataggio JSON, cifratura DPAPI, lettura/scrittura .rdp (senza interfaccia, testabile)
   Rdp/    hosting ActiveX (RdpClientHost : AxHost), dichiarazioni COM, avvio di mstsc
-  UI/     finestra principale (schede, schermo intero, barra laterale, hook di tastiera), dialoghi
+  UI/     finestra principale (schede, schermo intero, barra laterale, scorciatoie), dialoghi
 tests/RdpManager.Tests/   test xUnit (Core; categoria UI = prove con finestre e controllo RDP)
 installer/RdpManager.iss  script Inno Setup dell'installer
 build-installer.ps1       pubblicazione + installer → dist\
@@ -528,4 +630,5 @@ verifica/                 script dei criteri di verifica e prova dell'installer
 .github/workflows/ci.yml  build e test del Core su GitHub a ogni push
 scripts/release.ps1       pubblicazione di una nuova versione (vedi «Pubblicare un aggiornamento»)
 CHANGELOG.md              novità di ogni versione (usate come note della release)
+docs/falsi-positivi.md    antivirus: diagnosi, segnalazione dei falsi positivi, firma futura
 ```
