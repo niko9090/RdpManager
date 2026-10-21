@@ -72,6 +72,9 @@ Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags
 ; Aggiornamento silenzioso avviato dall'app con «Aggiorna ora»: la riapre (riaprirà le sessioni salvate).
 Filename: "{app}\{#AppExe}"; Flags: nowait; Check: ShouldRelaunch
 
+; Nessuna sezione [Registry] e nessun [UninstallDelete]: i dati dell'utente in %APPDATA%\RdpManager
+; non vengono mai toccati.
+
 [Code]
 // Vero se l'installer è stato avviato con /RELAUNCH=1 (o /RELAUNCH): solo allora l'app si riapre da sola.
 function ShouldRelaunch: Boolean;
@@ -87,6 +90,3 @@ begin
       Result := True;
   end;
 end;
-
-; Nessuna sezione [Registry] e nessun [UninstallDelete]: i dati dell'utente in %APPDATA%\RdpManager
-; non vengono mai toccati.

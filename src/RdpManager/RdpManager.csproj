@@ -15,6 +15,8 @@
     <Version>1.2.0</Version>
     <AssemblyVersion>$(Version).0</AssemblyVersion>
     <FileVersion>$(Version).0</FileVersion>
+    <!-- Versione del prodotto pulita ("1.3.0"), senza l'hash del commit aggiunto dall'SDK. -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <!-- Metadati dell'exe (Dettagli nelle proprietà del file): servono anche agli antivirus per riconoscerlo. -->
     <Company>niko9090</Company>
     <Copyright>Copyright © 2026 niko9090 - https://github.com/niko9090/RdpManager</Copyright>
