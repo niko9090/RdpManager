@@ -768,7 +768,8 @@ public sealed partial class MainForm
     /// <summary>Avviso non modale con le novità e le tre scelte.</summary>
     internal void ShowUpdateOffer()
     {
-        if (_updates.Ready is not { } ready || IsDisposed)
+        // Da bloccata niente avvisi: si ripropone dopo lo sblocco (timer orario o menu).
+        if (_updates.Ready is not { } ready || IsDisposed || _locked)
             return;
         if (UpdateOffer is { } open)
         {

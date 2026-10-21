@@ -36,6 +36,9 @@ public sealed partial class MainForm
     {
         if (_locked || !_doc.Settings.LockEnabled)
             return;
+        // Con un dialogo aperto (finestra principale disabilitata) si aspetta: nasconderla lascerebbe il dialogo visibile.
+        if (IsHandleCreated && !NativeMethods.IsWindowEnabled(Handle))
+            return;
         var idle = IdleOverride?.Invoke() ?? NativeMethods.IdleTime();
         if (LockPolicy.ShouldLock(_doc.Settings, idle))
             LockApp();
