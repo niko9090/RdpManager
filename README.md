@@ -695,6 +695,8 @@ remoto (così Ctrl+N, F5 ecc. funzionano nelle app remote).
 
 ```
 RdpManager.sln
+Directory.Build.props     spegne Source Link: l'hash del commit faceva ricompilare a ogni commit (causa del
+                          CS2012 nelle verifiche in parallelo); non va tolto
 src/RdpManager/
   Core/   modello, salvataggio JSON, cifratura DPAPI, lettura/scrittura .rdp (senza interfaccia, testabile)
   Rdp/    hosting ActiveX (RdpClientHost : AxHost), dichiarazioni COM, avvio di mstsc
