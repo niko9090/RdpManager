@@ -78,6 +78,26 @@ internal static class NativeMethods
     public const int WM_HOTKEY = 0x0312;
 
     [StructLayout(LayoutKind.Sequential)]
+    private struct LASTINPUTINFO
+    {
+        public uint cbSize;
+        public uint dwTime;
+    }
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
+
+    /// <summary>Da quanto tempo l'utente non usa tastiera e mouse (in tutta la sessione di Windows).</summary>
+    public static TimeSpan IdleTime()
+    {
+        var info = new LASTINPUTINFO { cbSize = (uint)Marshal.SizeOf<LASTINPUTINFO>() };
+        if (!GetLastInputInfo(ref info))
+            return TimeSpan.Zero;
+        return TimeSpan.FromMilliseconds(unchecked((uint)Environment.TickCount - info.dwTime));
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
     public struct MSG
     {
         public IntPtr hwnd;

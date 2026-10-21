@@ -102,6 +102,7 @@ public sealed partial class MainForm : Form
         ApplySettings();
         InitV12();
         InitAutoUpdate(checkUpdatesOnStartup);
+        InitV14();
         MstscLauncher.CleanupOldFiles();
 
         Load += (_, _) => PlaceOnPreferredMonitor();
@@ -120,7 +121,7 @@ public sealed partial class MainForm : Form
 
     private ToolStripMenuItem _fullScreenItem = null!, _pinItem = null!, _sidebarItem = null!, _monitorMenu = null!;
     private ToolStripMenuItem _nextSessionItem = null!, _previousSessionItem = null!;
-    private ToolStripMenuItem _overviewItem = null!, _quickSearchItem = null!, _splitItem = null!;
+    private ToolStripMenuItem _overviewItem = null!, _quickSearchItem = null!, _splitItem = null!, _lockItem = null!;
 
     private void BuildMenu()
     {
@@ -132,8 +133,11 @@ public sealed partial class MainForm : Form
         file.DropDownItems.Add(Item("Importa connessioni (.rdp&m)…", Keys.None, (_, _) => ImportRdpm()));
         file.DropDownItems.Add(Item("&Esporta connessioni (.rdpm)…", Keys.None, (_, _) => ExportRdpm()));
         file.DropDownItems.Add(Item("Importa dalla cronologia di ms&tsc…", Keys.None, (_, _) => ImportMstscHistory()));
+        file.DropDownItems.Add(Item("Importa connessioni da C&SV…", Keys.None, (_, _) => ImportCsv()));
         file.DropDownItems.Add(new ToolStripSeparator());
         file.DropDownItems.Add(Item("Impo&stazioni…", Keys.Control | Keys.Oemcomma, (_, _) => ShowSettings(), "Ctrl+,"));
+        _lockItem = Item("&Blocca RdpManager", Keys.None, (_, _) => LockApp());
+        file.DropDownItems.Add(_lockItem);
         file.DropDownItems.Add(Item("Apri &cartella dei dati", Keys.None, (_, _) => OpenDataFolder()));
         file.DropDownItems.Add(new ToolStripSeparator());
         file.DropDownItems.Add(Item("E&sci", Keys.Alt | Keys.F4, (_, _) => ExitApp()));
@@ -224,14 +228,17 @@ public sealed partial class MainForm : Form
         }));
 
         var help = new ToolStripMenuItem("A&iuto");
-        help.DropDownItems.Add(Item("&Scorciatoie da tastiera", Keys.None, (_, _) => ShowShortcutHelp()));
+        help.DropDownItems.Add(Item("&Scorciatoie da tastiera", Keys.F1, (_, _) => ShowShortcutHelp()));
         help.DropDownItems.Add(Item("Controlla &aggiornamenti", Keys.None, async (_, _) => await CheckForUpdatesAsync(manual: true)));
         help.DropDownItems.Add(Item("Pagina del &progetto su GitHub", Keys.None, (_, _) => OpenUrl(AppInfo.RepositoryUrl)));
         help.DropDownItems.Add(Item("Apri la cartella dei &log", Keys.None, (_, _) => OpenLogFolder()));
         help.DropDownItems.Add(new ToolStripSeparator());
         help.DropDownItems.Add(Item("&Informazioni", Keys.None, (_, _) => ShowAbout()));
 
-        _menu.Items.AddRange([file, conn, session, view, help]);
+        var workspaces = new ToolStripMenuItem("Spazi di la&voro");
+        workspaces.DropDownItems.Add("(caricamento)");
+        workspaces.DropDownOpening += (_, _) => FillWorkspacesMenu(workspaces);
+        _menu.Items.AddRange([file, conn, session, view, workspaces, help]);
     }
 
     private ToolStrip BuildTreeToolbar()
@@ -399,7 +406,12 @@ public sealed partial class MainForm : Form
     {
         try
         {
-            _doc = _store.Load();
+            // Le password si decifrano solo se non c'è il blocco con PIN; altrimenti dopo lo sblocco.
+            _doc = _store.Load(decryptPasswords: false);
+            if (_doc.Settings.LockEnabled)
+                _locked = true;
+            else
+                _doc.UnsealPasswords();
         }
         catch (Exception ex)
         {
@@ -501,6 +513,8 @@ public sealed partial class MainForm : Form
             _tree.SelectedNode = toSelect;
             toSelect.EnsureVisible();
         }
+        if (_multi.Count > 0)
+            ApplyMultiSelectionColors();
         UpdateStatus();
 
         void AddSection(string name, int image, IReadOnlyList<RdpConnection> items)
@@ -660,12 +674,18 @@ public sealed partial class MainForm : Form
 
     private void DeleteSelected()
     {
+        if (_multi.Count > 1)
+        {
+            DeleteGroup();
+            return;
+        }
         if (SelectedConnection is { } c)
         {
             if (MessageBox.Show(this, $"Eliminare la connessione «{c.DisplayName}»?", "Elimina",
                     MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
                 return;
             _doc.Connections.Remove(c);
+            _doc.RemoveFromWorkspaces(c.Id);
             SaveConnections();
             RefreshTree();
             return;
@@ -988,16 +1008,8 @@ public sealed partial class MainForm : Form
                           $"{map[ShortcutAction.ToggleSplitView]} vista affiancata";
     }
 
-    private void ShowShortcutHelp()
-    {
-        var lines = Enum.GetValues<ShortcutAction>()
-            .Select(a => $"{(_shortcuts[a].IsEmpty ? "(nessuna)" : _shortcuts[a].ToString()),-20}\t{ShortcutMap.Describe(a)}");
-        MessageBox.Show(this,
-            "Valgono anche con il fuoco dentro la sessione remota:\n\n" + string.Join('\n', lines) +
-            "\n\nNell'app: Ctrl+Tab / Ctrl+Shift+Tab cambia scheda, F5 riconnetti, F11 schermo intero, Ctrl+F cerca.\n" +
-            "Le scorciatoie si cambiano in File › Impostazioni.",
-            "Scorciatoie da tastiera", MessageBoxButtons.OK, MessageBoxIcon.Information);
-    }
+    /// <summary>F1: riepilogo di tutte le scorciatoie.</summary>
+    private void ShowShortcutHelp() => ShowShortcutsDialog();
 
     /// <summary>
     /// Controllo aggiornamenti sulle release GitHub (solo avviso, nessun download). All'avvio: in

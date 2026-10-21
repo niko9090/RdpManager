@@ -43,6 +43,8 @@ public sealed class UiV12Tests : IDisposable
         Exception? failure = null;
         var thread = new Thread(() =>
         {
+            // Un'eccezione dell'interfaccia deve far fallire la prova, non aprire il dialogo di .NET e bloccarla.
+            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
             try { body(); }
             catch (Exception ex) { failure = ex; }
         });

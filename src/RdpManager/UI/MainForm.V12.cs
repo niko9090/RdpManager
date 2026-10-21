@@ -519,6 +519,12 @@ public sealed partial class MainForm
     /// <summary>Riporta la finestra principale in primo piano (da area di notifica o scorciatoia globale).</summary>
     internal void RestoreFromTray()
     {
+        // Bloccata: va davanti la schermata del PIN, non la finestra.
+        if (_locked)
+        {
+            ShowLockForm();
+            return;
+        }
         if (!Visible)
             Show();
         if (WindowState == FormWindowState.Minimized)
@@ -560,7 +566,7 @@ public sealed partial class MainForm
             item.Click += (_, _) =>
             {
                 RestoreFromTray();
-                if (Enabled)
+                if (Enabled && !_locked)
                     OpenSession(c);
             };
             return item;

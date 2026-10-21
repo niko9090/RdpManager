@@ -40,7 +40,12 @@ public sealed class UiV13Tests : IDisposable
     private static void OnSta(Action body)
     {
         Exception? failure = null;
-        var t = new Thread(() => { try { body(); } catch (Exception ex) { failure = ex; } });
+        var t = new Thread(() =>
+        {
+            // Un'eccezione dell'interfaccia deve far fallire la prova, non aprire il dialogo di .NET e bloccarla.
+            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
+            try { body(); } catch (Exception ex) { failure = ex; }
+        });
         t.SetApartmentState(ApartmentState.STA);
         t.Start();
         Assert.True(t.Join(TimeSpan.FromSeconds(120)), "La prova UI non è terminata entro 120 s");

@@ -21,6 +21,9 @@ public sealed class SettingsDialog : Form
     private readonly RadioButton _updOff = new() { Text = "Spenti (resta «Aiuto › Controlla aggiornamenti»)", AutoSize = true };
     private readonly CheckBox _verboseLog = new() { Text = "Log dettagliato (anche gli indirizzi dei PC; mai le password)", AutoSize = true };
     private readonly CheckBox _manualOrder = new() { Text = "Ordine delle connessioni scelto trascinandole (altrimenti per nome)", AutoSize = true };
+    private readonly Label _pinState = new() { AutoSize = true, Margin = new Padding(3, 7, 10, 3) };
+    private readonly NumericUpDown _lockAfter = new() { Minimum = 0, Maximum = 24 * 60, Width = 70 };
+    private PinHash? _pin;
     private readonly IReadOnlyList<ScreenInfo> _screens = Screens.All();
 
     private static readonly (AppTheme Theme, string Text)[] ThemeChoices =
@@ -88,6 +91,28 @@ public sealed class SettingsDialog : Form
         _verboseLog.Checked = settings.VerboseLog;
         var openLogs = new Button { Text = "Apri la cartella dei log", AutoSize = true };
         openLogs.Click += (_, _) => OpenFolder(AppLog.Default?.Directory ?? AppLog.DefaultDirectory);
+        _pin = settings.LockPin;
+        _lockAfter.Value = Math.Clamp(settings.LockAfterMinutes, 0, 24 * 60);
+        var setPin = new Button { Text = "Imposta PIN…", AutoSize = true };
+        var removePin = new Button { Text = "Togli PIN", AutoSize = true };
+        void ShowPinState()
+        {
+            _pinState.Text = _pin is { IsValid: true } ? "PIN impostato" : "Nessun PIN: il blocco è spento";
+            removePin.Enabled = _pin is not null;
+        }
+        setPin.Click += (_, _) =>
+        {
+            using var dlg = new PinSetDialog();
+            if (dlg.ShowDialog(this) == DialogResult.OK && dlg.Result is { } hash)
+                _pin = hash;
+            ShowPinState();
+        };
+        removePin.Click += (_, _) => { _pin = null; ShowPinState(); };
+        ShowPinState();
+        startup.Controls.Add(Group("Blocco con PIN", Flow(_pinState, setPin, removePin),
+            Flow(new Label { Text = "Blocca dopo", AutoSize = true, Margin = new Padding(3, 7, 6, 3) }, _lockAfter,
+                new Label { Text = "minuti di inattività (0 = solo a mano)", AutoSize = true, Margin = new Padding(6, 7, 3, 3) }),
+            Note("Si salva solo un'impronta del PIN (PBKDF2). Da bloccata RdpManager nasconde le sessioni, tiene le password cifrate e non apre sessioni nuove. Se dimentichi il PIN le connessioni restano, le password vanno reinserite.")));
         startup.Controls.Add(Group("Cronologia e log", _history, _verboseLog,
             Note(@"Log a rotazione in %LOCALAPPDATA%\RdpManager\logs (5 file da 1 MB)."), openLogs));
 
@@ -116,7 +141,7 @@ public sealed class SettingsDialog : Form
         var tabs = new TabControl { Dock = DockStyle.Fill };
         tabs.TabPages.Add(Page("Generale", general));
         tabs.TabPages.Add(Page("Scorciatoie", shortcuts));
-        tabs.TabPages.Add(Page("Avvio e aggiornamenti", startup));
+        tabs.TabPages.Add(Page("Avvio, blocco e aggiornamenti", startup));
         // Il TabControl non si adatta da solo al contenuto: la pagina più grande decide la dimensione.
         Control[] pages = [general, shortcuts, startup];
         var size = new Size(pages.Max(p => p.PreferredSize.Width) + 24, pages.Max(p => p.PreferredSize.Height) + 48);
@@ -207,6 +232,9 @@ public sealed class SettingsDialog : Form
         _settings.VerboseLog = _verboseLog.Checked;
         _settings.UpdateMode = _updOff.Checked ? UpdateMode.Off : _updNotify.Checked ? UpdateMode.NotifyOnly : UpdateMode.AutomaticWithConfirmation;
         _settings.ConnectionOrder = _manualOrder.Checked ? ConnectionOrder.Manual : ConnectionOrder.Alphabetical;
+        _settings.LockPin = _pin;
+        _settings.LockAfterMinutes = (int)_lockAfter.Value;
+
     }
 
     /// <summary>Casella che registra una combinazione di tasti invece di testo.</summary>

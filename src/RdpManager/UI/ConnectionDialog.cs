@@ -24,6 +24,15 @@ public sealed class ConnectionDialog : Form
     private readonly CheckBox _microphone = new() { Text = "Microfono", AutoSize = true };
     private readonly ComboBox _audio = new() { Width = 200, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly CheckBox _allMonitors = new() { Text = "Usa tutti i monitor", AutoSize = true };
+    private readonly ComboBox _quality = new() { Width = 200, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly CheckBox _keepAlive = new() { Text = "Tieni sveglia la sessione", AutoSize = true };
+
+    private static readonly (QualityProfile Profile, string Text)[] QualityChoices =
+    [
+        (QualityProfile.Automatic, "Automatica (misura la rete)"),
+        (QualityProfile.LocalNetwork, "Rete locale (tutti gli effetti)"),
+        (QualityProfile.SlowConnection, "Connessione lenta (leggera)"),
+    ];
     private readonly CheckBox _autoReconnect = new() { Text = "Riconnetti da sola, al massimo", AutoSize = true };
     private readonly NumericUpDown _attempts = new() { Minimum = 1, Maximum = ReconnectPolicy.MaxAllowedAttempts, Width = 50 };
     private readonly CheckBox _favorite = new() { Text = "Preferita ★", AutoSize = true };
@@ -96,6 +105,7 @@ public sealed class ConnectionDialog : Form
         Row("Risoluzione", Flow(_fit, _fixed, _width, new Label { Text = "×", AutoSize = true, Margin = new Padding(0, 6, 0, 0) }, _height));
         Row("Risorse", Flow(_clipboard, _drives, _printers, _microphone));
         Row("Audio", _audio);
+        Row("Qualità", Flow(_quality, _keepAlive, Help("Rete locale: 32 bit e tutti gli effetti. Connessione lenta: 16 bit, niente sfondo, animazioni e temi, compressione. Automatica: decide il client misurando la rete. «Tieni sveglia» manda un segnale ogni minuto per evitare le disconnessioni per inattività di router e firewall. Valgono anche per «Apri con mstsc» e i file .rdp.")));
         Row("Monitor", Flow(_allMonitors, Help("A schermo intero la sessione occupa tutti i monitor come un unico desktop. Con «Apri con mstsc» usa la modalità multimonitor di Windows.")));
         Row("Riconnessione", Flow(_autoReconnect, _attempts, new Label { Text = "volte", AutoSize = true, Margin = new Padding(3, 6, 0, 0) },
             Help("Dopo una disconnessione non voluta (rete, server riavviato) l'app ritenta con attese crescenti: 2, 4, 8, 16, 30 secondi. Non ritenta se hai chiuso tu la sessione o se le credenziali sono sbagliate.")));
@@ -166,6 +176,9 @@ public sealed class ConnectionDialog : Form
         _microphone.Checked = target.RedirectMicrophone;
         _audio.SelectedIndex = Math.Max(0, Array.FindIndex(AudioChoices, a => a.Mode == target.AudioMode));
         _allMonitors.Checked = target.UseAllMonitors;
+        _quality.Items.AddRange(QualityChoices.Select(q => (object)q.Text).ToArray());
+        _quality.SelectedIndex = Math.Max(0, Array.FindIndex(QualityChoices, q => q.Profile == target.Quality));
+        _keepAlive.Checked = target.KeepAlive;
         _autoReconnect.Checked = target.AutoReconnect;
         _attempts.Value = Math.Clamp(target.AutoReconnectMaxAttempts, 1, ReconnectPolicy.MaxAllowedAttempts);
         _attempts.Enabled = _autoReconnect.Checked;
@@ -275,6 +288,8 @@ public sealed class ConnectionDialog : Form
         _target.RedirectMicrophone = _microphone.Checked;
         _target.AudioMode = AudioChoices[Math.Max(0, _audio.SelectedIndex)].Mode;
         _target.UseAllMonitors = _allMonitors.Checked;
+        _target.Quality = QualityChoices[Math.Max(0, _quality.SelectedIndex)].Profile;
+        _target.KeepAlive = _keepAlive.Checked;
         _target.AutoReconnect = _autoReconnect.Checked;
         _target.AutoReconnectMaxAttempts = (int)_attempts.Value;
         _target.IsFavorite = _favorite.Checked;

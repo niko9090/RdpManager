@@ -196,8 +196,17 @@ public sealed class RdpSessionView : UserControl
     /// <summary>Avvia (o riavvia) la connessione ricreando il controllo ActiveX.</summary>
     public void Connect() => Connect(keepAttempts: false);
 
+    /// <summary>Vero mentre RdpManager è bloccato con il PIN: niente connessioni (né riconnessioni automatiche).</summary>
+    public Func<bool>? ConnectBlocked { get; set; }
+
     private void Connect(bool keepAttempts)
     {
+        if (ConnectBlocked?.Invoke() == true)
+        {
+            _reconnectTimer.Stop();
+            SetState(SessionState.Disconnected, "RdpManager è bloccato: sbloccalo con il PIN per connetterti.");
+            return;
+        }
         _reconnectTimer.Stop();
         if (!keepAttempts)
             _reconnectAttempts = 0;
@@ -394,20 +403,35 @@ public sealed class RdpSessionView : UserControl
         if (_rdp is not { IsHandleCreated: true, Visible: true } rdp || rdp.Width <= 0 || rdp.Height <= 0)
             return null;
         var bmp = new Bitmap(rdp.Width, rdp.Height);
-        using var g = Graphics.FromImage(bmp);
-        if (FindForm() is { } form && Form.ActiveForm == form)
+        try
         {
-            // In primo piano: copia diretta dallo schermo, la più fedele.
-            g.CopyFromScreen(rdp.PointToScreen(Point.Empty), Point.Empty, rdp.Size);
+            using var g = Graphics.FromImage(bmp);
+            if (FindForm() is { } form && Form.ActiveForm == form)
+            {
+                // In primo piano: copia diretta dallo schermo, la più fedele.
+                g.CopyFromScreen(rdp.PointToScreen(Point.Empty), Point.Empty, rdp.Size);
+            }
+            else
+            {
+                var hdc = g.GetHdc();
+                try { NativeMethods.PrintWindow(rdp.Handle, hdc, NativeMethods.PW_RENDERFULLCONTENT); }
+                finally { g.ReleaseHdc(hdc); }
+            }
+            return bmp;
         }
-        else
+        catch (Exception ex) when (IsCaptureFailure(ex))
         {
-            var hdc = g.GetHdc();
-            try { NativeMethods.PrintWindow(rdp.Handle, hdc, NativeMethods.PW_RENDERFULLCONTENT); }
-            finally { g.ReleaseHdc(hdc); }
+            bmp.Dispose();
+            return null;
         }
-        return bmp;
     }
+
+    /// <summary>
+    /// Lo schermo non si può copiare (sessione di Windows bloccata, desktop sicuro, salvaschermo, monitor spento):
+    /// niente immagine invece di un errore che farebbe cadere l'app.
+    /// </summary>
+    private static bool IsCaptureFailure(Exception ex) =>
+        ex is System.ComponentModel.Win32Exception or ExternalException or ArgumentException or InvalidOperationException;
 
     /// <summary>
     /// Copia dallo schermo della zona della sessione (null se non è visibile). La usa la panoramica, che è esclusa
@@ -418,10 +442,19 @@ public sealed class RdpSessionView : UserControl
         if (_rdp is not { IsHandleCreated: true, Visible: true } rdp || rdp.Width <= 0 || rdp.Height <= 0)
             return null;
         var bmp = new Bitmap(rdp.Width, rdp.Height);
-        using var g = Graphics.FromImage(bmp);
-        g.CopyFromScreen(rdp.PointToScreen(Point.Empty), Point.Empty, rdp.Size);
-        return bmp;
+        try
+        {
+            using var g = Graphics.FromImage(bmp);
+            g.CopyFromScreen(rdp.PointToScreen(Point.Empty), Point.Empty, rdp.Size);
+            return bmp;
+        }
+        catch (Exception ex) when (IsCaptureFailure(ex))
+        {
+            bmp.Dispose();
+            return null;
+        }
     }
+
 
     // ---------- connessione ----------
 
@@ -461,7 +494,8 @@ public sealed class RdpSessionView : UserControl
         ocx.DesktopWidth = size.Width;
         ocx.DesktopHeight = size.Height;
         _lastSentSize = size;
-        Try(() => ocx.ColorDepth = 32);
+        var quality = QualitySettings.For(c.Quality);
+        Try(() => ocx.ColorDepth = quality.ColorDepth);
         Try(() => ocx.ConnectingText = $"Connessione a {c.Host}…");
         Try(() => ocx.FullScreenTitle = $"{c.DisplayName} - RdpManager");
 
@@ -472,6 +506,14 @@ public sealed class RdpSessionView : UserControl
 
         dynamic adv = ocx.AdvancedSettings2;
         adv.RDPPort = c.Port;
+        // Profilo di qualità: effetti grafici, compressione, cache e tipo di rete (7 = rilevamento automatico).
+        Try(() => adv.PerformanceFlags = quality.PerformanceFlags);
+        Try(() => adv.Compress = quality.Compression ? 1 : 0);
+        Try(() => adv.BitmapPersistence = quality.BitmapCaching ? 1 : 0);
+        Try(() => ocx.AdvancedSettings8.NetworkConnectionType = (uint)quality.ConnectionType);
+        // Sessione tenuta sveglia: segnale periodico contro le chiusure per inattività (0 = spento).
+        if (KeepAlive.IntervalFor(c) is int keepAlive and > 0)
+            Try(() => adv.keepAliveInterval = keepAlive);
         adv.RedirectDrives = c.RedirectDrives;
         Try(() => adv.RedirectPrinters = c.RedirectPrinters);
         // La riconnessione del controllo stesso (stessa sessione, pochi secondi) resta sempre attiva;

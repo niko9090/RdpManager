@@ -70,6 +70,7 @@ public sealed partial class MainForm
         _nextSessionItem.ShortcutKeyDisplayString = _shortcuts[ShortcutAction.NextSession].ToString();
         _previousSessionItem.ShortcutKeyDisplayString = _shortcuts[ShortcutAction.PreviousSession].ToString();
         _overviewItem.ShortcutKeyDisplayString = _shortcuts[ShortcutAction.Overview].ToString();
+        _lockItem.ShortcutKeyDisplayString = _shortcuts[ShortcutAction.Lock].ToString();
         _quickSearchItem.ShortcutKeyDisplayString = _shortcuts[ShortcutAction.QuickSearch].ToString();
         _splitItem.ShortcutKeyDisplayString = _shortcuts[ShortcutAction.ToggleSplitView].ToString();
         UpdateEmptyHint();
@@ -122,12 +123,17 @@ public sealed partial class MainForm
 
     private void ConnectSelected()
     {
-        if (SelectedConnection is { } c)
+        if (_multi.Count > 1)
+            ConnectGroup();
+        else if (SelectedConnection is { } c)
             OpenSession(c);
     }
 
     internal void OpenSession(RdpConnection c)
     {
+        // Bloccata con il PIN: nessuna sessione nuova (né password lette) finché non si sblocca.
+        if (_locked)
+            return;
         // Una sessione per connessione: se è già aperta la si porta in primo piano.
         var existing = AllViews.FirstOrDefault(v => v.Connection == c);
         if (existing is not null)
@@ -153,6 +159,7 @@ public sealed partial class MainForm
         view.ResolveForConnect = connection => _doc.WithResolvedCredentials(connection);
         view.ResolveGateway = connection => _doc.ResolveGatewayCredentials(connection);
         view.QuickTexts = () => _doc.QuickTexts;
+        view.ConnectBlocked = () => _locked;
         view.ManageQuickTextsRequested += (_, _) => ManageQuickTexts();
         ConfigureNewSession?.Invoke(view);
         AddTab(view);
@@ -394,6 +401,11 @@ public sealed partial class MainForm
 
     private void ReopenSessions()
     {
+        if (_locked)
+        {
+            _reopenAfterUnlock = true; // dopo lo sblocco
+            return;
+        }
         bool afterUpdate = _doc.Settings.ReopenOnceAfterUpdate;
         var ids = _doc.Settings.TakeSessionsToReopen();
         if (afterUpdate)
@@ -520,6 +532,8 @@ public sealed partial class MainForm
 
     internal void ExecuteShortcut(ShortcutAction action)
     {
+        if (_locked)
+            return;
         ShortcutsExecuted++;
         if (action != ShortcutAction.Overview)
             Overview?.Close();
@@ -539,6 +553,9 @@ public sealed partial class MainForm
                 return;
             case ShortcutAction.ToggleSplitView:
                 ToggleSplitView();
+                return;
+            case ShortcutAction.Lock:
+                LockApp();
                 return;
             case ShortcutAction.NextSession or ShortcutAction.PreviousSession when IsSplit:
                 // Nella vista affiancata si passa da una metà all'altra.
@@ -595,6 +612,7 @@ public sealed partial class MainForm
             else
                 failed.Add(combo.ToString());
         }
+        RegisterWorkspaceHotkeys(failed);
         if (failed.Count > 0 && !_hotkeyConflictShown)
         {
             _hotkeyConflictShown = true;
@@ -631,6 +649,8 @@ public sealed partial class MainForm
                 RestoreFromTray();
                 return;
             }
+            if (HandleWorkspaceHotkey(id))
+                return;
             if (id >= SessionHotkeyBase && Enum.IsDefined((ShortcutAction)(id - SessionHotkeyBase)))
             {
                 // Con un dialogo aperto la finestra principale è disabilitata: niente cambi di sessione alle sue spalle.
