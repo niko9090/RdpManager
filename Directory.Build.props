@@ -1,0 +1,14 @@
+<Project>
+  <!--
+    Niente Source Link e niente interrogazioni a git durante la compilazione.
+    Perché: con Source Link l'SDK scrive obj/Release/net8.0-windows/RdpManager.sourcelink.json con l'hash del
+    commit e lo passa al compilatore, quindi dopo ogni commit la dll risulta da ricompilare. Quando build e test
+    vengono lanciati insieme (come nelle misure dei criteri) ricompilano la stessa RdpManager.dll in parallelo e
+    uno dei due fallisce con CS2012 (file in uso da un altro processo). Senza Source Link la build dipende solo dal
+    codice: un commit che cambia solo documentazione non fa ricompilare nulla.
+  -->
+  <PropertyGroup>
+    <EnableSourceLink>false</EnableSourceLink>
+    <EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>
+  </PropertyGroup>
+</Project>
