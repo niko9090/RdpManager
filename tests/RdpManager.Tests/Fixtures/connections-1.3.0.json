@@ -1,0 +1,93 @@
+{
+  "version": 4,
+  "settings": {
+    "sidebarMode": "AutoHide",
+    "reopenSessionsOnStartup": true,
+    "openSessions": [
+      "4d2e1f33-0000-4000-8000-000000000002"
+    ],
+    "shortcuts": {
+      "QuickSearch": "Ctrl+Alt+K"
+    },
+    "theme": "Light",
+    "showTrayIcon": false,
+    "closeToTray": false,
+    "globalHotkey": "",
+    "historyEnabled": true,
+    "splitRatio": 0.6,
+    "updateMode": "NotifyOnly",
+    "verboseLog": true,
+    "connectionOrder": "Manual",
+    "reopenOnceAfterUpdate": false
+  },
+  "groups": [
+    "Uffici"
+  ],
+  "connections": [
+    {
+      "id": "4d2e1f33-0000-4000-8000-000000000002",
+      "name": "Zeta (prima nell'ordine manuale)",
+      "host": "zeta.example.test",
+      "port": 3389,
+      "username": "",
+      "domain": "",
+      "resolutionMode": "FitToWindow",
+      "desktopWidth": 1920,
+      "desktopHeight": 1080,
+      "redirectClipboard": true,
+      "redirectDrives": false,
+      "audioMode": "Local",
+      "redirectPrinters": false,
+      "redirectMicrophone": false,
+      "useAllMonitors": false,
+      "autoReconnect": false,
+      "autoReconnectMaxAttempts": 3,
+      "isFavorite": false,
+      "label": "",
+      "macAddress": "",
+      "group": "Uffici",
+      "credentialProfileId": "4d2e1f33-0000-4000-8000-0000000000a1",
+      "useGateway": false,
+      "gatewayHost": "",
+      "gatewayCredentials": "SameAsConnection"
+    },
+    {
+      "id": "4d2e1f33-0000-4000-8000-000000000001",
+      "name": "Alfa",
+      "host": "alfa.example.test",
+      "port": 3391,
+      "username": "operatore",
+      "domain": "SEDE",
+      "protectedPassword": "AQIDBAUGBwgJCgsMDQ4PEg==",
+      "resolutionMode": "Fixed",
+      "desktopWidth": 1366,
+      "desktopHeight": 768,
+      "redirectClipboard": false,
+      "redirectDrives": false,
+      "audioMode": "Remote",
+      "redirectPrinters": false,
+      "redirectMicrophone": false,
+      "useAllMonitors": false,
+      "autoReconnect": true,
+      "autoReconnectMaxAttempts": 2,
+      "isFavorite": true,
+      "color": "#16A085",
+      "label": "TEST",
+      "macAddress": "",
+      "group": "Uffici",
+      "useGateway": true,
+      "gatewayHost": "gw.example.test",
+      "gatewayCredentials": "SameAsConnection"
+    }
+  ],
+  "credentialProfiles": [
+    {
+      "id": "4d2e1f33-0000-4000-8000-0000000000a1",
+      "name": "Servizio",
+      "username": "svc",
+      "domain": "SEDE",
+      "protectedPassword": "AQIDBAUGBwgJCgsMDQ4PEw=="
+    }
+  ],
+  "quickTexts": []
+}

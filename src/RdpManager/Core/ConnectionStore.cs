@@ -8,9 +8,10 @@ public sealed partial class ConnectionsDocument
 {
     /// <summary>
     /// Versione scritta da questa build: 1 = RdpManager 1.0.x, 2 = 1.1 (campi nuovi e impostazioni),
-    /// 3 = 1.2 (profili di credenziali, gateway, testi rapidi), 4 = 1.3 (impostazioni nuove, ordine manuale).
+    /// 3 = 1.2 (profili di credenziali, gateway, testi rapidi), 4 = 1.3 (impostazioni nuove, ordine manuale),
+    /// 5 = 1.4 (spazi di lavoro, PIN di blocco, profili di qualità, sessione tenuta sveglia).
     /// </summary>
-    public const int CurrentVersion = 4;
+    public const int CurrentVersion = 5;
 
     /// <summary>Versione letta dal file; i file della 1.0.0 e 1.1.0 hanno 1 e 2 e si caricano con i valori predefiniti per i campi nuovi.</summary>
     public int Version { get; set; } = CurrentVersion;
@@ -175,7 +176,14 @@ public sealed class ConnectionStore
     }
 
     /// <exception cref="JsonException">File presente ma non leggibile.</exception>
-    public ConnectionsDocument Load()
+    public ConnectionsDocument Load() => Load(decryptPasswords: true);
+
+    /// <param name="decryptPasswords">
+    /// Falso = le password restano cifrate DPAPI (app bloccata con il PIN): si decifrano dopo lo sblocco con
+    /// <see cref="ConnectionsDocument.UnsealPasswords"/>.
+    /// </param>
+    /// <exception cref="JsonException">File presente ma non leggibile.</exception>
+    public ConnectionsDocument Load(bool decryptPasswords)
     {
         if (!File.Exists(FilePath))
             return new ConnectionsDocument();
@@ -191,7 +199,7 @@ public sealed class ConnectionStore
         foreach (var p in doc.CredentialProfiles)
         {
             p.Repair();
-            if (PasswordProtector.TryUnprotect(p.ProtectedPassword, out var profilePassword))
+            if (decryptPasswords && PasswordProtector.TryUnprotect(p.ProtectedPassword, out var profilePassword))
             {
                 p.Password = profilePassword;
                 p.ProtectedPassword = null;
@@ -201,11 +209,17 @@ public sealed class ConnectionStore
         doc.QuickTexts.RemoveAll(t => t is null);
         foreach (var t in doc.QuickTexts)
             t.Repair();
+        doc.Workspaces ??= [];
+        doc.Workspaces.RemoveAll(w => w is null);
+        foreach (var w in doc.Workspaces)
+            w.Repair();
         foreach (var c in doc.Connections)
         {
             c.GatewayHost ??= "";
             if (!Enum.IsDefined(c.GatewayCredentials))
                 c.GatewayCredentials = GatewayCredentialsSource.SameAsConnection;
+            if (!Enum.IsDefined(c.Quality))
+                c.Quality = QualityProfile.Automatic;
             c.Group = RdpConnection.NormalizeGroup(c.Group);
             c.Name ??= "";
             c.Host ??= "";
@@ -216,7 +230,7 @@ public sealed class ConnectionStore
             c.Color = RdpConnection.NormalizeColor(c.Color);
             if (c.AutoReconnectMaxAttempts < 0)
                 c.AutoReconnectMaxAttempts = ReconnectPolicy.DefaultMaxAttempts;
-            if (PasswordProtector.TryUnprotect(c.ProtectedPassword, out var plain))
+            if (decryptPasswords && PasswordProtector.TryUnprotect(c.ProtectedPassword, out var plain))
             {
                 c.Password = plain;
                 c.ProtectedPassword = null;
@@ -252,6 +266,7 @@ public sealed class ConnectionStore
                 return copy;
             }).ToList(),
             QuickTexts = doc.QuickTexts.Select(t => t.Clone()).ToList(),
+            Workspaces = doc.Workspaces.Select(w => w.Clone()).ToList(),
         };
 
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(FilePath))!);

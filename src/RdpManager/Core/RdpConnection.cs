@@ -108,7 +108,16 @@ public sealed class RdpConnection
     /// <summary>Profilo per il gateway quando <see cref="GatewayCredentials"/> è <see cref="GatewayCredentialsSource.Profile"/>.</summary>
     public Guid? GatewayProfileId { get; set; }
 
+    // --- Dalla 1.4 ---
+
+    /// <summary>Profilo di qualità (automatico, rete locale, connessione lenta).</summary>
+    public QualityProfile Quality { get; set; } = QualityProfile.Automatic;
+
+    /// <summary>Sessione tenuta sveglia: segnale periodico del controllo contro le disconnessioni per inattività.</summary>
+    public bool KeepAlive { get; set; }
+
     /// <summary>Vero se il gateway è attivo e ha un host.</summary>
+
     [JsonIgnore]
     public bool HasGateway => UseGateway && !string.IsNullOrWhiteSpace(GatewayHost);
 

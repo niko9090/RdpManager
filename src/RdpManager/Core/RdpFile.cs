@@ -72,6 +72,13 @@ public static class RdpFile
         if (settings.TryGetValue("password 51", out var pwd))
             c.Password = PasswordProtector.TryUnprotectFromRdpFile(pwd);
 
+        // Profilo di qualità: dal tipo di connessione; senza, dalla profondità di colore (16 bit = lenta).
+        int? connType = TryInt(settings, "connection type", out var ct) ? ct : null;
+        bool? autoDetect = TryInt(settings, "networkautodetect", out var nad) ? nad != 0 : null;
+        c.Quality = QualitySettings.FromRdp(connType, autoDetect);
+        if (connType is null && TryInt(settings, "session bpp", out var bpp) && bpp is > 0 and <= 16)
+            c.Quality = QualityProfile.SlowConnection;
+
         // Remote Desktop Gateway: attivo se c'è un host e il metodo è "usa sempre" (1) o "solo se serve" (2).
         if (settings.TryGetValue("gatewayhostname", out var gateway) && gateway.Length > 0)
         {
@@ -116,7 +123,20 @@ public static class RdpFile
         {
             Line("dynamic resolution", 'i', 1);
         }
-        Line("session bpp", 'i', 32);
+        var q = QualitySettings.For(c.Quality);
+        Line("session bpp", 'i', q.ColorDepth);
+        Line("connection type", 'i', q.ConnectionType);
+        Line("networkautodetect", 'i', q.NetworkAutoDetect ? 1 : 0);
+        Line("bandwidthautodetect", 'i', q.NetworkAutoDetect ? 1 : 0);
+        Line("disable wallpaper", 'i', q.DisableWallpaper ? 1 : 0);
+        Line("disable full window drag", 'i', q.DisableFullWindowDrag ? 1 : 0);
+        Line("disable menu anims", 'i', q.DisableMenuAnimations ? 1 : 0);
+        Line("disable themes", 'i', q.DisableThemes ? 1 : 0);
+        Line("allow font smoothing", 'i', q.AllowFontSmoothing ? 1 : 0);
+        Line("allow desktop composition", 'i', q.AllowDesktopComposition ? 1 : 0);
+        Line("compression", 'i', q.Compression ? 1 : 0);
+        Line("bitmapcachepersistenable", 'i', q.BitmapCaching ? 1 : 0);
+
         Line("redirectclipboard", 'i', c.RedirectClipboard ? 1 : 0);
         if (c.RedirectDrives)
             Line("drivestoredirect", 's', "*");

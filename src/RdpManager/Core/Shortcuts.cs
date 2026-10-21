@@ -14,6 +14,8 @@ public enum ShortcutAction
     Overview,
     QuickSearch,
     ToggleSplitView,
+    // Dalla 1.4
+    Lock,
 }
 
 /// <summary>Una combinazione di tasti: modificatori Ctrl/Alt/Maiusc più un tasto.</summary>
@@ -201,6 +203,7 @@ public sealed class ShortcutMap
             [ShortcutAction.Overview] = new(true, true, false, Keys.G),
             [ShortcutAction.QuickSearch] = new(true, true, false, Keys.Space),
             [ShortcutAction.ToggleSplitView] = new(true, true, false, Keys.S),
+            [ShortcutAction.Lock] = new(true, true, false, Keys.L),
         };
         for (int n = 1; n <= 9; n++)
             d[SessionAction(n)] = new(true, true, false, Keys.D0 + n);
@@ -223,6 +226,7 @@ public sealed class ShortcutMap
         ShortcutAction.Overview => "Panoramica delle sessioni",
         ShortcutAction.QuickSearch => "Ricerca rapida",
         ShortcutAction.ToggleSplitView => "Vista affiancata sì/no",
+        ShortcutAction.Lock => "Blocca RdpManager (PIN)",
 
         _ when SessionNumber(action) is int n => $"Vai alla sessione {n}",
         _ => action.ToString(),

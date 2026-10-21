@@ -95,6 +95,18 @@ public sealed class AppSettings
     /// </summary>
     public bool ReopenOnceAfterUpdate { get; set; }
 
+    // --- Dalla 1.4 ---
+
+    /// <summary>Impronta PBKDF2 del PIN di blocco (mai il PIN); null = blocco con PIN spento.</summary>
+    public PinHash? LockPin { get; set; }
+
+    /// <summary>Blocco dopo questi minuti di inattività (0 = solo a mano); vale solo con il PIN impostato.</summary>
+    public int LockAfterMinutes { get; set; } = 10;
+
+    /// <summary>Vero se il blocco con PIN è attivo.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool LockEnabled => LockPin is { IsValid: true };
+
     public ShortcutMap GetShortcuts() => ShortcutMap.FromSettings(Shortcuts);
 
     /// <summary>
@@ -106,6 +118,7 @@ public sealed class AppSettings
         copy.PreferredMonitor = null;
         copy.OpenSessions = [];
         copy.ReopenOnceAfterUpdate = false;
+        copy.LockPin = null; // il PIN non esce mai dal PC
         return copy;
     }
 
@@ -129,6 +142,7 @@ public sealed class AppSettings
         UpdateMode = src.UpdateMode;
         VerboseLog = src.VerboseLog;
         ConnectionOrder = src.ConnectionOrder;
+        LockAfterMinutes = src.LockAfterMinutes;
         PreferredMonitor = monitor;
         OpenSessions = open;
     }
@@ -177,6 +191,9 @@ public sealed class AppSettings
             ConnectionOrder = ConnectionOrder.Alphabetical;
         if (!Enum.IsDefined(UpdateMode))
             UpdateMode = UpdateMode.AutomaticWithConfirmation;
+        if (LockPin is { IsValid: false })
+            LockPin = null;
+        LockAfterMinutes = Math.Clamp(LockAfterMinutes, 0, 24 * 60);
 
     }
 }
