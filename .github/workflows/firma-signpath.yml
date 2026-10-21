@@ -1,0 +1,64 @@
+# Firma del codice con SignPath (progetti open source) — PRONTO MA DISATTIVATO.
+#
+# Non parte da solo: si avvia solo a mano (workflow_dispatch) e il job ha `if: false`, quindi anche avviato non
+# fa nulla. Per attivarlo seguire docs/firma-signpath.md: adesione a SignPath Foundation accettata, segreto
+# SIGNPATH_API_TOKEN e variabili SIGNPATH_* configurati nel repository, poi togliere la riga `if: false`.
+# Nessun segreto è scritto qui: solo i nomi.
+name: Firma SignPath (disattivato)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versione da firmare (es. 1.4.0), deve coincidere con <Version> del csproj'
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  firma:
+    # DISATTIVATO: togliere questa riga solo quando SignPath ha approvato il progetto (vedi docs/firma-signpath.md).
+    if: ${{ false }}
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Pubblicazione a cartella (come nell'installer)
+        run: dotnet publish src/RdpManager -c Release -r win-x64 --self-contained -p:PublishSingleFile=false -o artifacts/publish
+
+      - name: Carica i file da firmare
+        id: da-firmare
+        uses: actions/upload-artifact@v4
+        with:
+          name: rdpmanager-da-firmare
+          path: artifacts/publish/
+
+      - name: Richiesta di firma a SignPath
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+          github-artifact-id: ${{ steps.da-firmare.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: artifacts/publish-firmato
+
+      - name: Installer dai file firmati
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /Q "/DAppVersion=${{ inputs.version }}" "/DPublishDir=$PWD\artifacts\publish-firmato" "/O$PWD\dist" installer\RdpManager.iss
+
+      - name: Carica l'installer da far firmare
+        uses: actions/upload-artifact@v4
+        with:
+          name: rdpmanager-setup-da-firmare
+          path: dist/RdpManager-Setup-${{ inputs.version }}.exe
