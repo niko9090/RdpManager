@@ -350,7 +350,11 @@ Da fare su un PC dove RdpManager 1.3.0 è installato, con almeno due PC remoti.
   alla 1.1.0: backup di programma e dati, Setup 1.3.0 della release con SHA256 verificato,
   `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER /RELAUNCH=1` → installer terminato, exe alla 1.3.0
   a cartella, app riaperta da sola con la finestra e l'elenco, chiusa normalmente, SHA256 dei dati utente
-  identici a prima, Defender senza minacce sull'exe e sulla dll installati. La prova automatica
+  identici a prima, Defender senza minacce sull'exe e sulla dll installati.
+- **Aggiornamento silenzioso 1.3.0 → 1.4.0** (21/10/2026), stessa procedura sull'installazione del PC di
+  sviluppo: Setup 1.4.0 della release con SHA256 verificato, installer terminato con codice 0, exe alla
+  1.4.0, app riaperta da sola («RdpManager 1.4.0 - Desktop remoti») e chiusa normalmente, 0 differenze
+  negli SHA256 dei dati utente, Defender senza minacce sul Setup e sull'exe installato. La prova automatica
   `verifica/installer.ps1 -Aggiornamento` va lanciata su un PC pulito (si ferma dove RdpManager è già
   installato).
 
