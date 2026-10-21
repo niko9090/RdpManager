@@ -323,9 +323,13 @@ prove precedenti.
   prove l'installer non viene eseguito), installer manomesso mai avviato. Lo stato «connessa» in queste
   prove è simulato.
 - **Antivirus**: scansione di Microsoft Defender sui file della 1.2.0 e della 1.3.0 (nessuna minaccia).
-- **Non provato in automatico**: la prova di aggiornamento silenzioso 1.2.0 → 1.3.0 di
-  `verifica/installer.ps1 -Aggiornamento` esiste ma va lanciata su un PC pulito (si ferma dove RdpManager è
-  già installato, come sul PC di sviluppo).
+- **Aggiornamento silenzioso provato a mano** (21/10/2026) sull'installazione del PC di sviluppo, che era
+  alla 1.1.0: backup di programma e dati, Setup 1.3.0 della release con SHA256 verificato,
+  `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER /RELAUNCH=1` → installer terminato, exe alla 1.3.0
+  a cartella, app riaperta da sola con la finestra e l'elenco, chiusa normalmente, SHA256 dei dati utente
+  identici a prima, Defender senza minacce sull'exe e sulla dll installati. La prova automatica
+  `verifica/installer.ps1 -Aggiornamento` va lanciata su un PC pulito (si ferma dove RdpManager è già
+  installato).
 
 - **Provato con clic e tasti veri** sull'app compilata (ottobre 2026, un monitor, connessioni finte):
   doppio clic sull'elenco, Ctrl+Alt+Invio dentro la sessione, barra in alto dal bordo e clic su una

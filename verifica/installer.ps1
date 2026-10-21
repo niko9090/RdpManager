@@ -75,7 +75,9 @@ if ($Aggiornamento) {
         $before = Hashes $data
 
         "Aggiorno in silenzio con: $Setup /RELAUNCH=1"
-        $p = Start-Process $Setup -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', '/RELAUNCH=1' -PassThru -Wait
+        # Non -Wait: in Windows PowerShell aspetterebbe anche i figli, cioè l'app riaperta dall'installer.
+        $p = Start-Process $Setup -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', '/RELAUNCH=1' -PassThru
+        $p.WaitForExit()
         Check ($p.ExitCode -eq 0) "aggiornamento terminato con codice $($p.ExitCode)"
         $newVersion = (Get-Item $exe).VersionInfo.FileVersion
         Check ($newVersion -ne $oldVersion) "versione installata cambiata: $oldVersion -> $newVersion"
@@ -90,9 +92,9 @@ if ($Aggiornamento) {
             Start-Sleep 5
             $relaunched.Refresh()
             Check (-not $relaunched.HasExited) "l'app aggiornata resta aperta per 5 s"
-            # Chiusura brusca: l'app non riscrive i dati.
-            Stop-Process -Id $relaunched.Id -Force
-            $relaunched.WaitForExit(10000) | Out-Null
+            # Chiusura normale (come l'utente); se non basta, forzata.
+            [void]$relaunched.CloseMainWindow()
+            if (-not $relaunched.WaitForExit(15000)) { Stop-Process -Id $relaunched.Id -Force; $relaunched.WaitForExit(10000) | Out-Null }
         }
 
         $after = Hashes $data | Where-Object { $_ -notmatch '\\(history\.json|logs\\)' }
