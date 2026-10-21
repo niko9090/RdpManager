@@ -8,6 +8,12 @@ Perché: un eseguibile firmato mostra l'editore verificato invece di «Editore s
 la reputazione SmartScreen; è il rimedio più efficace ai blocchi degli antivirus descritti in
 [falsi-positivi.md](falsi-positivi.md).
 
+## Prima della domanda
+
+SignPath chiede che nel repository ci sia un file `LICENSE` con una licenza open source riconosciuta (approvata
+da OSI). Oggi il file **manca**: la licenza (per esempio MIT) la sceglie Nicholas, e il file va aggiunto prima di
+inviare la domanda.
+
 ## Cosa offre SignPath Foundation
 
 SignPath Foundation (<https://signpath.org/>) firma gratis i rilasci dei progetti open source che accetta, con un
