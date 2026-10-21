@@ -144,7 +144,45 @@ public sealed class ScreenshotTests : IDisposable
 
                 foreach (var v in views.Where(v => v.State == SessionState.Connected))
                     v.SetStateForTests(SessionState.Disconnected, "Disconnessa");
+                // 1.4: selezione multipla, F1, anteprima CSV, schermata di blocco.
+                var conns = form.Document.Connections;
+                form.SelectForTests(conns[0], Keys.None);
+                form.SelectForTests(conns[1], Keys.Control);
+                form.SelectForTests(conns[3], Keys.Control);
+                Pump(300);
+                Save(form, Path.Combine(outDir, "10-selezione-multipla.png"));
+                form.SelectForTests(null, Keys.None);
+
+                using (var f1 = new ShortcutsDialog(form.ShortcutLines()) { StartPosition = FormStartPosition.Manual, Location = new Point(80, 60) })
+                {
+                    f1.Show();
+                    Pump(400);
+                    Save(f1, Path.Combine(outDir, "11-scorciatoie-F1.png"));
+                }
+
+                var csv = CsvImport.Parse("Nome;Indirizzo;Porta;Utente;Cartella\nUfficio Nord;nord.example.invalid;3389;SEDE\\anna;Sedi\nMagazzino;magazzino.invalid;;;\nSenza host;;3389;;\n");
+                using (var csvDlg = new CsvImportDialog("connessioni.csv", csv, form.Document, "Importate") { StartPosition = FormStartPosition.Manual, Location = new Point(60, 60) })
+                {
+                    csvDlg.Show();
+                    Pump(400);
+                    Save(csvDlg, Path.Combine(outDir, "12-importazione-csv.png"));
+                }
+
+                form.Document.Settings.LockPin = PinLock.Create("2580", 10_000);
+                form.LockApp();
+                Pump(600);
+                if (form.LockScreen is { } lockScreen)
+                {
+                    lockScreen.PinBox.Text = "9";
+                    lockScreen.TryUnlock();
+                    Pump(200);
+                    Save(lockScreen, Path.Combine(outDir, "13-blocco-pin.png"));
+                    lockScreen.PinBox.Text = "2580";
+                    lockScreen.TryUnlock();
+                    Pump(300);
+                }
                 form.StartInstaller = _ => { };
+
                 form.ExitApp();
                 Pump(200);
             }
@@ -173,10 +211,20 @@ public sealed class ScreenshotTests : IDisposable
         }
         else
         {
-            using var g = Graphics.FromImage(bmp);
-            g.CopyFromScreen(b.Location, Point.Empty, b.Size);
+            try
+            {
+                using var g = Graphics.FromImage(bmp);
+                g.CopyFromScreen(b.Location, Point.Empty, b.Size);
+            }
+            catch (System.ComponentModel.Win32Exception)
+            {
+                // Schermo non copiabile (sessione di Windows bloccata): la finestra si disegna da sola, senza il
+                // contenuto dei controlli ActiveX.
+                form.DrawToBitmap(bmp, new Rectangle(Point.Empty, b.Size));
+            }
         }
         bmp.Save(path, ImageFormat.Png);
+
     }
 
     private static bool PumpUntil(Func<bool> condition, int ms)
