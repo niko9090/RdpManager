@@ -343,6 +343,18 @@ public sealed class V15CoreTests : IDisposable
     }
 
     [Fact]
+    public void AllConnections_SearchFiltersByNameHostAndLabel()
+    {
+        RdpConnection C(string name, string host, string label = "") => new() { Name = name, Host = host, Label = label };
+        var list = new[] { C("Magazzino", "mag.example.test"), C("Ufficio", "uff.example.test", "PROD"), C("Laboratorio", "lab.example.test") };
+        Assert.Equal(["Magazzino", "Ufficio", "Laboratorio"], FullScreenBarLayout.FilterConnections("  ", list).Select(c => c.Name));
+        Assert.Equal(["Magazzino"], FullScreenBarLayout.FilterConnections("magaz", list).Select(c => c.Name));
+        Assert.Equal(["Ufficio"], FullScreenBarLayout.FilterConnections("prod", list).Select(c => c.Name));
+        Assert.Equal(["Laboratorio"], FullScreenBarLayout.FilterConnections("lab.example", list).Select(c => c.Name));
+        Assert.Empty(FullScreenBarLayout.FilterConnections("zzzz", list));
+    }
+
+    [Fact]
     public void Describe_HasItalianNamesForEverySectionPositionAndMode()
     {
         Assert.All(Enum.GetValues<BarSection>(), s => Assert.NotEqual(s.ToString(), FullScreenBarSettings.Describe(s)));

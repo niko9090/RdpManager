@@ -11,7 +11,7 @@ public sealed partial class MainForm
     private readonly Splitter _splitter = new() { Dock = DockStyle.Left, Width = 5, MinSize = 180, MinExtra = 300 };
     private readonly Panel _edge = new() { Dock = DockStyle.Left, Width = 6, BackColor = Color.FromArgb(200, 205, 215), Cursor = Cursors.Hand, Visible = false };
     private readonly Panel _content = new() { Dock = DockStyle.Fill };
-    private readonly SwitchBar _switchBar = new() { Visible = false };
+    private readonly FullScreenSideBar _fsBar = new() { Visible = false };
     private readonly ToolStripButton _pinButton = new("A comparsa") { Alignment = ToolStripItemAlignment.Right, CheckOnClick = false };
     private readonly ToolTip _tips = new();
     private readonly System.Windows.Forms.Timer _edgeTimer = new() { Interval = 120 };
@@ -27,8 +27,16 @@ public sealed partial class MainForm
     private bool _sidebarHiddenByUser;
     /// <summary>Barra a comparsa attualmente aperta sopra le sessioni.</summary>
     private bool _sidebarRevealed;
-    private int _sidebarAwayTicks, _topTicks, _barAwayTicks;
-    private DateTime _barShownUntil;
+    private int _sidebarAwayTicks, _fsBarAwayTicks;
+
+    /// <summary>Barra fissa a schermo intero nascosta a mano (scorciatoia della barra laterale).</summary>
+    private bool _fsBarHiddenByUser;
+    /// <summary>Barra a schermo intero aperta sopra la sessione (a comparsa o richiamata).</summary>
+    private bool _fsBarRevealed;
+    /// <summary>Da quando il mouse è sul bordo della barra a comparsa (null = non c'è).</summary>
+    private DateTime? _fsEdgeSince;
+    private DateTime _fsBarShownUntil;
+    private readonly System.Windows.Forms.Timer _thumbTimer = new() { Interval = 2000 };
 
     private void BuildLayout()
     {
@@ -39,7 +47,6 @@ public sealed partial class MainForm
 
         _content.Controls.Add(_tabs);
         _content.Controls.Add(_emptyHint);
-        _content.Controls.Add(_switchBar);
         _content.Resize += (_, _) => LayoutOverlays();
 
         // Ordine di aggiunta = ordine di aggancio dall'esterno verso l'interno, al contrario.
@@ -47,13 +54,23 @@ public sealed partial class MainForm
         _root.Controls.Add(_splitter);
         _root.Controls.Add(_sidebar);
         _root.Controls.Add(_edge);
+        _root.Controls.Add(_fsBar);
         _root.Resize += (_, _) => LayoutOverlays();
 
         _tips.SetToolTip(_edge, "Barra laterale");
         _edge.MouseEnter += (_, _) => ShowSidebar(focusSearch: false);
         _edge.Click += (_, _) => ShowSidebar(focusSearch: false);
 
-        _switchBar.SessionClicked += (_, view) => SelectView(view);
+        _fsBar.SessionClicked += (_, view) => SelectView(view);
+        _fsBar.ConnectionClicked += (_, c) => OpenSession(c);
+        _fsBar.WorkspaceClicked += (_, ws) => OpenWorkspace(ws);
+        _fsBar.ActionClicked += (_, action) => ExecuteShortcut(action);
+        _fsBar.QuickTextClicked += async (_, t) =>
+        {
+            if (CurrentView is { State: SessionState.Connected } v)
+                await v.TypeTextAsync(t.TextToType());
+        };
+        _thumbTimer.Tick += (_, _) => RefreshBarThumbnails();
         _edgeTimer.Tick += (_, _) => OnEdgeTimer();
         _edgeTimer.Start();
     }
@@ -181,8 +198,7 @@ public sealed partial class MainForm
         {
             UpdateTreeStates();
         }
-        if (_switchBar.Visible)
-            FillSwitchBar();
+        UpdateFullScreenBarSessions();
     }
 
     /// <summary>Connette tutte le connessioni della cartella (e sottocartelle), ognuna nella sua scheda.</summary>
@@ -269,8 +285,7 @@ public sealed partial class MainForm
     {
         foreach (var v in AllViews)
             UpdateSessionTab(v);
-        if (_switchBar.Visible)
-            FillSwitchBar();
+        UpdateFullScreenBarSessions();
     }
 
     internal void CloseSession(RdpSessionView view)
@@ -302,8 +317,7 @@ public sealed partial class MainForm
         ShowHintIfEmpty();
         UpdateStatus();
         UpdateTreeStates();
-        if (_switchBar.Visible)
-            FillSwitchBar();
+        UpdateFullScreenBarSessions();
     }
 
     internal void ToggleDetach(RdpSessionView view)
@@ -373,7 +387,7 @@ public sealed partial class MainForm
     /// <summary>Salva l'immagine della sessione in Immagini\RdpManager e la copia negli appunti.</summary>
     private async Task SaveSnapshotAsync(RdpSessionView view)
     {
-        HideSwitchBar();
+        HideFullScreenBarOverlay();
         await Task.Delay(250); // il menu o la barra appena chiusi non devono finire nella foto
         using var bmp = view.CaptureSession();
         if (bmp is null)
@@ -571,11 +585,11 @@ public sealed partial class MainForm
         {
             SelectView(views[target]);
             if (_fullScreen)
-                FlashSwitchBar();
+                FlashFullScreenBar();
         }
         else if (_fullScreen)
         {
-            FlashSwitchBar(); // nessuna sessione connessa dove andare: la barra mostra perché
+            FlashFullScreenBar(); // nessuna sessione connessa dove andare: la barra mostra perché
         }
     }
 
@@ -668,8 +682,9 @@ public sealed partial class MainForm
 
     /// <summary>
     /// Schermo intero dell'app: la finestra principale diventa senza bordi e copre il monitor scelto
-    /// (tutti i monitor se la sessione corrente lo chiede). Le schede restano, senza intestazioni; la
-    /// barra di passaggio compare portando il mouse sul bordo in alto.
+    /// (tutti i monitor se la sessione corrente lo chiede). Le schede restano, senza intestazioni. In alto non
+    /// c'è niente (dalla 1.5): sessioni, connessioni e comandi stanno nella barra a schermo intero, a sinistra,
+    /// a destra o in basso, fissa, a comparsa o nascosta come scelto nelle impostazioni.
     /// </summary>
     internal void ToggleFullScreen()
     {
@@ -690,6 +705,9 @@ public sealed partial class MainForm
         _tabInsets = new Padding(display.Left, display.Top, _tabs.Width - display.Right, _tabs.Height - display.Bottom);
 
         _fullScreen = true;
+        _fsBarHiddenByUser = false;
+        _fsBarRevealed = false;
+        _fsEdgeSince = null;
         SuspendLayout();
         _menu.Visible = false;
         _statusStrip.Visible = false;
@@ -698,11 +716,12 @@ public sealed partial class MainForm
         WindowState = FormWindowState.Normal;
         FormBorderStyle = FormBorderStyle.None;
         UpdateFullScreenBounds();
+        ApplySidebarLayout();
         ResumeLayout();
         LayoutOverlays();
         _fullScreenItem.Checked = true;
         Activate();
-        FlashSwitchBar();
+        FlashFullScreenBar();
         if (CurrentView is { } cv)
             BeginInvoke(cv.FocusSession);
     }
@@ -713,7 +732,10 @@ public sealed partial class MainForm
             return;
         _fullScreen = false;
         SuspendLayout();
-        _switchBar.Visible = false;
+        _fsBarRevealed = false;
+        _fsBar.Visible = false;
+        _thumbTimer.Stop();
+        _content.Dock = DockStyle.Fill;
         _tabs.Dock = DockStyle.Fill;
         FormBorderStyle = _savedBorder;
         Bounds = MonitorLayout.EnsureVisible(_savedBounds, Screens.All(), _doc.Settings.PreferredMonitor);
@@ -722,6 +744,7 @@ public sealed partial class MainForm
         _statusStrip.Visible = true;
         foreach (var v in AllViews)
             v.ToolbarVisible = true;
+        ApplySidebarLayout();
         ResumeLayout();
         LayoutOverlays();
         _fullScreenItem.Checked = false;
@@ -745,23 +768,36 @@ public sealed partial class MainForm
             Bounds = target;
     }
 
-    /// <summary>Posizione degli elementi sovrapposti: schede senza intestazioni, barra di passaggio, barra a comparsa.</summary>
+    /// <summary>
+    /// Posizione degli elementi: a schermo intero sessione e barra secondo <see cref="FullScreenBarLayout"/> (con la
+    /// barra fissa la sessione prende solo lo spazio che resta), schede senza intestazioni; in finestra la barra
+    /// laterale a comparsa sopra le sessioni.
+    /// </summary>
     private void LayoutOverlays()
     {
         if (_fullScreen)
         {
+            bool shown = FullScreenBarShown;
+            var r = FullScreenBarLayout.Compute(_root.ClientRectangle, _doc.Settings.Bar, shown);
+            if (_content.Dock != DockStyle.None)
+                _content.Dock = DockStyle.None;
+            if (_content.Bounds != r.Session)
+                _content.Bounds = r.Session;
+            if (shown)
+            {
+                _fsBar.Bounds = r.Bar;
+                _fsBar.BringToFront();
+            }
+            if (_fsBar.Visible != shown)
+                _fsBar.Visible = shown;
             // Le intestazioni delle schede finiscono fuori dall'area visibile: resta solo la sessione.
             _tabs.Dock = DockStyle.None;
             _tabs.Bounds = new Rectangle(-_tabInsets.Left, -_tabInsets.Top,
                 _content.Width + _tabInsets.Horizontal, _content.Height + _tabInsets.Vertical);
+            return;
         }
-        else if (_tabs.Dock != DockStyle.Fill)
-        {
+        if (_tabs.Dock != DockStyle.Fill)
             _tabs.Dock = DockStyle.Fill;
-        }
-        _switchBar.Bounds = new Rectangle(0, 0, _content.Width, _switchBar.Height);
-        if (_switchBar.Visible)
-            _switchBar.BringToFront();
         if (_doc.Settings.SidebarMode == SidebarMode.AutoHide && _sidebarRevealed)
         {
             _sidebar.Bounds = new Rectangle(_edge.Visible ? _edge.Width : 0, 0, _sidebar.Width, _root.Height);
@@ -769,60 +805,168 @@ public sealed partial class MainForm
         }
     }
 
-    // ---------- barra di passaggio ----------
+    // ---------- barra a schermo intero ----------
 
-    internal bool SwitchBarVisible => _switchBar.Visible;
+    /// <summary>Vero se a schermo intero la barra si vede (fissa non nascosta a mano, oppure aperta sopra la sessione).</summary>
+    internal bool FullScreenBarShown =>
+        _fullScreen && (_fsBarRevealed || (_doc.Settings.Bar.Mode == BarMode.Fixed && !_fsBarHiddenByUser));
 
-    private void FillSwitchBar()
+    internal FullScreenSideBar FullScreenBarControl => _fsBar;
+
+    private List<FullScreenSideBar.SessionItem> BarSessions()
     {
         var views = TabViews;
         var connected = views.Select(v => v.State == SessionState.Connected).ToList();
         int selected = _tabs.SelectedIndex;
-        _switchBar.SetItems(views.Select((v, i) =>
+        var current = CurrentView;
+        return views.Select((v, i) =>
         {
             int number = connected.Take(i + 1).Count(x => x);
-            return new SwitchBar.Item(v, connected[i] && number <= 9 ? number : null, i == selected);
-        }));
-        var commands = new List<(string, string, Action)>
+            return new FullScreenSideBar.SessionItem(v, connected[i] && number <= 9 ? number : null,
+                IsSplit ? v == current : i == selected);
+        }).ToList();
+    }
+
+    private bool CanTypeQuickText => CurrentView is { State: SessionState.Connected };
+
+    /// <summary>Ricostruisce la barra (sezioni, connessioni, spazi di lavoro…) se si vede.</summary>
+    private void RebuildFullScreenBar()
+    {
+        if (!_fullScreen || !_fsBar.Visible)
+            return;
+        _fsBar.Rebuild(new FullScreenSideBar.Content(
+            _doc.Settings.Bar,
+            BarSessions(),
+            _doc.InDisplayOrder(_doc.Connections.Where(c => c.IsFavorite)).ToList(),
+            _doc.InDisplayOrder(_doc.Connections).ToList(),
+            _doc.Workspaces,
+            _doc.QuickTexts,
+            _shortcuts,
+            CanTypeQuickText));
+        bool thumbs = _doc.Settings.Bar.SessionStyle == SessionListStyle.Thumbnails
+                      && _doc.Settings.Bar.VisibleSections.Contains(BarSection.ConnectedSessions);
+        if (thumbs)
         {
-            ("Panoramica", $"Miniature delle sessioni connesse ({_shortcuts[ShortcutAction.Overview]})", ToggleOverview),
-            ("Cerca", $"Ricerca rapida ({_shortcuts[ShortcutAction.QuickSearch]})", ShowQuickSearch),
-            ("Testi", "Testi rapidi da digitare nella sessione", ShowQuickTextsMenuAtCursor),
-            ("Ctrl+Alt+Canc", "Invia Ctrl+Alt+Canc alla sessione", () => CurrentView?.SendCtrlAltDel()),
-
-            ("Foto", "Foto della sessione (Immagini\\RdpManager)", async () => { if (CurrentView is { } v) await SaveSnapshotAsync(v); }),
-            ("Barra laterale", $"Mostra/nascondi la barra laterale ({_shortcuts[ShortcutAction.ToggleSidebar]})", ToggleSidebar),
-        };
-        if (Screen.AllScreens.Length > 1)
-            commands.Add(("Monitor ›", "Schermo intero sul monitor successivo", MoveToNextMonitor));
-        commands.Add(("Esci", $"Esci dallo schermo intero ({_shortcuts[ShortcutAction.ToggleFullScreen]})", LeaveFullScreen));
-        _switchBar.SetCommands(commands.ToArray());
+            _thumbTimer.Start();
+            RefreshBarThumbnails();
+        }
+        else
+        {
+            _thumbTimer.Stop();
+        }
     }
 
-    internal void ShowSwitchBar()
+    /// <summary>Aggiorna solo le sessioni della barra (stato, numeri, scheda scelta).</summary>
+    private void UpdateFullScreenBarSessions()
     {
-        FillSwitchBar();
-        _switchBar.Visible = true;
+        if (_fullScreen && _fsBar.Visible)
+            _fsBar.UpdateSessions(BarSessions(), CanTypeQuickText);
+    }
+
+    /// <summary>
+    /// Miniature: si fotografa (PrintWindow) solo la sessione visibile, così non si cambia scheda alle spalle
+    /// dell'utente; le altre tengono l'ultima immagine di quando erano visibili.
+    /// </summary>
+    private void RefreshBarThumbnails()
+    {
+        if (!_fullScreen || !_fsBar.Visible || _locked)
+        {
+            _thumbTimer.Stop();
+            return;
+        }
+        var visible = IsSplit ? new[] { _splitLeft, _splitRight } : new[] { _tabs.SelectedTab?.Tag as RdpSessionView };
+        foreach (var v in visible.OfType<RdpSessionView>().Where(v => v.State == SessionState.Connected))
+        {
+            using var full = v.CaptureSession();
+            if (full is null)
+                continue;
+            int w = Math.Min(full.Width, 480);
+            int h = Math.Max(1, full.Height * w / Math.Max(1, full.Width));
+            var small = new Bitmap(w, h);
+            using (var g = Graphics.FromImage(small))
+            {
+                g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBilinear;
+                g.DrawImage(full, 0, 0, w, h);
+            }
+            _fsBar.UpdateThumbnail(v, small);
+        }
+    }
+
+    /// <summary>Scorciatoia della barra laterale a schermo intero: fissa → la nasconde o la rimostra; altrimenti la apre o la chiude.</summary>
+    private void ToggleFullScreenBar()
+    {
+        if (_doc.Settings.Bar.Mode == BarMode.Fixed && !_fsBarRevealed)
+        {
+            _fsBarHiddenByUser = !_fsBarHiddenByUser;
+            LayoutOverlays();
+            RebuildFullScreenBar();
+        }
+        else if (_fsBarRevealed)
+        {
+            HideFullScreenBarOverlay();
+        }
+        else
+        {
+            RevealFullScreenBar();
+            if (_fsBar.SearchBox is { } box)
+            {
+                if (Form.ActiveForm != this)
+                    Activate();
+                box.Focus();
+            }
+            return;
+        }
+        if (CurrentView is { } v)
+            BeginInvoke(v.FocusSession);
+    }
+
+    /// <summary>Apre la barra sopra la sessione (a comparsa o nascosta).</summary>
+    internal void RevealFullScreenBar()
+    {
+        if (!_fullScreen || FullScreenBarShown)
+            return;
+        _fsBarRevealed = true;
+        _fsBarAwayTicks = 0;
         LayoutOverlays();
-        _barAwayTicks = 0;
+        RebuildFullScreenBar();
     }
 
-    /// <summary>Mostra la barra per un attimo, come conferma dopo un cambio di sessione da tastiera.</summary>
-    private void FlashSwitchBar()
+    private void HideFullScreenBarOverlay()
     {
-        ShowSwitchBar();
-        _barShownUntil = DateTime.UtcNow.AddSeconds(1.5);
+        _fsEdgeSince = null;
+        if (!_fsBarRevealed)
+            return;
+        _fsBarRevealed = false;
+        _fsBarShownUntil = DateTime.MinValue;
+        LayoutOverlays();
     }
 
-    private void HideSwitchBar()
+    /// <summary>Barra a comparsa: si apre per un attimo, come conferma dopo un cambio di sessione da tastiera.</summary>
+    private void FlashFullScreenBar()
     {
-        _switchBar.Visible = false;
-        _barShownUntil = DateTime.MinValue;
+        if (!_fullScreen)
+            return;
+        if (FullScreenBarShown)
+        {
+            if (_fsBar.Visible && _fsBar.ShownSections.Count == 0)
+                RebuildFullScreenBar();
+            else
+                UpdateFullScreenBarSessions();
+        }
+        if (_doc.Settings.Bar.Mode != BarMode.AutoReveal || _fsBarRevealed)
+        {
+            if (FullScreenBarShown && _fsBar.ShownSections.Count == 0)
+                RebuildFullScreenBar();
+            return;
+        }
+        RevealFullScreenBar();
+        _fsBarShownUntil = DateTime.UtcNow.AddSeconds(1.5);
     }
 
     /// <summary>
     /// Il mouse sopra il controllo RDP non genera eventi per WinForms: la posizione si controlla a intervalli.
-    /// Bordo in alto (a schermo intero) → barra di passaggio; fuori dalla barra a comparsa → si richiude.
+    /// A schermo intero: bordo della barra a comparsa (per il ritardo scelto) → si apre; fuori dalla barra → si
+    /// richiude. Il bordo in alto non fa niente. In finestra: fuori dalla barra laterale a comparsa → si richiude.
     /// </summary>
     private void OnEdgeTimer()
     {
@@ -836,20 +980,32 @@ public sealed partial class MainForm
 
         if (_fullScreen)
         {
-            if (!_switchBar.Visible)
+            var bar = _doc.Settings.Bar;
+            if (_fsBarRevealed)
             {
-                _topTicks = active && p.Y <= Bounds.Top + 1 && p.X >= Bounds.Left && p.X < Bounds.Right ? _topTicks + 1 : 0;
-                if (_topTicks >= 2)
-                    ShowSwitchBar();
+                var area = _fsBar.RectangleToScreen(_fsBar.ClientRectangle);
+                area.Inflate(16, 16);
+                bool inside = area.Contains(p) || _fsBar.IsSearching || _fsBar.ContainsFocus && Form.ActiveForm == this
+                              || DateTime.UtcNow < _fsBarShownUntil;
+                _fsBarAwayTicks = inside ? 0 : _fsBarAwayTicks + 1;
+                if (_fsBarAwayTicks >= 5)
+                    HideFullScreenBarOverlay();
             }
-            else
+            else if (bar.Mode == BarMode.AutoReveal && !_locked)
             {
-                var bar = _switchBar.RectangleToScreen(_switchBar.ClientRectangle);
-                bool near = p.Y <= bar.Bottom + 24 && p.X >= bar.Left && p.X < bar.Right;
-                _barAwayTicks = near || DateTime.UtcNow < _barShownUntil ? 0 : _barAwayTicks + 1;
-                if (_barAwayTicks >= 4)
-                    HideSwitchBar();
+                var screen = _root.RectangleToScreen(_root.ClientRectangle);
+                if (active && FullScreenBarLayout.IsOnRevealEdge(p, screen, bar.Position))
+                {
+                    _fsEdgeSince ??= DateTime.UtcNow;
+                    if ((DateTime.UtcNow - _fsEdgeSince.Value).TotalMilliseconds >= bar.RevealDelayMs)
+                        RevealFullScreenBar();
+                }
+                else
+                {
+                    _fsEdgeSince = null;
+                }
             }
+            return;
         }
 
         if (_doc.Settings.SidebarMode == SidebarMode.AutoHide && _sidebarRevealed)
@@ -881,7 +1037,15 @@ public sealed partial class MainForm
     {
         bool pinned = _doc.Settings.SidebarMode == SidebarMode.Pinned;
         SuspendLayout();
-        if (pinned)
+        if (_fullScreen)
+        {
+            // A schermo intero vale la barra a schermo intero: la barra laterale della finestra si toglie.
+            _edge.Visible = false;
+            _splitter.Visible = false;
+            _sidebar.Visible = false;
+            _sidebarRevealed = false;
+        }
+        else if (pinned)
         {
             _edge.Visible = false;
             _sidebar.Dock = DockStyle.Left;
@@ -904,6 +1068,7 @@ public sealed partial class MainForm
         }
         ResumeLayout();
         LayoutOverlays();
+        RebuildFullScreenBar();
         _pinButton.Text = pinned ? "A comparsa" : "Fissa";
         _pinButton.ToolTipText = pinned
             ? "Barra a comparsa: si nasconde e riappare portando il mouse sul bordo sinistro"
@@ -914,6 +1079,11 @@ public sealed partial class MainForm
     /// <summary>Ctrl+Alt+B: barra fissa → la nasconde o la rimostra; barra a comparsa → la apre o la chiude.</summary>
     internal void ToggleSidebar()
     {
+        if (_fullScreen)
+        {
+            ToggleFullScreenBar();
+            return;
+        }
         if (SidebarShown)
         {
             if (_doc.Settings.SidebarMode == SidebarMode.Pinned)
@@ -936,6 +1106,11 @@ public sealed partial class MainForm
 
     private void ShowSidebar(bool focusSearch)
     {
+        if (_fullScreen)
+        {
+            RevealFullScreenBar();
+            return;
+        }
         if (_doc.Settings.SidebarMode == SidebarMode.Pinned)
         {
             _sidebarHiddenByUser = false;
@@ -1001,8 +1176,7 @@ public sealed partial class MainForm
         var current = MonitorLayout.ScreenOf(all, Bounds);
         if (MonitorLayout.NextScreen(all, current) is { } next)
             SetPreferredMonitor(next);
-        if (_fullScreen && _switchBar.Visible)
-            FillSwitchBar();
+        UpdateFullScreenBarSessions();
     }
 
     /// <summary>All'avvio la finestra si apre sul monitor scelto (se è collegato).</summary>
@@ -1026,9 +1200,20 @@ public sealed partial class MainForm
     internal ConnectionsDocument Document => _doc;
     internal IReadOnlyList<DetachedSessionForm> DetachedForms => _detached;
     internal Control Sidebar => _sidebar;
-    internal Control SwitchBarControl => _switchBar;
 
     internal void SetSidebarModeForTests(SidebarMode mode) => SetSidebarMode(mode);
+
+    /// <summary>Come dopo «OK» nelle impostazioni, con solo la barra a schermo intero cambiata.</summary>
+    internal void ApplyFullScreenBarForTests(FullScreenBarSettings bar)
+    {
+        bar.Normalize();
+        _doc.Settings.FullScreenBar = bar;
+        _fsBarHiddenByUser = false;
+        _fsBarRevealed = false;
+        ApplySettings();
+    }
+
+    internal void HideFullScreenBarOverlayForTests() => HideFullScreenBarOverlay();
     internal void RefreshTreeForTests() => RefreshTree();
     internal void ShowSidebarForTests() => ShowSidebar(focusSearch: false);
 }

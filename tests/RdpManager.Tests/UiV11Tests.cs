@@ -10,7 +10,7 @@ using Xunit.Abstractions;
 namespace RdpManager.Tests;
 
 /// <summary>
-/// Prove della finestra principale 1.1 (schermo intero dell'app, barra di passaggio, barra laterale,
+/// Prove della finestra principale 1.1 (schermo intero dell'app, sessioni nella barra a schermo intero, barra laterale,
 /// scorciatoie anche dentro la sessione, riapertura e riconnessione). Come <see cref="UiIntegrationTests"/>
 /// usano host irraggiungibili e un archivio temporaneo; lo stato «connessa» si simula dove serve.
 /// </summary>
@@ -103,8 +103,8 @@ public sealed class UiV11Tests(ITestOutputHelper output) : IDisposable
             v.SetStateForTests(SessionState.Connected, "Connessa");
     }
 
-    private static List<string> SwitchBarButtons(MainForm form) =>
-        Descendants(form.SwitchBarControl).OfType<Button>().Where(b => b.Tag is RdpSessionView).Select(b => b.Text).ToList();
+    private static List<string> BarSessionButtons(MainForm form) =>
+        Descendants(form.FullScreenBarControl).OfType<Button>().Where(b => b.Tag is RdpSessionView).Select(b => b.Text).ToList();
 
     private static IEnumerable<Control> Descendants(Control parent)
     {
@@ -164,7 +164,7 @@ public sealed class UiV11Tests(ITestOutputHelper output) : IDisposable
     }
 
     [Fact]
-    public void SwitchBar_NumbersOnlyConnectedSessionsLikeTheShortcuts()
+    public void FullScreenBarSessions_NumberOnlyConnectedSessionsLikeTheShortcuts()
     {
         WithMainForm(StoreWith(Unreachable("Uno"), Unreachable("Due"), Unreachable("Tre")), form =>
         {
@@ -174,13 +174,13 @@ public sealed class UiV11Tests(ITestOutputHelper output) : IDisposable
 
             form.ToggleFullScreen();
             Pump(TimeSpan.FromMilliseconds(200));
-            Assert.True(form.SwitchBarVisible); // compare per un attimo entrando a schermo intero
-            form.ShowSwitchBar();
-            Assert.Equal(["1  Uno", "Due", "2  Tre"], SwitchBarButtons(form));
-            Assert.True(form.SwitchBarControl.Top == 0 && form.SwitchBarControl.Width > 0);
+            Assert.True(form.FullScreenBarShown); // barra fissa a sinistra (predefinita)
+            Assert.Equal(["1  Uno", "Due", "2  Tre"], BarSessionButtons(form));
+            Assert.Equal(0, form.FullScreenBarControl.Left);
+            Assert.Equal(form.FullScreenBarControl.Parent!.ClientSize.Height, form.FullScreenBarControl.Height);
 
             // Clic vero su «Due» (non connessa): la scheda diventa quella.
-            var due = Descendants(form.SwitchBarControl).OfType<Button>().Single(b => b.Text == "Due");
+            var due = Descendants(form.FullScreenBarControl).OfType<Button>().Single(b => b.Text == "Due");
             due.PerformClick();
             Pump(TimeSpan.FromMilliseconds(100));
             Assert.Equal(1, form.Tabs.SelectedIndex);
@@ -285,7 +285,7 @@ public sealed class UiV11Tests(ITestOutputHelper output) : IDisposable
     }
 
     [Fact]
-    public void Sidebar_PinnedCanBeHiddenAndAutoHideOverlaysTheSessionsAlsoInFullScreen()
+    public void Sidebar_PinnedCanBeHiddenAndAutoHideOverlaysTheSessions_FullScreenHasItsOwnBar()
     {
         WithMainForm(StoreWith(Unreachable("Uno")), form =>
         {
@@ -311,10 +311,18 @@ public sealed class UiV11Tests(ITestOutputHelper output) : IDisposable
 
             form.ToggleSidebar();
             Assert.False(form.SidebarShown);
+            // A schermo intero la barra della finestra lascia il posto a quella a schermo intero (fissa a sinistra,
+            // predefinita), che la stessa scorciatoia nasconde e rimostra.
             form.ToggleFullScreen();
+            Assert.False(form.SidebarShown);
+            Assert.True(form.FullScreenBarShown);
             form.ToggleSidebar();
-            Assert.True(form.SidebarShown, "La barra laterale deve essere disponibile anche a schermo intero");
-            Assert.True(form.Sidebar.Bounds.IntersectsWith(form.Sidebar.Parent.ClientRectangle));
+            Assert.False(form.FullScreenBarShown);
+            form.ToggleSidebar();
+            Assert.True(form.FullScreenBarShown, "La barra deve essere disponibile anche a schermo intero");
+            Assert.True(form.FullScreenBarControl.Bounds.IntersectsWith(form.FullScreenBarControl.Parent!.ClientRectangle));
+            form.ToggleFullScreen();
+            Assert.False(form.FullScreenBarControl.Visible);
         });
     }
 

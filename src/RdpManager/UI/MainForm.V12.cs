@@ -32,7 +32,7 @@ public sealed partial class MainForm
     private void ApplyTheme()
     {
         ThemeManager.SetTheme(_doc.Settings.Theme);
-        ThemeManager.Exclude(_switchBar);
+        ThemeManager.Exclude(_fsBar);
         ThemeManager.Apply(this, _treeMenu, _tabMenu, _trayMenu);
         foreach (var d in _detached)
             ThemeManager.Apply(d);
@@ -74,7 +74,7 @@ public sealed partial class MainForm
 
     private void ShowOverview()
     {
-        HideSwitchBar();
+        HideFullScreenBarOverlay();
         var views = AllViews.Where(v => v.State == SessionState.Connected).ToList();
         var form = new OverviewForm();
         form.SetSessions(views, CurrentView);
@@ -219,7 +219,7 @@ public sealed partial class MainForm
     internal void ShowQuickSearch()
     {
         Overview?.Close();
-        HideSwitchBar();
+        HideFullScreenBarOverlay();
         var open = AllViews.Select(v => v.Connection.Id).ToList();
         using var dlg = new QuickSearchForm(_doc.Connections, open);
         dlg.PlaceOver(Bounds);
@@ -288,8 +288,6 @@ public sealed partial class MainForm
         left.ToolbarVisible = right.ToolbarVisible = true;
         _split.Visible = true;
         _split.BringToFront();
-        if (_switchBar.Visible)
-            _switchBar.BringToFront();
         ResumeLayout();
         _split.SplitterDistance = SplitLayout.SplitterDistance(_split.Width, _doc.Settings.SplitRatio, _split.SplitterWidth);
         _splitItem.Checked = true;

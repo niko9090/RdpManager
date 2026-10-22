@@ -2,7 +2,7 @@ using RdpManager.Core;
 
 namespace RdpManager.UI;
 
-/// <summary>Impostazioni dell'app: aspetto, area di notifica, monitor, barra laterale, avvio, cronologia, scorciatoie.</summary>
+/// <summary>Impostazioni dell'app: aspetto, area di notifica, monitor, barre, schermo intero, avvio, cronologia, scorciatoie.</summary>
 public sealed class SettingsDialog : Form
 {
     private readonly AppSettings _settings;
@@ -24,6 +24,13 @@ public sealed class SettingsDialog : Form
     private readonly Label _pinState = new() { AutoSize = true, Margin = new Padding(3, 7, 10, 3) };
     private readonly NumericUpDown _lockAfter = new() { Minimum = 0, Maximum = 24 * 60, Width = 70 };
     private PinHash? _pin;
+    private readonly ComboBox _barPosition = new() { Width = 200, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly ComboBox _barMode = new() { Width = 260, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly NumericUpDown _barWidth = new() { Minimum = FullScreenBarSettings.MinWidth, Maximum = FullScreenBarSettings.MaxWidth, Increment = 10, Width = 70 };
+    private readonly NumericUpDown _barDelay = new() { Minimum = 0, Maximum = FullScreenBarSettings.MaxRevealDelayMs, Increment = 50, Width = 70 };
+    private readonly ComboBox _barStyle = new() { Width = 200, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly CheckedListBox _barSections = new() { Width = 300, Height = 130, CheckOnClick = true, IntegralHeight = false };
+    private readonly List<BarSectionSetting> _sections;
     private readonly IReadOnlyList<ScreenInfo> _screens = Screens.All();
 
     private static readonly (AppTheme Theme, string Text)[] ThemeChoices =
@@ -73,10 +80,45 @@ public sealed class SettingsDialog : Form
 
         _pinned.Checked = settings.SidebarMode == SidebarMode.Pinned;
         _autoHide.Checked = !_pinned.Checked;
-        general.Controls.Add(Group("Barra laterale", Flow(_pinned, _autoHide)));
+        general.Controls.Add(Group("Barra laterale della finestra", Flow(_pinned, _autoHide),
+            Note("A schermo intero vale la barra della scheda «Schermo intero».")));
 
         _manualOrder.Checked = settings.ConnectionOrder == ConnectionOrder.Manual;
         general.Controls.Add(Group("Elenco", _manualOrder));
+
+        // ---------- Schermo intero ----------
+        var full = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Dock = DockStyle.Fill };
+        var bar = settings.Bar;
+        _barPosition.Items.AddRange(Enum.GetValues<BarPosition>().Select(p => (object)FullScreenBarSettings.Describe(p)).ToArray());
+        _barPosition.SelectedIndex = (int)bar.Position;
+        _barMode.Items.AddRange(Enum.GetValues<BarMode>().Select(m => (object)FullScreenBarSettings.Describe(m)).ToArray());
+        _barMode.SelectedIndex = (int)bar.Mode;
+        _barWidth.Value = bar.Thickness;
+        _barDelay.Value = Math.Clamp(bar.RevealDelayMs, 0, FullScreenBarSettings.MaxRevealDelayMs);
+        _barStyle.Items.AddRange(["Con miniatura", "Compatte (una riga)"]);
+        _barStyle.SelectedIndex = bar.SessionStyle == SessionListStyle.Thumbnails ? 0 : 1;
+        _barMode.SelectedIndexChanged += (_, _) => _barDelay.Enabled = _barMode.SelectedIndex == (int)BarMode.AutoReveal;
+        _barDelay.Enabled = bar.Mode == BarMode.AutoReveal;
+        full.Controls.Add(Group("Barra a schermo intero",
+            Flow(Caption("Posizione"), _barPosition),
+            Flow(Caption("Modalità"), _barMode),
+            Flow(Caption("Larghezza"), _barWidth, Caption("pixel (in basso: altezza)")),
+            Flow(Caption("Ritardo di comparsa"), _barDelay, Caption("millisecondi sul bordo")),
+            Note("In alto non c'è niente: la parte alta dello schermo resta della sessione. Con la barra fissa la sessione si restringe e non viene coperta; a comparsa o nascosta la barra si apre sopra la sessione (anche con la scorciatoia della barra laterale).")));
+
+        _sections = bar.Sections.Select(s => new BarSectionSetting(s.Kind, s.Visible)).ToList();
+        FillSections(0);
+        _barSections.ItemCheck += (_, e) => _sections[e.Index].Visible = e.NewValue == CheckState.Checked;
+        var up = new Button { Text = "Su", AutoSize = true };
+        var down = new Button { Text = "Giù", AutoSize = true };
+        up.Click += (_, _) => MoveSection(-1);
+        down.Click += (_, _) => MoveSection(+1);
+        var sectionButtons = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, Margin = Padding.Empty };
+        sectionButtons.Controls.AddRange([up, down]);
+        full.Controls.Add(Group("Sezioni della barra (spuntate = mostrate, nell'ordine dell'elenco)",
+            Flow(_barSections, sectionButtons),
+            Flow(Caption("Sessioni connesse"), _barStyle),
+            Note("I pulsanti rapidi sono le stesse azioni delle scorciatoie. Sezioni vuote (nessun preferito, spazio di lavoro o testo rapido) non si mostrano.")));
 
         // ---------- Avvio e aggiornamenti ----------
         var startup = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Dock = DockStyle.Fill };
@@ -140,10 +182,11 @@ public sealed class SettingsDialog : Form
 
         var tabs = new TabControl { Dock = DockStyle.Fill };
         tabs.TabPages.Add(Page("Generale", general));
+        tabs.TabPages.Add(Page("Schermo intero", full));
         tabs.TabPages.Add(Page("Scorciatoie", shortcuts));
         tabs.TabPages.Add(Page("Avvio, blocco e aggiornamenti", startup));
         // Il TabControl non si adatta da solo al contenuto: la pagina più grande decide la dimensione.
-        Control[] pages = [general, shortcuts, startup];
+        Control[] pages = [general, full, shortcuts, startup];
         var size = new Size(pages.Max(p => p.PreferredSize.Width) + 24, pages.Max(p => p.PreferredSize.Height) + 48);
         tabs.Size = size;
         tabs.Dock = DockStyle.None;
@@ -172,6 +215,39 @@ public sealed class SettingsDialog : Form
         {
         }
     }
+
+    private void FillSections(int selected)
+    {
+        _barSections.BeginUpdate();
+        _barSections.Items.Clear();
+        foreach (var s in _sections)
+            _barSections.Items.Add(FullScreenBarSettings.Describe(s.Kind), s.Visible);
+        if (_sections.Count > 0)
+            _barSections.SelectedIndex = Math.Clamp(selected, 0, _sections.Count - 1);
+        _barSections.EndUpdate();
+    }
+
+    private void MoveSection(int delta)
+    {
+        int i = _barSections.SelectedIndex;
+        if (i < 0)
+            return;
+        var bar = new FullScreenBarSettings { Sections = _sections };
+        int j = bar.MoveSection(_sections[i].Kind, delta);
+        FillSections(j);
+    }
+
+    // ---------- accesso per le prove automatiche ----------
+
+    internal ComboBox BarPositionBox => _barPosition;
+    internal ComboBox BarModeBox => _barMode;
+    internal ComboBox BarStyleBox => _barStyle;
+    internal NumericUpDown BarWidthBox => _barWidth;
+    internal NumericUpDown BarDelayBox => _barDelay;
+    internal CheckedListBox BarSectionsBox => _barSections;
+    internal void MoveSectionForTests(int delta) => MoveSection(delta);
+
+    private static Label Caption(string text) => new() { Text = text, AutoSize = true, Margin = new Padding(3, 7, 8, 3) };
 
     private static TabPage Page(string title, Control content)
     {
@@ -234,7 +310,16 @@ public sealed class SettingsDialog : Form
         _settings.ConnectionOrder = _manualOrder.Checked ? ConnectionOrder.Manual : ConnectionOrder.Alphabetical;
         _settings.LockPin = _pin;
         _settings.LockAfterMinutes = (int)_lockAfter.Value;
-
+        _settings.FullScreenBar = new FullScreenBarSettings
+        {
+            Position = (BarPosition)Math.Max(0, _barPosition.SelectedIndex),
+            Mode = (BarMode)Math.Max(0, _barMode.SelectedIndex),
+            Width = (int)_barWidth.Value,
+            RevealDelayMs = (int)_barDelay.Value,
+            SessionStyle = _barStyle.SelectedIndex == 0 ? SessionListStyle.Thumbnails : SessionListStyle.Compact,
+            Sections = _sections.Select(s => new BarSectionSetting(s.Kind, s.Visible)).ToList(),
+        };
+        _settings.FullScreenBar.Normalize();
     }
 
     /// <summary>Casella che registra una combinazione di tasti invece di testo.</summary>

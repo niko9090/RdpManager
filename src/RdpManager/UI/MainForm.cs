@@ -437,6 +437,10 @@ public sealed partial class MainForm : Form
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         UpdateStatus();
+        // Connessioni, preferiti, spazi di lavoro o testi cambiati: la barra a schermo intero si rifà (non mentre
+        // si scrive nella sua ricerca).
+        if (!_fsBar.IsSearching)
+            RebuildFullScreenBar();
     }
 
     // ---------- elenco ----------

@@ -198,6 +198,86 @@ public sealed class ScreenshotTests : IDisposable
             ExceptionDispatchInfo.Throw(failure);
     }
 
+    /// <summary>Schermo intero 1.5: niente in alto, barra a sinistra (con miniature), a destra, in basso e nascosta.</summary>
+    [ScreenshotFact]
+    public void SaveScreenshotsOfTheV15FullScreenBar()
+    {
+        var outDir = Environment.GetEnvironmentVariable(FolderVariable)!;
+        Directory.CreateDirectory(outDir);
+        RdpConnection C(string name, string group, string label = "", string? color = null, bool favorite = false) =>
+            new() { Name = name, Host = name.ToLowerInvariant().Replace(' ', '-') + ".invalid", Group = group, Label = label, Color = color, IsFavorite = favorite };
+        var doc = new ConnectionsDocument
+        {
+            Connections =
+            [
+                C("Magazzino", "Clienti/Rossi", "PROD", "#E67E22", favorite: true),
+                C("Ufficio", "Clienti/Rossi", color: "#2E86DE"),
+                C("Laboratorio", "Interni", "TEST", "#27AE60"),
+                C("Server posta", "Interni", "PROD", "#C0392B", favorite: true),
+                C("Contabilità", "Interni"),
+            ],
+            QuickTexts = [new QuickText { Name = "Configurazione IP", Text = "ipconfig /all\n" }],
+        };
+        doc.SaveWorkspace("Mattina", new WorkspaceLayout([doc.Connections[0].Id, doc.Connections[1].Id], null, null, true, null, null, 0.5));
+        doc.Settings.Theme = AppTheme.Dark;
+        Directory.CreateDirectory(_dir);
+        var store = new ConnectionStore(Path.Combine(_dir, "connections.json"));
+        store.Save(doc);
+
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                using var form = new MainForm(store) { StartPosition = FormStartPosition.Manual, Location = new Point(40, 40), Size = new Size(1280, 800) };
+                form.Show();
+                Pump(400);
+                foreach (var c in form.Document.Connections.Take(4))
+                    form.OpenSession(c);
+                Pump(300);
+                var views = form.AllViews.ToList();
+                PumpUntil(() => views.All(v => v.State == SessionState.Disconnected), 30_000);
+                foreach (var v in views.Take(3))
+                    v.SetStateForTests(SessionState.Connected, "Connessa");
+                form.Tabs.SelectedIndex = 0;
+                Pump(300);
+
+                (string File, FullScreenBarSettings Bar, bool Reveal)[] shots =
+                [
+                    ("14-schermo-intero-barra-sinistra.png", new FullScreenBarSettings { Position = BarPosition.Left, Mode = BarMode.Fixed, SessionStyle = SessionListStyle.Thumbnails }, false),
+                    ("15-schermo-intero-barra-destra.png", new FullScreenBarSettings { Position = BarPosition.Right, Mode = BarMode.Fixed, Width = 280 }, false),
+                    ("16-schermo-intero-barra-in-basso.png", new FullScreenBarSettings { Position = BarPosition.Bottom, Mode = BarMode.Fixed, Width = 210 }, false),
+                    ("17-schermo-intero-barra-nascosta.png", new FullScreenBarSettings { Position = BarPosition.Left, Mode = BarMode.Hidden }, false),
+                    ("18-schermo-intero-barra-nascosta-richiamata.png", new FullScreenBarSettings { Position = BarPosition.Left, Mode = BarMode.Hidden }, true),
+                ];
+                form.ToggleFullScreen();
+                foreach (var (file, bar, reveal) in shots)
+                {
+                    form.ApplyFullScreenBarForTests(bar);
+                    form.HideFullScreenBarOverlayForTests();
+                    if (reveal)
+                        form.ToggleSidebar();
+                    Pump(500);
+                    Save(form, Path.Combine(outDir, file));
+                }
+                form.ToggleFullScreen();
+                foreach (var v in views)
+                    v.SetStateForTests(SessionState.Disconnected, "Disconnessa");
+                form.ExitApp();
+                Pump(200);
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        Assert.True(thread.Join(TimeSpan.FromSeconds(120)));
+        if (failure is not null)
+            ExceptionDispatchInfo.Throw(failure);
+    }
+
     private static void Save(Form form, string path)
     {
         form.Activate();

@@ -177,6 +177,13 @@ public sealed class FullScreenBarSettings
         _ => section.ToString(),
     };
 
+    /// <summary>Titolo breve della sezione nella barra.</summary>
+    public static string Title(BarSection section) => section switch
+    {
+        BarSection.AllConnections => "Connessioni",
+        _ => Describe(section),
+    };
+
     public static string Describe(BarPosition position) => position switch
     {
         BarPosition.Left => "A sinistra",
@@ -246,6 +253,24 @@ public static class FullScreenBarLayout
             BarPosition.Bottom => p.Y >= area.Bottom - EdgeThickness,
             _ => p.X < area.Left + EdgeThickness,
         };
+    }
+
+    /// <summary>
+    /// Elenco della sezione «Tutte le connessioni»: con la ricerca vuota tutte nell'ordine dato, altrimenti solo
+    /// quelle che corrispondono (nome, indirizzo o etichetta), dalle più pertinenti.
+    /// </summary>
+    public static IReadOnlyList<RdpConnection> FilterConnections(string? query, IEnumerable<RdpConnection> connections)
+    {
+        ArgumentNullException.ThrowIfNull(connections);
+        if (string.IsNullOrWhiteSpace(query))
+            return connections.ToList();
+        return connections
+            .Select(c => (Connection: c, Score: FuzzySearch.Score(query, [c.DisplayName, c.Host, c.Label])))
+            .Where(r => r.Score > 0)
+            .OrderByDescending(r => r.Score)
+            .ThenBy(r => r.Connection.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+            .Select(r => r.Connection)
+            .ToList();
     }
 
     /// <summary>
