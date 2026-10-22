@@ -1,5 +1,29 @@
 # Novità di RdpManager
 
+## 1.5.0
+
+**Schermo intero: in alto non c'è più niente**
+- Tolta la barra di passaggio che compariva dal bordo superiore, insieme al rilevamento del mouse su quel
+  bordo: la parte alta dello schermo resta della sessione remota.
+- Le sessioni connesse (con colore, stato e numero di Ctrl+Alt+1…9) stanno ora nella **barra a schermo
+  intero**, che sostituisce a schermo intero la barra laterale della finestra.
+
+**Barra a schermo intero personalizzabile** (*File → Impostazioni → Schermo intero*)
+- Posizione: a sinistra (predefinita), a destra o in basso; mai in alto (un valore «alto» in un file
+  torna a sinistra).
+- Modalità: fissa (la sessione si restringe e non viene mai coperta, con la risoluzione che si adatta),
+  a comparsa dal bordo del suo lato, con il ritardo scelto, oppure nascosta (si apre con Ctrl+Alt+B).
+- Larghezza (o altezza in basso) e ritardo di comparsa.
+- Sezioni scelte e ordinate: sessioni connesse (con miniatura o compatte), preferiti, tutte le
+  connessioni con ricerca, spazi di lavoro, pulsanti rapidi, testi rapidi.
+- I pulsanti rapidi sono le stesse azioni delle scorciatoie (sessione successiva/precedente, schermo
+  intero, barra, Panoramica, ricerca rapida, vista affiancata, blocco), con la combinazione accanto.
+- Le impostazioni della barra viaggiano nei .rdpm con «Includi le impostazioni».
+
+**Aggiornando dalla 1.1-1.4** la barra si crea dalle impostazioni di prima: a sinistra, fissa o a
+comparsa come la barra laterale, con le sessioni connesse (la vecchia barra in alto) in cima. Un
+connections.json dalla 1.0.0 alla 1.4.0 si carica senza perdere nulla.
+
 ## 1.4.0
 
 **Spazi di lavoro**

@@ -2,8 +2,7 @@
 
 App desktop per Windows (C# .NET 8, WinForms) per gestire più desktop remoti dalla stessa finestra:
 ogni sessione si apre in una **scheda** e si passa da un PC all'altro con un clic o con **Ctrl+Tab**.
-Dalla 1.1: **schermo intero dell'app** con una barra di passaggio fra le sessioni che compare dal
-bordo in alto, scorciatoie che funzionano anche dentro la sessione remota (**Ctrl+Alt+Destra/Sinistra**,
+Dalla 1.1: **schermo intero dell'app**, scorciatoie che funzionano anche dentro la sessione remota (**Ctrl+Alt+Destra/Sinistra**,
 Ctrl+Alt+1…9, Ctrl+Alt+Invio), **barra laterale** fissa o a comparsa con preferiti, recenti e stato
 dei PC, scelta del **monitor** e uso di tutti i monitor, **esportazione/importazione** cifrata in `.rdpm`,
 Wake-on-LAN, riconnessione automatica e altro (vedi «Uso»).
@@ -20,6 +19,9 @@ Dalla 1.4: **spazi di lavoro** (connessioni e layout riaperti con un clic o una 
 con PIN** (anche dopo un tempo di inattività), **profili di qualità** per connessione, sessione **tenuta
 sveglia**, **selezione multipla** con azioni di gruppo, importazione da **CSV** con anteprima e riepilogo
 delle scorciatoie con **F1**.
+Dalla 1.5: a schermo intero **in alto non c'è niente**; le sessioni connesse stanno nella **barra a schermo
+intero**, personalizzabile: a sinistra, a destra o in basso, fissa (la sessione non viene coperta), a
+comparsa o nascosta, con larghezza, ritardo e sezioni scelte e ordinate (vedi «Schermo intero dell'app»).
 Le novità di ogni versione sono in [CHANGELOG.md](CHANGELOG.md).
 
 Le sessioni usano il controllo ActiveX Desktop remoto di Windows (`mstscax.dll`, classe
@@ -211,7 +213,7 @@ con lo stesso utente chiude la sua sessione locale; con un altro utente la blocc
 | 5 | Se compare «Impossibile verificare l'identità del computer remoto» | La finestra di RdpManager è in primo piano sulla scheda giusta. Controlla il nome del PC, poi «Sì» (senza spuntare «Non visualizzare più…»). |
 | 6 | Attendi | Pallino verde «Connessa», si vede il desktop remoto; nessuna richiesta di password (è salvata). |
 | 7 | Ridimensiona o massimizza la finestra di RdpManager | Dopo circa 1 s il desktop remoto si adatta alla nuova dimensione (oppure viene scalato, se il PC remoto non lo supporta). |
-| 8 | Ctrl+Alt+Invio o F11 (o «Schermo intero») | RdpManager a schermo intero con la sessione; si esce con Ctrl+Alt+Invio o con «Esci» nella barra che compare dal bordo in alto (vedi «Prova manuale 1.1»). |
+| 8 | Ctrl+Alt+Invio o F11 (o «Schermo intero») | RdpManager a schermo intero con la sessione e la barra a schermo intero a sinistra; si esce con Ctrl+Alt+Invio o con «Schermo intero sì/no» fra i pulsanti rapidi della barra (vedi «Prova manuale 1.5»). |
 | 9 | Clic nella sessione, poi Ctrl+N o F5 | Agiscono sul PC remoto, non su RdpManager. |
 | 10 | Apri una seconda connessione (anche verso lo stesso PC con un altro nome), poi Ctrl+Tab e Ctrl+Shift+Tab con il clic dentro la sessione | Si passa da una scheda all'altra; entrambe restano connesse. |
 | 11 | «Stacca» (Ctrl+Shift+D) | La sessione passa in una finestra separata **senza disconnettersi** e si può usare. |
@@ -236,13 +238,13 @@ connessioni diverse) e, se possibile, due monitor. Stesse avvertenze: avvisa chi
 | 1 | Avvia la 1.1 su un PC che aveva la 1.0.0 | Tutte le connessioni, cartelle e password di prima ci sono ancora. |
 | 2 | Apri due sessioni e attendi «Connessa» su entrambe | Nell'elenco le due connessioni hanno il pallino verde pieno e il nome in grassetto; in *Recenti* compaiono loro. |
 | 3 | Clic dentro una sessione, poi **Ctrl+Alt+Destra** e **Ctrl+Alt+Sinistra** | Si passa all'altra sessione connessa; il PC remoto non riceve la freccia. |
-| 4 | Clic dentro una sessione, **Ctrl+Alt+Invio** | RdpManager copre tutto il monitor senza bordi, schede e barre spariscono; per un attimo compare la barra in alto. Il desktop remoto si adatta alla nuova dimensione. |
-| 5 | Mouse sul bordo in alto dello schermo | Compare la barra di passaggio con le sessioni (le connesse numerate 1, 2…). Clic su una: si passa lì. Allontanando il mouse la barra sparisce. |
+| 4 | Clic dentro una sessione, **Ctrl+Alt+Invio** | RdpManager copre tutto il monitor senza bordi, schede e menu spariscono. Il desktop remoto si adatta alla nuova dimensione. (Dalla 1.5 la barra in alto non c'è più: vedi «Prova manuale 1.5».) |
+| 5 | Barra a schermo intero, sezione «Sessioni connesse» | Le sessioni con le connesse numerate 1, 2…. Clic su una: si passa lì. |
 | 6 | **Ctrl+Alt+1** e **Ctrl+Alt+2** con il clic dentro la sessione | Si va alla prima e alla seconda sessione connessa. |
 | 7 | **Ctrl+Alt+B**, poi di nuovo | La barra laterale compare sopra la sessione / sparisce, anche a schermo intero. |
 | 8 | Barra laterale: «A comparsa», poi mouse sul bordo sinistro | La barra si nasconde; avvicinando il mouse al bordo sinistro riappare sopra la sessione, allontanandolo si richiude. «Fissa» la rimette accanto alle sessioni. |
-| 9 | Con due monitor: *Monitor ›* nella barra in alto | Lo schermo intero passa all'altro monitor; con scala diversa (es. 100 % e 150 %) il desktop remoto si adatta senza riconnettersi. Riaprendo l'app, la finestra si apre su quel monitor. |
-| 10 | Esci dallo schermo intero (Ctrl+Alt+Invio o «Esci») | La finestra torna com'era, con menu, schede e barre. |
+| 9 | Con due monitor: *Visualizza → Sposta la finestra sul monitor successivo* | Lo schermo intero passa all'altro monitor; con scala diversa (es. 100 % e 150 %) il desktop remoto si adatta senza riconnettersi. Riaprendo l'app, la finestra si apre su quel monitor. |
+| 10 | Esci dallo schermo intero (Ctrl+Alt+Invio) | La finestra torna com'era, con menu, schede e barre. |
 | 11 | Modifica una connessione: *Usa tutti i monitor*, poi schermo intero su quella sessione | Il desktop remoto si estende su tutti i monitor. |
 | 12 | «Stacca», poi «Monitor ›» nella finestra staccata | La finestra passa sull'altro monitor e la sessione resta connessa. |
 | 13 | Nella sessione apri il Blocco note; copia un testo sul PC locale; *Invia → Incolla appunti come digitazione* | Il testo viene digitato nel Blocco note remoto, a capo compresi. |
@@ -323,6 +325,24 @@ Da fare su un PC dove RdpManager 1.3.0 è installato, con almeno due PC remoti.
 | 11 | *File → Importa connessioni da CSV* con un file di Excel (separatore `;`, accenti) | Anteprima con le colonne riconosciute, righe escluse spiegate; si importano solo quelle valide e senza doppioni. |
 | 12 | **F1** fuori dalla sessione | Riepilogo di tutte le scorciatoie, divise per sezione, comprese quelle degli spazi di lavoro. |
 
+## Prova manuale 1.5
+
+Da fare su un PC dove RdpManager 1.4.0 è installato, con almeno due PC remoti connessi.
+
+| # | Passo | Risultato atteso |
+|---|---|---|
+| 1 | Lascia che la 1.4.0 proponga l'aggiornamento e scegli «Aggiorna ora» | Si aggiorna in silenzio e si riapre con connessioni, spazi di lavoro, PIN e impostazioni di prima. |
+| 2 | Clic in una sessione, **Ctrl+Alt+Invio** | Schermo intero con la barra **a sinistra** (fissa, o a comparsa se prima la barra laterale era a comparsa); in cima «Sessioni connesse». In alto non c'è niente. |
+| 3 | Mouse sul bordo **in alto** dello schermo, fermo per qualche secondo | Non compare niente: il bordo in alto è della sessione remota. |
+| 4 | Con la barra fissa: guarda il bordo sinistro del desktop remoto | Il desktop remoto comincia dopo la barra, non sotto: nulla è coperto; dopo circa 1 s la risoluzione si adatta. |
+| 5 | Clic su una sessione nella barra, poi su «Sessione successiva» fra i pulsanti rapidi | Si passa da una sessione all'altra, come con Ctrl+Alt+1…9 e Ctrl+Alt+Destra. |
+| 6 | *File → Impostazioni → Schermo intero*: posizione «A destra», modalità «A comparsa dal bordo», ritardo 500 ms | A schermo intero la sessione prende tutto; tenendo il mouse sul bordo destro per mezzo secondo la barra si apre sopra la sessione e si richiude allontanandolo. |
+| 7 | Posizione «In basso», modalità «Fissa», altezza 200 | La barra sta in basso con le sezioni affiancate; il desktop remoto finisce sopra la barra. |
+| 8 | Modalità «Nascosta» | Nessuna barra; Ctrl+Alt+B la apre sopra la sessione e la richiude. |
+| 9 | Nelle sezioni: togli «Preferiti», sposta «Pulsanti rapidi» in cima, scegli «Con miniatura» | La barra mostra le sezioni in quell'ordine, senza preferiti, con la miniatura della sessione visibile. |
+| 10 | Sezione «Connessioni»: scrivi parte di un nome, Invio | L'elenco si restringe e Invio apre (o porta a) quella connessione. |
+| 11 | *File → Esporta (.rdpm)* con *Includi le impostazioni*; importa su un altro PC con *Applica anche le impostazioni* | La barra arriva con posizione, modalità e ordine delle sezioni. |
+
 ## Cosa è stato provato e cosa no
 
 - **Provato automaticamente** (`dotnet test`): modello, salvataggio JSON e cifratura DPAPI, file `.rdp`,
@@ -331,7 +351,7 @@ Da fare su un PC dove RdpManager 1.3.0 è installato, con almeno due PC remoti.
   ciclo fra le sessioni, monitor; finestra principale con il controllo ActiveX vero: più sessioni,
   Ctrl+Tab, tasti inoltrati al remoto, stacca/riaggancia, avviso sul certificato e richiesta credenziali
   (server RDP finto locale); 1.1: schermo intero dell'app (finestra senza bordi sul monitor, tutti i
-  monitor per le connessioni che lo chiedono), barra di passaggio, barra laterale fissa e a comparsa
+  monitor per le connessioni che lo chiedono), barra di passaggio (tolta nella 1.5), barra laterale fissa e a comparsa
   anche a schermo intero, Preferiti/Recenti, connetti cartella, riconnessione automatica con limite,
   riapertura all'avvio, e **Ctrl+Alt+Destra digitato davvero** (SendInput) con il fuoco nella finestra
   interna del controllo RDP; 1.2: Panoramica (solo sessioni connesse, la scheda scelta non cambia
@@ -345,6 +365,13 @@ Da fare su un PC dove RdpManager 1.3.0 è installato, con almeno due PC remoti.
   chiusura» e «Aggiorna ora» (sessioni salvate e riaperte, installer silenzioso con `/RELAUNCH=1`; nelle
   prove l'installer non viene eseguito), installer manomesso mai avviato. Lo stato «connessa» in queste
   prove è simulato.
+- **1.5** (`dotnet test`): barra a schermo intero con valori predefiniti, conversione dalle impostazioni
+  1.0-1.4 (file di esempio di ogni versione), posizione «alto» rifiutata e riportata a sinistra, ordine delle
+  sezioni conservato, impostazioni nei `.rdpm`; nella finestra vera: barra fissa a sinistra, a destra e in
+  basso senza sovrapporsi alla sessione, a comparsa e nascosta sopra la sessione, niente in alto, sezioni
+  nell'ordine scelto, pulsanti rapidi = azioni delle scorciatoie, ricerca fra le connessioni, impostazioni;
+  con il **mouse vero**: il bordo in alto non apre niente, il bordo sinistro apre la barra a comparsa.
+  Schermate in `artifacts\screenshots-1.5` (prova `SaveScreenshotsOfTheV15FullScreenBar`).
 - **Antivirus**: scansione di Microsoft Defender sui file della 1.2.0 e della 1.3.0 (nessuna minaccia).
 - **Aggiornamento silenzioso provato a mano** (21/10/2026) sull'installazione del PC di sviluppo, che era
   alla 1.1.0: backup di programma e dati, Setup 1.3.0 della release con SHA256 verificato,
@@ -410,7 +437,7 @@ Windows Sandbox.
   *In connessione* (arancione), *Disconnessa* (rosso), *Raggiungibile* (anello verde: la porta RDP
   risponde), *Non raggiungibile* (anello grigio). La raggiungibilità si controlla all'avvio e ogni
   minuto (TCP sulla porta, 2 s di attesa); *Verifica raggiungibilità* la rifà subito.
-- **Colore ed etichetta** (nella modifica): il colore tinge l'icona e la barra di passaggio,
+- **Colore ed etichetta** (nella modifica): il colore tinge l'icona e la barra a schermo intero,
   l'etichetta breve (es. `PROD`) compare accanto al nome nell'elenco, nelle schede e nella barra.
 - **Nuova** (Ctrl+N): nome, host (anche nella forma `host:porta`), porta (predefinita 3389), utente,
   dominio, password facoltativa, cartella, risoluzione (*adatta alla finestra* oppure fissa),
@@ -599,17 +626,32 @@ Windows Sandbox.
 - **Ctrl+Alt+Invio** (o F11, o *Visualizza → Schermo intero*): la finestra di RdpManager diventa
   senza bordi e copre tutto il monitor scelto, con tutte le schede e le sessioni dentro; le
   intestazioni delle schede e le barre spariscono, la sessione corrente occupa lo schermo.
-- **Barra di passaggio**: porta il mouse sul bordo in alto dello schermo. Elenca le sessioni aperte
-  con il colore e lo stato; le **connesse** hanno il numero della scorciatoia (Ctrl+Alt+1, 2, …).
-  Clic su una sessione per passarci. A destra: *Ctrl+Alt+Canc*, *Foto*, *Barra laterale*,
-  *Monitor ›* (con più monitor) ed *Esci*. Compare per un attimo anche dopo ogni cambio di sessione.
+- **In alto non c'è niente** (dalla 1.5): niente barra e niente comparsa dal bordo superiore, che
+  resta della sessione remota.
+- **Barra a schermo intero** (dalla 1.5; a schermo intero prende il posto della barra laterale): si
+  regola in *File → Impostazioni → Schermo intero*.
+  - *Posizione*: a sinistra (predefinita), a destra o in basso. In alto no.
+  - *Modalità*: **fissa** (sempre visibile; la sessione occupa solo lo spazio che resta, senza essere
+    coperta, e con «Adatta alla finestra» la risoluzione si adatta), **a comparsa** (si apre sopra la
+    sessione tenendo il mouse sul bordo del suo lato per il *ritardo di comparsa* scelto, si richiude
+    allontanandolo) o **nascosta** (solo con **Ctrl+Alt+B**). Con la barra fissa Ctrl+Alt+B la nasconde e
+    la rimostra.
+  - *Larghezza* (in basso: altezza) e *ritardo di comparsa*.
+  - *Sezioni*, spuntate e ordinate con Su/Giù: **sessioni connesse** (con miniatura o compatte; le
+    connesse hanno il numero di Ctrl+Alt+1, 2, …, clic per passarci), **preferiti**, **tutte le
+    connessioni** con la casella di ricerca (Invio o doppio clic per connettersi), **spazi di lavoro**,
+    **pulsanti rapidi** (le stesse azioni delle scorciatoie, con la combinazione accanto) e **testi
+    rapidi** (digitati nella sessione visibile). Le sezioni vuote non si mostrano.
+  - Chi aggiorna dalla 1.1-1.4 trova la barra a sinistra, fissa o a comparsa come la barra laterale di
+    prima, con le sessioni connesse (la vecchia barra in alto) in cima.
+  - La barra a comparsa si apre per un attimo anche dopo un cambio di sessione da tastiera.
 - **Ctrl+Alt+Destra / Ctrl+Alt+Sinistra** passano alla sessione connessa successiva / precedente
   (quelle non connesse si saltano), **Ctrl+Alt+1…9** alla prima, seconda… sessione connessa.
   Funzionano anche con il clic dentro la sessione remota.
 - **Monitor**: *Visualizza → Monitor per lo schermo intero* (o File → Impostazioni) sceglie il
   monitor; viene ricordato e all'avvio la finestra si apre lì. Se il monitor non è più collegato si
-  usa il principale. *Sposta la finestra sul monitor successivo* (o *Monitor ›* nella barra) cambia
-  monitor anche a schermo intero.
+  usa il principale. *Sposta la finestra sul monitor successivo* cambia monitor anche a schermo
+  intero.
 - **Tutti i monitor**: una connessione con *Usa tutti i monitor* a schermo intero si estende su
   tutti i monitor come un unico desktop remoto; con *Apri con mstsc* usa la modalità multimonitor di
   Windows (`use multimon`).
@@ -627,9 +669,9 @@ Impostazioni* (clic sulla casella, poi la combinazione; serve Ctrl o Alt; Canc l
 |---|---|
 | Ctrl+Alt+Destra | sessione connessa successiva |
 | Ctrl+Alt+Sinistra | sessione connessa precedente |
-| Ctrl+Alt+1 … Ctrl+Alt+9 | prima … nona sessione connessa (come i numeri della barra di passaggio) |
+| Ctrl+Alt+1 … Ctrl+Alt+9 | prima … nona sessione connessa (come i numeri nella barra a schermo intero) |
 | Ctrl+Alt+Invio | schermo intero sì/no |
-| Ctrl+Alt+B | mostra/nascondi la barra laterale |
+| Ctrl+Alt+B | mostra/nascondi la barra laterale (a schermo intero: la barra a schermo intero) |
 | Ctrl+Alt+G | Panoramica delle sessioni connesse |
 | Ctrl+Alt+Spazio | ricerca rapida |
 | Ctrl+Alt+S | vista affiancata sì/no |
