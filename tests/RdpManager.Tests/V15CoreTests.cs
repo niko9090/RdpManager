@@ -43,7 +43,7 @@ public sealed class V15CoreTests : IDisposable
             (bar.Position, bar.Mode, bar.Width, bar.RevealDelayMs, bar.SessionStyle));
         Assert.Equal(
             [BarSection.ConnectedSessions, BarSection.Favorites, BarSection.AllConnections, BarSection.Workspaces,
-             BarSection.QuickButtons, BarSection.QuickTexts],
+             BarSection.QuickButtons, BarSection.SessionActions, BarSection.QuickTexts],
             bar.VisibleSections);
         Assert.Equal(Enum.GetValues<BarSection>().Length, bar.Sections.Count);
     }
@@ -175,6 +175,7 @@ public sealed class V15CoreTests : IDisposable
             new(BarSection.Workspaces),
             new(BarSection.Favorites, visible: false),
             new(BarSection.AllConnections),
+            new(BarSection.SessionActions, visible: false),
         ];
         var store = new ConnectionStore(Path.Combine(_dir, "ordine.json"));
         store.Save(doc);
@@ -196,8 +197,8 @@ public sealed class V15CoreTests : IDisposable
         Assert.Equal((BarSection.Workspaces, true), Sections(repaired)[0]);
         Assert.Equal((BarSection.ConnectedSessions, false), Sections(repaired)[1]);
         Assert.Equal(Enum.GetValues<BarSection>().Length, repaired.Sections.Count);
-        Assert.All(repaired.Sections.Skip(2), s => Assert.False(s.Visible));
-        Assert.Equal([BarSection.Workspaces], repaired.VisibleSections);
+        // Le mancanti finiscono nascoste, tranne le azioni sulla sessione (aggiunte dopo la 1.5.0), che arrivano mostrate.
+        Assert.Equal([BarSection.Workspaces, BarSection.SessionActions], repaired.VisibleSections);
     }
 
     [Fact]
@@ -340,6 +341,69 @@ public sealed class V15CoreTests : IDisposable
         Assert.Contains(ShortcutAction.ToggleFullScreen, FullScreenBarLayout.QuickActions);
         Assert.Contains(ShortcutAction.Lock, FullScreenBarLayout.QuickActions);
         Assert.All(FullScreenBarLayout.QuickActions, a => Assert.NotEqual(a.ToString(), ShortcutMap.Describe(a)));
+    }
+
+    // ---------- azioni sulla sessione (Ctrl+Alt+Canc, foto, monitor) ----------
+
+    [Fact]
+    public void SessionActions_HaveTheThree11FunctionsAndAreShownByDefault()
+    {
+        Assert.Equal([SessionBarAction.SendCtrlAltDel, SessionBarAction.Snapshot, SessionBarAction.NextMonitor], FullScreenBarLayout.SessionActions);
+        Assert.Equal(["Invia Ctrl+Alt+Canc", "Foto della sessione", "Monitor successivo"],
+            FullScreenBarLayout.SessionActions.Select(FullScreenBarSettings.Describe));
+        Assert.Contains(BarSection.SessionActions, new AppSettings().Bar.VisibleSections);
+        Assert.Contains(BarSection.SessionActions, FullScreenBarSettings.FromLegacy(SidebarMode.AutoHide).VisibleSections);
+    }
+
+    [Fact]
+    public void Settings150_GetTheSessionActionsWithoutLosingTheirSections()
+    {
+        // Barra salvata dalla 1.5.0 (senza la sezione nuova), con ordine e sezioni nascoste scelti dall'utente.
+        var json = """
+            { "version": 6, "settings": { "fullScreenBar": { "position": "Right", "mode": "AutoReveal", "width": 310,
+              "revealDelayMs": 450, "sessionStyle": "Thumbnails",
+              "sections": [ { "kind": "QuickTexts", "visible": true }, { "kind": "ConnectedSessions", "visible": true },
+                            { "kind": "Favorites", "visible": false }, { "kind": "QuickButtons", "visible": true },
+                            { "kind": "AllConnections", "visible": true }, { "kind": "Workspaces", "visible": false } ] } } }
+            """;
+        var store = new ConnectionStore(WriteJson(json));
+        var bar = store.Load().Settings.Bar;
+        Assert.Equal((BarPosition.Right, BarMode.AutoReveal, 310, 450, SessionListStyle.Thumbnails),
+            (bar.Position, bar.Mode, bar.Width, bar.RevealDelayMs, bar.SessionStyle));
+        Assert.Equal(
+            [(BarSection.QuickTexts, true), (BarSection.ConnectedSessions, true), (BarSection.Favorites, false),
+             (BarSection.QuickButtons, true), (BarSection.SessionActions, true), (BarSection.AllConnections, true),
+             (BarSection.Workspaces, false)],
+            Sections(bar));
+
+        // Chi poi la nasconde la ritrova nascosta.
+        var doc = store.Load();
+        doc.Settings.Bar.Sections.Single(s => s.Kind == BarSection.SessionActions).Visible = false;
+        store.Save(doc);
+        Assert.DoesNotContain(BarSection.SessionActions, store.Load().Settings.Bar.VisibleSections);
+    }
+
+    [Theory]
+    [InlineData(120)]
+    [InlineData(160)]
+    [InlineData(200)]
+    [InlineData(260)]
+    [InlineData(600)]
+    public void ActionButtonLayout_NameAndShortcutNeverOverlap(int width)
+    {
+        foreach (var (name, shortcut) in new[] { (190, 70), (60, 70), (120, 110), (300, 0), (40, 300) })
+        {
+            var l = FullScreenBarLayout.LayoutActionButton(width, name, shortcut, 15);
+            Assert.False(l.Name.IntersectsWith(l.Shortcut), $"larghezza {width}, nome {name}, scorciatoia {shortcut}");
+            Assert.True(l.Name.Left >= 0 && l.Name.Right <= width);
+            Assert.True(l.Shortcut.IsEmpty || (l.Shortcut.Left >= 0 && l.Shortcut.Right <= width));
+            Assert.True(l.Name.Bottom <= l.Height && l.Shortcut.Bottom <= l.Height);
+            if (shortcut > 0 && !l.TwoLines)
+                Assert.True(l.Name.Width >= name, "su una riga il nome deve starci per intero");
+        }
+        // Su una riga quando c'è posto, su due quando non c'è.
+        Assert.False(FullScreenBarLayout.LayoutActionButton(400, 150, 80, 15).TwoLines);
+        Assert.True(FullScreenBarLayout.LayoutActionButton(200, 180, 80, 15).TwoLines);
     }
 
     [Fact]

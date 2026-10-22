@@ -644,8 +644,10 @@ Windows Sandbox.
   - *Sezioni*, spuntate e ordinate con Su/Giù: **sessioni connesse** (con miniatura o compatte; le
     connesse hanno il numero di Ctrl+Alt+1, 2, …, clic per passarci), **preferiti**, **tutte le
     connessioni** con la casella di ricerca (Invio o doppio clic per connettersi), **spazi di lavoro**,
-    **pulsanti rapidi** (le stesse azioni delle scorciatoie, con la combinazione accanto) e **testi
-    rapidi** (digitati nella sessione visibile). Le sezioni vuote non si mostrano.
+    **pulsanti rapidi** (le stesse azioni delle scorciatoie, con la combinazione accanto, o sotto se non
+    c'è posto), **azioni sulla sessione** (*Invia Ctrl+Alt+Canc*, *Foto della sessione*, *Monitor
+    successivo*, sulla sessione visibile) e **testi rapidi** (digitati nella sessione visibile). Le sezioni
+    vuote non si mostrano.
   - Chi aggiorna dalla 1.1-1.4 trova la barra a sinistra, fissa o a comparsa come la barra laterale di
     prima, con le sessioni connesse (la vecchia barra in alto) in cima.
   - La barra a comparsa si apre per un attimo anche dopo un cambio di sessione da tastiera.

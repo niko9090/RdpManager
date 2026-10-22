@@ -245,6 +245,11 @@ public sealed class ScreenshotTests : IDisposable
                 (string File, FullScreenBarSettings Bar, bool Reveal)[] shots =
                 [
                     ("14-schermo-intero-barra-sinistra.png", new FullScreenBarSettings { Position = BarPosition.Left, Mode = BarMode.Fixed, SessionStyle = SessionListStyle.Thumbnails }, false),
+                    ("14b-schermo-intero-barra-sinistra-stretta-pulsanti.png", new FullScreenBarSettings
+                    {
+                        Position = BarPosition.Left, Mode = BarMode.Fixed, Width = 170,
+                        Sections = [new(BarSection.QuickButtons), new(BarSection.SessionActions), new(BarSection.ConnectedSessions)],
+                    }, false),
                     ("15-schermo-intero-barra-destra.png", new FullScreenBarSettings { Position = BarPosition.Right, Mode = BarMode.Fixed, Width = 280 }, false),
                     ("16-schermo-intero-barra-in-basso.png", new FullScreenBarSettings { Position = BarPosition.Bottom, Mode = BarMode.Fixed, Width = 210 }, false),
                     ("17-schermo-intero-barra-nascosta.png", new FullScreenBarSettings { Position = BarPosition.Left, Mode = BarMode.Hidden }, false),

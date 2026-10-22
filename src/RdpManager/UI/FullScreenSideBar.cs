@@ -20,7 +20,8 @@ internal sealed class FullScreenSideBar : Panel
         IReadOnlyList<Workspace> Workspaces,
         IReadOnlyList<QuickText> QuickTexts,
         ShortcutMap Shortcuts,
-        bool CanTypeText);
+        bool CanTypeText,
+        bool MultipleMonitors);
 
     private static readonly Color Back = Color.FromArgb(30, 32, 38);
     private static readonly Color SectionBack = Color.FromArgb(36, 38, 45);
@@ -61,6 +62,7 @@ internal sealed class FullScreenSideBar : Panel
     public event EventHandler<Workspace>? WorkspaceClicked;
     public event EventHandler<ShortcutAction>? ActionClicked;
     public event EventHandler<QuickText>? QuickTextClicked;
+    public event EventHandler<SessionBarAction>? SessionActionClicked;
 
     /// <summary>Casella di ricerca della sezione «Tutte le connessioni» (null se la sezione non c'è).</summary>
     internal TextBox? SearchBox { get; private set; }
@@ -113,6 +115,8 @@ internal sealed class FullScreenSideBar : Panel
         _content = _content with { Sessions = sessions, CanTypeText = canTypeText };
         foreach (var b in Descendants(_flow).OfType<Button>().Where(b => b.Tag is QuickText))
             b.Enabled = canTypeText;
+        foreach (var b in Descendants(_flow).OfType<ActionButton>().Where(b => b.Tag is SessionBarAction))
+            b.Enabled = SessionActionEnabled((SessionBarAction)b.Tag!, _content);
         foreach (var view in _thumbnails.Keys.Where(v => v.IsDisposed || sessions.All(s => s.View != v)).ToList())
         {
             _thumbnails[view].Dispose();
@@ -180,17 +184,29 @@ internal sealed class FullScreenSideBar : Panel
                 {
                     var action = a;
                     var combo = content.Shortcuts[a];
-                    var b = MakeButton(ShortcutMap.Describe(a), ButtonBack);
-                    b.Tag = action;
-                    _tips.SetToolTip(b, combo.IsEmpty ? "Senza scorciatoia" : combo.ToString());
-                    if (!combo.IsEmpty)
-                        b.Paint += (_, e) => TextRenderer.DrawText(e.Graphics, combo.ToString(), b.Font,
-                            new Rectangle(0, 0, b.Width - 6, b.Height), HeaderFore,
-                            TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
+                    var b = new ActionButton(ShortcutMap.Describe(a), combo.IsEmpty ? "" : combo.ToString()) { Tag = action };
+                    _tips.SetToolTip(b, ShortcutMap.Describe(a) + (combo.IsEmpty ? " (senza scorciatoia)" : $" ({combo})"));
                     b.Click += (_, _) => ActionClicked?.Invoke(this, action);
                     actions.Controls.Add(b);
                 }
                 return actions;
+            case BarSection.SessionActions:
+                var sessionActions = Body();
+                foreach (var a in FullScreenBarLayout.SessionActions)
+                {
+                    var action = a;
+                    var b = new ActionButton(FullScreenBarSettings.Describe(a), "") { Tag = action };
+                    b.Enabled = SessionActionEnabled(a, content);
+                    _tips.SetToolTip(b, a switch
+                    {
+                        SessionBarAction.SendCtrlAltDel => "Invia Ctrl+Alt+Canc alla sessione visibile",
+                        SessionBarAction.Snapshot => "Foto della sessione visibile (Immagini\\RdpManager e appunti)",
+                        _ => content.MultipleMonitors ? "Schermo intero sul monitor successivo" : "C'è un solo monitor",
+                    });
+                    b.Click += (_, _) => SessionActionClicked?.Invoke(this, action);
+                    sessionActions.Controls.Add(b);
+                }
+                return sessionActions;
             case BarSection.QuickTexts:
                 if (content.QuickTexts.Count == 0)
                     return null;
@@ -414,6 +430,88 @@ internal sealed class FullScreenSideBar : Panel
 
     private static Label Note(string text) =>
         new() { Text = text, AutoSize = true, ForeColor = Color.Silver, Margin = new Padding(2, 4, 0, 4) };
+
+    private static bool SessionActionEnabled(SessionBarAction action, Content content) =>
+        action == SessionBarAction.NextMonitor ? content.MultipleMonitors : content.CanTypeText;
+
+    /// <summary>
+    /// Pulsante con il nome a sinistra e la scorciatoia a destra, disegnati senza sovrapporsi
+    /// (<see cref="FullScreenBarLayout.LayoutActionButton"/>): su due righe se non ci stanno su una, nome troncato con «…».
+    /// </summary>
+    internal sealed class ActionButton : Button
+    {
+        public ActionButton(string name, string shortcut)
+        {
+            Text = name;
+            ShortcutText = shortcut;
+            AutoSize = false;
+            Height = 28;
+            FlatStyle = FlatStyle.Flat;
+            BackColor = ButtonBack;
+            ForeColor = Color.White;
+            Margin = new Padding(0, 0, 0, 3);
+            UseVisualStyleBackColor = false;
+            TabStop = false;
+            Cursor = Cursors.Hand;
+            UseMnemonic = false;
+            FlatAppearance.BorderSize = 0;
+            FlatAppearance.MouseOverBackColor = Color.FromArgb(70, 110, 180);
+            SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint, true);
+        }
+
+        public string ShortcutText { get; }
+
+        private bool _hover;
+
+        /// <summary>Disposizione per la larghezza attuale (per le prove automatiche).</summary>
+        internal ActionButtonLayout CurrentLayout()
+        {
+            const TextFormatFlags measure = TextFormatFlags.SingleLine | TextFormatFlags.NoPadding;
+            int nameWidth = TextRenderer.MeasureText(Text, Font, Size.Empty, measure).Width;
+            int scWidth = ShortcutText.Length > 0 ? TextRenderer.MeasureText(ShortcutText, Font, Size.Empty, measure).Width : 0;
+            return FullScreenBarLayout.LayoutActionButton(Width, nameWidth, scWidth, Font.Height);
+        }
+
+        protected override void OnSizeChanged(EventArgs e)
+        {
+            base.OnSizeChanged(e);
+            int h = CurrentLayout().Height;
+            if (Height != h)
+                Height = h;
+        }
+
+        protected override void OnMouseEnter(EventArgs e)
+        {
+            _hover = true;
+            Invalidate();
+            base.OnMouseEnter(e);
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            _hover = false;
+            Invalidate();
+            base.OnMouseLeave(e);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            using (var back = new SolidBrush(_hover && Enabled ? FlatAppearance.MouseOverBackColor : BackColor))
+                g.FillRectangle(back, ClientRectangle);
+            var l = CurrentLayout();
+            var fore = Enabled ? ForeColor : Color.FromArgb(120, 125, 135);
+            var flags = TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding |
+                        (l.TwoLines ? TextFormatFlags.Top : TextFormatFlags.VerticalCenter);
+            var nameRect = l.TwoLines ? l.Name : l.Name with { Height = Height };
+            TextRenderer.DrawText(g, Text, Font, nameRect, fore, flags | TextFormatFlags.Left);
+            if (ShortcutText.Length > 0)
+            {
+                var scRect = l.TwoLines ? l.Shortcut : l.Shortcut with { Height = Height };
+                TextRenderer.DrawText(g, ShortcutText, Font, scRect, HeaderFore, flags | TextFormatFlags.Right);
+            }
+        }
+    }
 
     private static Button MakeButton(string text, Color back)
     {

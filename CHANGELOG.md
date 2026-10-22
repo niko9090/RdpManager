@@ -1,5 +1,17 @@
 # Novità di RdpManager
 
+## Non ancora rilasciato
+
+**Correzioni della barra a schermo intero (1.5.0)**
+- Pulsanti rapidi: il nome dell'azione non si sovrappone più alla scorciatoia. Se non ci stanno su una
+  riga vanno su due (nome sopra, scorciatoia sotto a destra) e un nome troppo lungo si tronca con «…»;
+  vale a sinistra, a destra e in basso, anche alla larghezza minima.
+- Tornano raggiungibili a schermo intero **Invia Ctrl+Alt+Canc**, **Foto della sessione** e **Monitor
+  successivo** (funzioni della 1.1 che stavano nella barra in alto), nella nuova sezione «Azioni sulla
+  sessione», mostrata di serie dopo i pulsanti rapidi e attiva sulla sessione visibile. Chi ha già la
+  1.5.0 la trova mostrata senza perdere l'ordine e le scelte delle sue sezioni; se la nasconde, resta
+  nascosta.
+
 ## 1.5.0
 
 **Schermo intero: in alto non c'è più niente**

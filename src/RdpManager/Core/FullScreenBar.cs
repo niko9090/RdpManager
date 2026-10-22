@@ -38,6 +38,16 @@ public enum BarSection
     /// <summary>Pulsanti delle stesse azioni delle scorciatoie.</summary>
     QuickButtons,
     QuickTexts,
+    /// <summary>Ctrl+Alt+Canc, foto della sessione e monitor successivo, sulla sessione attiva (dopo la 1.5.0).</summary>
+    SessionActions,
+}
+
+/// <summary>Azioni della sezione «Azioni sulla sessione» (erano nella barra in alto fino alla 1.4).</summary>
+public enum SessionBarAction
+{
+    SendCtrlAltDel,
+    Snapshot,
+    NextMonitor,
 }
 
 /// <summary>Aspetto delle sessioni nella sezione «Sessioni connesse».</summary>
@@ -97,7 +107,16 @@ public sealed class FullScreenBarSettings
 
     /// <summary>Ordine predefinito: le sessioni connesse in cima, come la vecchia barra in alto.</summary>
     public static List<BarSectionSetting> DefaultSections() =>
-        Enum.GetValues<BarSection>().Select(k => new BarSectionSetting(k)).ToList();
+    [
+        new(BarSection.ConnectedSessions), new(BarSection.Favorites), new(BarSection.AllConnections),
+        new(BarSection.Workspaces), new(BarSection.QuickButtons), new(BarSection.SessionActions), new(BarSection.QuickTexts),
+    ];
+
+    /// <summary>
+    /// Sezioni aggiunte dopo la 1.5.0: chi ha già la barra salvata le trova mostrate (subito dopo i pulsanti
+    /// rapidi) invece che nascoste in fondo. Se poi le nasconde, restano nascoste.
+    /// </summary>
+    private static readonly BarSection[] AddedVisibleAfter150 = [BarSection.SessionActions];
 
     /// <summary>
     /// Barra per chi arriva dalla 1.1-1.4 (impostazioni senza questo campo): a sinistra, fissa o a comparsa come
@@ -138,7 +157,17 @@ public sealed class FullScreenBarSettings
         if (sections.Count == 0)
             sections = DefaultSections();
         foreach (var kind in Enum.GetValues<BarSection>().Where(k => !seen.Contains(k) && sections.All(s => s.Kind != k)))
-            sections.Add(new BarSectionSetting(kind, visible: false));
+        {
+            if (AddedVisibleAfter150.Contains(kind))
+            {
+                int quick = sections.FindIndex(s => s.Kind == BarSection.QuickButtons);
+                sections.Insert(quick >= 0 ? quick + 1 : sections.Count, new BarSectionSetting(kind));
+            }
+            else
+            {
+                sections.Add(new BarSectionSetting(kind, visible: false));
+            }
+        }
         Sections = sections;
     }
 
@@ -174,7 +203,16 @@ public sealed class FullScreenBarSettings
         BarSection.Workspaces => "Spazi di lavoro",
         BarSection.QuickButtons => "Pulsanti rapidi",
         BarSection.QuickTexts => "Testi rapidi",
+        BarSection.SessionActions => "Azioni sulla sessione",
         _ => section.ToString(),
+    };
+
+    public static string Describe(SessionBarAction action) => action switch
+    {
+        SessionBarAction.SendCtrlAltDel => "Invia Ctrl+Alt+Canc",
+        SessionBarAction.Snapshot => "Foto della sessione",
+        SessionBarAction.NextMonitor => "Monitor successivo",
+        _ => action.ToString(),
     };
 
     /// <summary>Titolo breve della sezione nella barra.</summary>
@@ -279,7 +317,37 @@ public static class FullScreenBarLayout
     /// </summary>
     public static IReadOnlyList<ShortcutAction> QuickActions { get; } =
         Enum.GetValues<ShortcutAction>().Where(a => ShortcutMap.SessionNumber(a) is null).ToList();
+
+    /// <summary>Azioni sulla sessione attiva: le funzioni della 1.1 che stavano nella barra in alto.</summary>
+    public static IReadOnlyList<SessionBarAction> SessionActions { get; } = Enum.GetValues<SessionBarAction>();
+
+    /// <summary>
+    /// Disposizione di un pulsante con nome e scorciatoia: su una riga se ci stanno affiancati, altrimenti su due
+    /// (nome sopra, scorciatoia sotto a destra). Il nome che non ci sta comunque si tronca con «…». Mai sovrapposti.
+    /// </summary>
+    /// <param name="width">Larghezza del pulsante.</param>
+    /// <param name="nameWidth">Larghezza del nome per intero.</param>
+    /// <param name="shortcutWidth">Larghezza della scorciatoia (0 = nessuna).</param>
+    /// <param name="lineHeight">Altezza di una riga di testo.</param>
+    public static ActionButtonLayout LayoutActionButton(int width, int nameWidth, int shortcutWidth, int lineHeight)
+    {
+        const int pad = 6, gap = 10, oneLineHeight = 28;
+        int inner = Math.Max(0, width - 2 * pad);
+        if (shortcutWidth <= 0)
+            return new(new Rectangle(pad, 0, inner, oneLineHeight), Rectangle.Empty, oneLineHeight, false);
+        if (nameWidth + gap + shortcutWidth <= inner)
+        {
+            var sc = new Rectangle(width - pad - shortcutWidth, 0, shortcutWidth, oneLineHeight);
+            return new(new Rectangle(pad, 0, inner - shortcutWidth - gap, oneLineHeight), sc, oneLineHeight, false);
+        }
+        int h = 2 * lineHeight + 8;
+        int scw = Math.Min(shortcutWidth, inner);
+        return new(new Rectangle(pad, 3, inner, lineHeight), new Rectangle(width - pad - scw, 4 + lineHeight, scw, lineHeight), h, true);
+    }
 }
+
+/// <summary>Dove disegnare nome e scorciatoia di un pulsante della barra, e quanto è alto.</summary>
+public readonly record struct ActionButtonLayout(Rectangle Name, Rectangle Shortcut, int Height, bool TwoLines);
 
 /// <summary>
 /// Legge un enum per nome o numero senza far fallire tutto il file: un valore sconosciuto (per esempio «Top» per la

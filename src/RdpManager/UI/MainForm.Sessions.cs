@@ -65,6 +65,7 @@ public sealed partial class MainForm
         _fsBar.ConnectionClicked += (_, c) => OpenSession(c);
         _fsBar.WorkspaceClicked += (_, ws) => OpenWorkspace(ws);
         _fsBar.ActionClicked += (_, action) => ExecuteShortcut(action);
+        _fsBar.SessionActionClicked += (_, action) => ExecuteSessionAction(action);
         _fsBar.QuickTextClicked += async (_, t) =>
         {
             if (CurrentView is { State: SessionState.Connected } v)
@@ -842,7 +843,8 @@ public sealed partial class MainForm
             _doc.Workspaces,
             _doc.QuickTexts,
             _shortcuts,
-            CanTypeQuickText));
+            CanTypeQuickText,
+            Screen.AllScreens.Length > 1));
         bool thumbs = _doc.Settings.Bar.SessionStyle == SessionListStyle.Thumbnails
                       && _doc.Settings.Bar.VisibleSections.Contains(BarSection.ConnectedSessions);
         if (thumbs)
@@ -853,6 +855,33 @@ public sealed partial class MainForm
         else
         {
             _thumbTimer.Stop();
+        }
+    }
+
+    /// <summary>Per le prove automatiche: se impostata, riceve le azioni sulla sessione invece di eseguirle.</summary>
+    internal Action<SessionBarAction>? SessionActionForTests { get; set; }
+
+    /// <summary>Azioni sulla sessione della barra (le funzioni della 1.1 della barra in alto), sulla sessione attiva.</summary>
+    internal void ExecuteSessionAction(SessionBarAction action)
+    {
+        if (_locked)
+            return;
+        if (SessionActionForTests is { } test)
+        {
+            test(action);
+            return;
+        }
+        switch (action)
+        {
+            case SessionBarAction.SendCtrlAltDel:
+                CurrentView?.SendCtrlAltDel();
+                break;
+            case SessionBarAction.Snapshot when CurrentView is { } v:
+                _ = SaveSnapshotAsync(v);
+                break;
+            case SessionBarAction.NextMonitor:
+                MoveToNextMonitor();
+                break;
         }
     }
 

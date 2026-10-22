@@ -231,7 +231,8 @@ public sealed class UiV15Tests(ITestOutputHelper output) : IDisposable
             form.ToggleFullScreen();
             Pump(150);
             var bar = form.FullScreenBarControl;
-            Assert.Equal([BarSection.QuickButtons, BarSection.Workspaces, BarSection.ConnectedSessions, BarSection.AllConnections, BarSection.QuickTexts],
+            // La sezione delle azioni sulla sessione, mancante nell'elenco salvato, arriva dopo i pulsanti rapidi.
+            Assert.Equal([BarSection.QuickButtons, BarSection.SessionActions, BarSection.Workspaces, BarSection.ConnectedSessions, BarSection.AllConnections, BarSection.QuickTexts],
                 bar.ShownSections);
             // Titoli delle sezioni nello stesso ordine sullo schermo (dall'alto in basso).
             var titles = Descendants(bar).OfType<Label>().Where(l => l.Text == l.Text.ToUpperInvariant() && l.Text.Length > 3)
@@ -263,6 +264,66 @@ public sealed class UiV15Tests(ITestOutputHelper output) : IDisposable
             var list = Descendants(bar).OfType<ListBox>().Single();
             Assert.Equal(["Due"], list.Items.Cast<RdpConnection>().Select(c => c.Name));
             Assert.True(bar.Visible);
+        });
+    }
+
+    [Fact]
+    public void SessionActions_CtrlAltDelSnapshotAndMonitor_ActOnTheActiveSession()
+    {
+        WithMainForm(StoreWith(null, Unreachable("Uno"), Unreachable("Due")), form =>
+        {
+            var views = OpenAllConnected(form);
+            form.ToggleFullScreen();
+            Pump(150);
+            var bar = form.FullScreenBarControl;
+            Assert.Contains(BarSection.SessionActions, bar.ShownSections); // di serie
+            var buttons = Descendants(bar).OfType<FullScreenSideBar.ActionButton>().Where(b => b.Tag is SessionBarAction).ToList();
+            Assert.Equal(FullScreenBarLayout.SessionActions, buttons.Select(b => (SessionBarAction)b.Tag!));
+            Assert.Equal(["Invia Ctrl+Alt+Canc", "Foto della sessione", "Monitor successivo"], buttons.Select(b => b.Text));
+
+            var done = new List<(SessionBarAction, RdpSessionView?)>();
+            form.SessionActionForTests = a => done.Add((a, form.CurrentView));
+            form.Tabs.SelectedIndex = 1;
+            Pump(50);
+            buttons[0].PerformClick();
+            buttons[1].PerformClick();
+            Assert.Equal([(SessionBarAction.SendCtrlAltDel, views[1]), (SessionBarAction.Snapshot, views[1])], done);
+            Assert.Equal(Screen.AllScreens.Length > 1, buttons[2].Enabled);
+
+            // Sessione visibile non connessa: Ctrl+Alt+Canc e foto si spengono.
+            views[1].SetStateForTests(SessionState.Disconnected, "Disconnessa");
+            Pump(50);
+            Assert.False(buttons[0].Enabled);
+            Assert.False(buttons[1].Enabled);
+        });
+    }
+
+    [Theory]
+    [InlineData(BarPosition.Left)]
+    [InlineData(BarPosition.Right)]
+    [InlineData(BarPosition.Bottom)]
+    public void ActionButtons_NameAndShortcutDoNotOverlap_AtTheMinimumWidth(BarPosition position)
+    {
+        WithMainForm(StoreWith(null, Unreachable("Uno")), form =>
+        {
+            OpenAllConnected(form);
+            foreach (int width in new[] { FullScreenBarSettings.MinWidth, FullScreenBarSettings.DefaultWidth })
+            {
+                form.ApplyFullScreenBarForTests(new FullScreenBarSettings { Position = position, Width = width });
+                if (!form.IsFullScreen)
+                    form.ToggleFullScreen();
+                Pump(150);
+                var buttons = Descendants(form.FullScreenBarControl).OfType<FullScreenSideBar.ActionButton>().ToList();
+                Assert.Equal(FullScreenBarLayout.QuickActions.Count + FullScreenBarLayout.SessionActions.Count, buttons.Count);
+                foreach (var b in buttons)
+                {
+                    var l = b.CurrentLayout();
+                    Assert.False(l.Name.IntersectsWith(l.Shortcut), $"{position} {width}: «{b.Text}» si sovrappone a «{b.ShortcutText}»");
+                    Assert.True(l.Name.Right <= b.Width && (l.Shortcut.IsEmpty || l.Shortcut.Right <= b.Width));
+                    Assert.Equal(l.Height, b.Height);
+                    Assert.True(b.Width > 60, $"{position} {width}: pulsante largo solo {b.Width}");
+                }
+            }
         });
     }
 
@@ -337,16 +398,17 @@ public sealed class UiV15Tests(ITestOutputHelper output) : IDisposable
                 dlg.BarSectionsBox.SelectedIndex = 4; // Pulsanti rapidi
                 dlg.MoveSectionForTests(-1);
                 dlg.MoveSectionForTests(-1);
-                dlg.BarSectionsBox.SetItemChecked(5, false); // Testi rapidi
+                Assert.Equal(7, dlg.BarSectionsBox.Items.Count);
+                dlg.BarSectionsBox.SetItemChecked(6, false); // Testi rapidi
                 Descendants(dlg).OfType<Button>().Single(b => b.Text == "OK").PerformClick();
 
                 var bar = settings.Bar;
                 Assert.Equal((BarPosition.Bottom, BarMode.AutoReveal, 200, 700, SessionListStyle.Thumbnails),
                     (bar.Position, bar.Mode, bar.Width, bar.RevealDelayMs, bar.SessionStyle));
-                Assert.Equal([BarSection.ConnectedSessions, BarSection.Favorites, BarSection.QuickButtons, BarSection.AllConnections, BarSection.Workspaces, BarSection.QuickTexts],
+                Assert.Equal([BarSection.ConnectedSessions, BarSection.Favorites, BarSection.QuickButtons, BarSection.AllConnections, BarSection.Workspaces, BarSection.SessionActions, BarSection.QuickTexts],
                     bar.Sections.Select(s => s.Kind));
-                Assert.False(bar.Sections[5].Visible);
-                Assert.Equal(5, bar.VisibleSections.Count);
+                Assert.False(bar.Sections[6].Visible);
+                Assert.Equal(6, bar.VisibleSections.Count);
             }
             catch (Exception ex)
             {
