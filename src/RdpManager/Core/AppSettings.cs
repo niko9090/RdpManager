@@ -29,6 +29,7 @@ public enum ConnectionOrder
     Manual,
 }
 
+/// <summary>Barra laterale della finestra (fuori dallo schermo intero, dove vale <see cref="FullScreenBarSettings"/>).</summary>
 public enum SidebarMode
 {
     /// <summary>Barra laterale sempre visibile accanto alle sessioni.</summary>
@@ -103,6 +104,18 @@ public sealed class AppSettings
     /// <summary>Blocco dopo questi minuti di inattività (0 = solo a mano); vale solo con il PIN impostato.</summary>
     public int LockAfterMinutes { get; set; } = 10;
 
+    // --- Dalla 1.5 ---
+
+    /// <summary>
+    /// Barra a schermo intero (posizione, modalità, misure, sezioni). Assente nei file 1.1-1.4: <see cref="Normalize"/>
+    /// la ricava dalla barra laterale di allora (<see cref="FullScreenBarSettings.FromLegacy"/>).
+    /// </summary>
+    public FullScreenBarSettings? FullScreenBar { get; set; }
+
+    /// <summary>La barra a schermo intero, creata dalle impostazioni di prima se manca.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public FullScreenBarSettings Bar => FullScreenBar ??= FullScreenBarSettings.FromLegacy(SidebarMode);
+
     /// <summary>Vero se il blocco con PIN è attivo.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public bool LockEnabled => LockPin is { IsValid: true };
@@ -119,6 +132,7 @@ public sealed class AppSettings
         copy.OpenSessions = [];
         copy.ReopenOnceAfterUpdate = false;
         copy.LockPin = null; // il PIN non esce mai dal PC
+        copy.FullScreenBar = Bar.Clone();
         return copy;
     }
 
@@ -143,6 +157,7 @@ public sealed class AppSettings
         VerboseLog = src.VerboseLog;
         ConnectionOrder = src.ConnectionOrder;
         LockAfterMinutes = src.LockAfterMinutes;
+        FullScreenBar = src.Bar.Clone();
         PreferredMonitor = monitor;
         OpenSessions = open;
     }
@@ -164,6 +179,7 @@ public sealed class AppSettings
         var copy = (AppSettings)MemberwiseClone();
         copy.OpenSessions = [.. OpenSessions ?? []];
         copy.Shortcuts = new Dictionary<string, string>(Shortcuts ?? []);
+        copy.FullScreenBar = FullScreenBar?.Clone();
         return copy;
     }
 
@@ -194,6 +210,6 @@ public sealed class AppSettings
         if (LockPin is { IsValid: false })
             LockPin = null;
         LockAfterMinutes = Math.Clamp(LockAfterMinutes, 0, 24 * 60);
-
+        Bar.Normalize();
     }
 }

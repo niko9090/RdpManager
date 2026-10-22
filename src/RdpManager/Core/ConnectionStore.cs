@@ -9,9 +9,10 @@ public sealed partial class ConnectionsDocument
     /// <summary>
     /// Versione scritta da questa build: 1 = RdpManager 1.0.x, 2 = 1.1 (campi nuovi e impostazioni),
     /// 3 = 1.2 (profili di credenziali, gateway, testi rapidi), 4 = 1.3 (impostazioni nuove, ordine manuale),
-    /// 5 = 1.4 (spazi di lavoro, PIN di blocco, profili di qualità, sessione tenuta sveglia).
+    /// 5 = 1.4 (spazi di lavoro, PIN di blocco, profili di qualità, sessione tenuta sveglia),
+    /// 6 = 1.5 (barra a schermo intero personalizzabile).
     /// </summary>
-    public const int CurrentVersion = 5;
+    public const int CurrentVersion = 6;
 
     /// <summary>Versione letta dal file; i file della 1.0.0 e 1.1.0 hanno 1 e 2 e si caricano con i valori predefiniti per i campi nuovi.</summary>
     public int Version { get; set; } = CurrentVersion;

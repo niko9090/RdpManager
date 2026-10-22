@@ -1,0 +1,110 @@
+{
+  "version": 5,
+  "settings": {
+    "sidebarMode": "AutoHide",
+    "reopenSessionsOnStartup": false,
+    "openSessions": [],
+    "shortcuts": {
+      "ToggleSidebar": "Ctrl+Alt+N"
+    },
+    "theme": "Dark",
+    "showTrayIcon": true,
+    "closeToTray": false,
+    "globalHotkey": "Ctrl+Alt+Maiusc+R",
+    "historyEnabled": true,
+    "splitRatio": 0.5,
+    "updateMode": "AutomaticWithConfirmation",
+    "verboseLog": false,
+    "connectionOrder": "Alphabetical",
+    "reopenOnceAfterUpdate": false,
+    "lockPin": {
+      "salt": "AAECAwQFBgcICQoLDA0ODw==",
+      "hash": "EBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8=",
+      "iterations": 210000
+    },
+    "lockAfterMinutes": 5
+  },
+  "groups": [
+    "Sede"
+  ],
+  "connections": [
+    {
+      "id": "5e3f2a44-0000-4000-8000-000000000001",
+      "name": "Contabilità",
+      "host": "contabilita.example.test",
+      "port": 3389,
+      "username": "operatore",
+      "domain": "SEDE",
+      "protectedPassword": "AQIDBAUGBwgJCgsMDQ4PFA==",
+      "resolutionMode": "FitToWindow",
+      "desktopWidth": 1920,
+      "desktopHeight": 1080,
+      "redirectClipboard": true,
+      "redirectDrives": false,
+      "audioMode": "Local",
+      "redirectPrinters": false,
+      "redirectMicrophone": false,
+      "useAllMonitors": false,
+      "autoReconnect": true,
+      "autoReconnectMaxAttempts": 3,
+      "isFavorite": true,
+      "label": "PROD",
+      "macAddress": "",
+      "group": "Sede",
+      "useGateway": false,
+      "gatewayHost": "",
+      "gatewayCredentials": "SameAsConnection",
+      "quality": "SlowConnection",
+      "keepAlive": true
+    },
+    {
+      "id": "5e3f2a44-0000-4000-8000-000000000002",
+      "name": "Magazzino",
+      "host": "magazzino.example.test",
+      "port": 3390,
+      "username": "",
+      "domain": "",
+      "resolutionMode": "FitToWindow",
+      "desktopWidth": 1920,
+      "desktopHeight": 1080,
+      "redirectClipboard": true,
+      "redirectDrives": false,
+      "audioMode": "Local",
+      "redirectPrinters": false,
+      "redirectMicrophone": false,
+      "useAllMonitors": false,
+      "autoReconnect": false,
+      "autoReconnectMaxAttempts": 3,
+      "isFavorite": false,
+      "label": "",
+      "macAddress": "",
+      "group": "Sede",
+      "useGateway": false,
+      "gatewayHost": "",
+      "gatewayCredentials": "SameAsConnection",
+      "quality": "LocalNetwork",
+      "keepAlive": false
+    }
+  ],
+  "credentialProfiles": [],
+  "quickTexts": [
+    {
+      "name": "Data",
+      "text": "date /t\n"
+    }
+  ],
+  "workspaces": [
+    {
+      "id": "5e3f2a44-0000-4000-8000-0000000000b1",
+      "name": "Mattina",
+      "connections": [
+        "5e3f2a44-0000-4000-8000-000000000002",
+        "5e3f2a44-0000-4000-8000-000000000001"
+      ],
+      "selected": "5e3f2a44-0000-4000-8000-000000000001",
+      "fullScreen": true,
+      "splitRatio": 0.5,
+      "shortcut": "Ctrl+Alt+Maiusc+1"
+    }
+  ]
+}
