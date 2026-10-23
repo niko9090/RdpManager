@@ -12,7 +12,7 @@
     <ApplicationVisualStyles>true</ApplicationVisualStyles>
     <Product>RdpManager</Product>
     <!-- Versione dell'app: cambiarla qui prima di creare il tag vX.Y.Z (vedi README, «Aggiornamenti»). -->
-    <Version>1.5.1</Version>
+    <Version>1.6.0</Version>
     <AssemblyVersion>$(Version).0</AssemblyVersion>
     <FileVersion>$(Version).0</FileVersion>
     <!-- Versione del prodotto pulita ("1.3.0"), senza l'hash del commit aggiunto dall'SDK. -->
