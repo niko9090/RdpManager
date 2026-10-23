@@ -34,6 +34,7 @@ internal sealed class FullScreenSideBar : Panel
 
     private readonly FlowLayoutPanel _flow = new() { Dock = DockStyle.Fill, WrapContents = false, AutoScroll = true, BackColor = Back };
     private readonly ToolTip _tips = new();
+    private readonly ResizeGrip _grip = new() { BackColor = Color.FromArgb(44, 47, 55) };
     private readonly Dictionary<RdpSessionView, Bitmap> _thumbnails = [];
     private FlowLayoutPanel? _sessionsBody;
     private ListBox? _connectionsList;
@@ -42,7 +43,11 @@ internal sealed class FullScreenSideBar : Panel
     public FullScreenSideBar()
     {
         BackColor = Back;
+        // Prima il riempimento, poi il bordo: WinForms aggancia per primo l'ultimo aggiunto.
         Controls.Add(_flow);
+        Controls.Add(_grip);
+        _tips.SetToolTip(_grip, "Trascina per cambiare la misura della barra");
+        _grip.Drag += (_, e) => ResizeDrag?.Invoke(this, e);
         _flow.Resize += (_, _) => FitSectionWidths();
         DarkScrollBars(_flow);
     }
@@ -63,6 +68,15 @@ internal sealed class FullScreenSideBar : Panel
     public event EventHandler<ShortcutAction>? ActionClicked;
     public event EventHandler<QuickText>? QuickTextClicked;
     public event EventHandler<SessionBarAction>? SessionActionClicked;
+
+    /// <summary>Si trascina il bordo verso la sessione: la finestra calcola la nuova misura (dalla 1.5.1).</summary>
+    public event EventHandler<GripDragEventArgs>? ResizeDrag;
+
+    /// <summary>Bordo da trascinare per cambiare la misura.</summary>
+    internal ResizeGrip Grip => _grip;
+
+    /// <summary>Vero mentre si trascina il bordo.</summary>
+    public bool IsResizing => _grip.IsDragging;
 
     /// <summary>Casella di ricerca della sezione «Tutte le connessioni» (null se la sezione non c'è).</summary>
     internal TextBox? SearchBox { get; private set; }
@@ -89,6 +103,13 @@ internal sealed class FullScreenSideBar : Panel
         _connectionsList = null;
         SearchBox = null;
         _flow.FlowDirection = Vertical ? FlowDirection.TopDown : FlowDirection.LeftToRight;
+        // Il bordo da trascinare sta verso la sessione: a destra della barra sinistra, a sinistra della destra, sopra quella in basso.
+        _grip.Edge = content.Settings.Position switch
+        {
+            BarPosition.Right => DockStyle.Left,
+            BarPosition.Bottom => DockStyle.Top,
+            _ => DockStyle.Right,
+        };
         _flow.Padding = new Padding(6);
         var shown = new List<BarSection>();
         foreach (var section in content.Settings.VisibleSections)

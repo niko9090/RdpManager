@@ -790,7 +790,7 @@ public sealed partial class MainForm : Form
         }
         string? password;
         bool includeSettings;
-        using (var options = new RdpmExportDialog(_doc.Connections.Count))
+        using (var options = new RdpmExportDialog(_doc))
         {
             ThemeManager.Apply(options);
             if (options.ShowDialog(this) != DialogResult.OK)
@@ -819,8 +819,7 @@ public sealed partial class MainForm : Form
         {
             Cursor = Cursors.Default;
         }
-        int withPassword = password is null ? 0
-            : _doc.Connections.Count(c => !string.IsNullOrEmpty(c.Password)) + _doc.CredentialProfiles.Count(p => !string.IsNullOrEmpty(p.Password));
+        int withPassword = password is null ? 0 : RdpmFile.CountExportablePasswords(_doc);
         var profiles = _doc.CredentialProfiles.Count > 0 ? $", {_doc.CredentialProfiles.Count} profili" : "";
         ShowNotice($"Esportate {_doc.Connections.Count} connessioni{profiles}{(includeSettings ? " e le impostazioni" : "")} in {Path.GetFileName(save.FileName)}" +
                    (password is null ? " (senza password)" : $" ({withPassword} password cifrate)"));
@@ -881,6 +880,15 @@ public sealed partial class MainForm : Form
             mode = dlg.Mode;
             applySettings = dlg.ApplySettings;
         }
+        ApplyRdpmImport(imported, mode, applySettings);
+    }
+
+    /// <summary>Per le prove automatiche: se impostata, riceve il riepilogo dell'importazione invece del messaggio.</summary>
+    internal Action<string>? ImportSummaryForTests { get; set; }
+
+    /// <summary>Porta nell'elenco le connessioni (e i profili, le password…) di un .rdpm già letto, salva e mostra il riepilogo.</summary>
+    internal ImportResult ApplyRdpmImport(ConnectionsDocument imported, ImportMode mode, bool applySettings)
+    {
         var result = RdpmFile.ApplyImport(_doc, imported, mode, applySettings);
         if (result.SettingsApplied)
         {
@@ -890,21 +898,16 @@ public sealed partial class MainForm : Form
         }
         SaveConnections();
         RefreshTree();
-        var text = $"Aggiunte {result.Added} connessioni";
-        if (result.Skipped > 0)
-            text += $", {result.Skipped} già presenti";
-        if (result.Removed > 0)
-            text += $", {result.Removed} sostituite";
-        if (result.ProfilesAdded > 0)
-            text += $", {result.ProfilesAdded} profili di credenziali";
-        if (result.QuickTextsAdded > 0)
-            text += $", {result.QuickTextsAdded} testi rapidi";
-        if (result.SettingsApplied)
-            text += "; impostazioni dell'app applicate";
-        AppLog.Default?.Info($"Importazione .rdpm: {result.Added} aggiunte, {result.Skipped} doppioni, {result.Removed} sostituite, impostazioni {(result.SettingsApplied ? "applicate" : "no")}");
-        MessageBox.Show(this, text + ".", "Importa", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        AppLog.Default?.Info($"Importazione .rdpm: {result.Added} aggiunte, {result.Skipped} doppioni, {result.Removed} sostituite, " +
+                             $"{result.PasswordsImported} password, {result.ProfilesAdded} profili, impostazioni {(result.SettingsApplied ? "applicate" : "no")}");
+        var summary = result.Summary();
+        if (ImportSummaryForTests is { } test)
+            test(summary);
+        else
+            MessageBox.Show(this, summary, "Importazione completata", MessageBoxButtons.OK, MessageBoxIcon.Information);
         if (_backgroundChecks)
             _ = CheckReachabilityAsync(_doc.Connections.ToList());
+        return result;
     }
 
     // ---------- rete: raggiungibilità e Wake-on-LAN ----------

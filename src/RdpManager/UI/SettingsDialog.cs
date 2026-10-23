@@ -102,7 +102,7 @@ public sealed class SettingsDialog : Form
         full.Controls.Add(Group("Barra a schermo intero",
             Flow(Caption("Posizione"), _barPosition),
             Flow(Caption("Modalità"), _barMode),
-            Flow(Caption("Larghezza"), _barWidth, Caption("pixel (in basso: altezza)")),
+            Flow(Caption("Larghezza"), _barWidth, Caption("pixel (in basso: altezza); si cambia anche trascinando il bordo della barra")),
             Flow(Caption("Ritardo di comparsa"), _barDelay, Caption("millisecondi sul bordo")),
             Note("In alto non c'è niente: la parte alta dello schermo resta della sessione. Con la barra fissa la sessione si restringe e non viene coperta; a comparsa o nascosta la barra si apre sopra la sessione (anche con la scorciatoia della barra laterale).")));
 

@@ -37,6 +37,9 @@ public sealed partial class MainForm
     private DateTime? _fsEdgeSince;
     private DateTime _fsBarShownUntil;
     private readonly System.Windows.Forms.Timer _thumbTimer = new() { Interval = 2000 };
+    /// <summary>Bordo della barra laterale a comparsa, da trascinare per cambiarne la larghezza (quella fissa ha lo splitter).</summary>
+    private readonly ResizeGrip _sidebarGrip = new() { Edge = DockStyle.Right, Visible = false };
+    private int _barDragStartThickness, _sidebarDragStartWidth;
 
     private void BuildLayout()
     {
@@ -44,6 +47,10 @@ public sealed partial class MainForm
         _sidebar.Controls.Add(BuildTreeToolbar());
         _sidebar.Controls.Add(_search);
         _sidebar.Controls.Add(BuildSidebarHeader());
+        _sidebar.Controls.Add(_sidebarGrip);
+        _tips.SetToolTip(_sidebarGrip, "Trascina per cambiare la larghezza della barra laterale");
+        _sidebarGrip.Drag += (_, e) => OnSidebarResize(e);
+        _splitter.SplitterMoved += (_, _) => RememberSidebarWidth();
 
         _content.Controls.Add(_tabs);
         _content.Controls.Add(_emptyHint);
@@ -66,6 +73,7 @@ public sealed partial class MainForm
         _fsBar.WorkspaceClicked += (_, ws) => OpenWorkspace(ws);
         _fsBar.ActionClicked += (_, action) => ExecuteShortcut(action);
         _fsBar.SessionActionClicked += (_, action) => ExecuteSessionAction(action);
+        _fsBar.ResizeDrag += (_, e) => OnFullScreenBarResize(e);
         _fsBar.QuickTextClicked += async (_, t) =>
         {
             if (CurrentView is { State: SessionState.Connected } v)
@@ -1014,7 +1022,7 @@ public sealed partial class MainForm
             {
                 var area = _fsBar.RectangleToScreen(_fsBar.ClientRectangle);
                 area.Inflate(16, 16);
-                bool inside = area.Contains(p) || _fsBar.IsSearching || _fsBar.ContainsFocus && Form.ActiveForm == this
+                bool inside = area.Contains(p) || _fsBar.IsSearching || _fsBar.IsResizing || _fsBar.ContainsFocus && Form.ActiveForm == this
                               || DateTime.UtcNow < _fsBarShownUntil;
                 _fsBarAwayTicks = inside ? 0 : _fsBarAwayTicks + 1;
                 if (_fsBarAwayTicks >= 5)
@@ -1042,7 +1050,8 @@ public sealed partial class MainForm
             var area = _sidebar.RectangleToScreen(_sidebar.ClientRectangle);
             area.Inflate(12, 0);
             bool menuOpen = _treeMenu.Visible;
-            bool inside = area.Contains(p) || menuOpen || (_sidebar.ContainsFocus && _search.Focused && _search.TextLength > 0);
+            bool inside = area.Contains(p) || menuOpen || _sidebarGrip.IsDragging
+                          || (_sidebar.ContainsFocus && _search.Focused && _search.TextLength > 0);
             _sidebarAwayTicks = inside ? 0 : _sidebarAwayTicks + 1;
             if (_sidebarAwayTicks >= 5)
                 HideRevealedSidebar();
@@ -1062,10 +1071,68 @@ public sealed partial class MainForm
         ApplySidebarLayout();
     }
 
+    /// <summary>
+    /// Trascinando il bordo della barra a schermo intero: nuova larghezza (o altezza, in basso) entro i limiti del Core;
+    /// la sessione si adatta subito (con la barra fissa prende lo spazio che resta). Si salva a fine trascinamento.
+    /// </summary>
+    internal void OnFullScreenBarResize(GripDragEventArgs e)
+    {
+        var bar = _doc.Settings.Bar;
+        var area = _root.ClientRectangle;
+        if (e.Phase == GripPhase.Start)
+            _barDragStartThickness = Math.Min(bar.Thickness, FullScreenBarLayout.MaxThickness(area, bar.Position));
+        int thickness = FullScreenBarLayout.DragThickness(bar.Position, _barDragStartThickness, e.Start, e.Current, area);
+        if (thickness != bar.Width)
+        {
+            bar.Width = thickness;
+            LayoutOverlays();
+        }
+        if (e.Phase == GripPhase.End)
+        {
+            SaveConnections();
+            AppLog.Default?.Info($"Barra a schermo intero: misura {bar.Width} px");
+        }
+    }
+
+    /// <summary>Barra laterale a comparsa: trascinando il bordo destro si cambia la larghezza, poi si salva.</summary>
+    private void OnSidebarResize(GripDragEventArgs e)
+    {
+        if (e.Phase == GripPhase.Start)
+            _sidebarDragStartWidth = _sidebar.Width;
+        int width = WindowSidebar.Fit(_sidebarDragStartWidth + e.Current.X - e.Start.X, _root.ClientSize.Width);
+        if (width != _sidebar.Width)
+        {
+            _sidebar.Width = width;
+            LayoutOverlays();
+        }
+        if (e.Phase == GripPhase.End)
+            RememberSidebarWidth();
+    }
+
+    /// <summary>Salva la larghezza della barra laterale scelta trascinando (splitter della barra fissa o bordo di quella a comparsa).</summary>
+    private void RememberSidebarWidth()
+    {
+        int width = Math.Clamp(_sidebar.Width, WindowSidebar.MinWidth, WindowSidebar.MaxWidth);
+        if (_doc.Settings.SidebarWidth == width)
+            return;
+        _doc.Settings.SidebarWidth = width;
+        SaveConnections();
+    }
+
+    /// <summary>Larghezza salvata della barra laterale, ridotta se la finestra è stretta (le sessioni tengono almeno 300 px).</summary>
+    private int FittedSidebarWidth()
+    {
+        int available = _root.ClientSize.Width > 0 ? _root.ClientSize.Width : int.MaxValue / 2;
+        return WindowSidebar.Fit(_doc.Settings.SidebarWidth, available);
+    }
+
     private void ApplySidebarLayout()
     {
         bool pinned = _doc.Settings.SidebarMode == SidebarMode.Pinned;
         SuspendLayout();
+        if (!_fullScreen)
+            _sidebar.Width = FittedSidebarWidth();
+        _sidebarGrip.Visible = !pinned;
         if (_fullScreen)
         {
             // A schermo intero vale la barra a schermo intero: la barra laterale della finestra si toglie.
@@ -1079,7 +1146,8 @@ public sealed partial class MainForm
             _edge.Visible = false;
             _sidebar.Dock = DockStyle.Left;
             _sidebar.Visible = !_sidebarHiddenByUser;
-            _splitter.Visible = _sidebar.Visible;
+            // Non _sidebar.Visible: prima che la finestra si mostri vale falso e lo splitter resterebbe nascosto.
+            _splitter.Visible = !_sidebarHiddenByUser;
             // Ordine nell'elenco dei controlli = ordine di aggancio (vedi BuildLayout).
             _root.Controls.SetChildIndex(_content, 0);
             _root.Controls.SetChildIndex(_splitter, 1);
@@ -1229,6 +1297,8 @@ public sealed partial class MainForm
     internal ConnectionsDocument Document => _doc;
     internal IReadOnlyList<DetachedSessionForm> DetachedForms => _detached;
     internal Control Sidebar => _sidebar;
+    internal ResizeGrip SidebarGrip => _sidebarGrip;
+    internal Splitter SidebarSplitter => _splitter;
 
     internal void SetSidebarModeForTests(SidebarMode mode) => SetSidebarMode(mode);
 
