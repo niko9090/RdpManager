@@ -1,5 +1,36 @@
 # Novità di RdpManager
 
+## 1.6.0
+
+**Cerca PC in rete** (*Strumenti → Cerca PC in rete…*, o il pulsante «Cerca PC» in cima alla barra laterale)
+- Una finestra con tre schede, **Rete locale**, **Tailscale** e **Altre VPN**, che elenca i PC con il Desktop
+  remoto acceso. **Non parte niente da solo**: la ricerca comincia solo quando premi «Avvia ricerca» (o
+  «Leggi la rete Tailscale»), e si può annullare in ogni momento.
+- **Scanner di rete**: prova la porta RDP (3389, o quella che scegli) sulla sottorete di una scheda di rete
+  attiva oppure su un intervallo scritto a mano, come `192.168.1.0/24`, `192.168.1.10-192.168.1.50` o
+  `192.168.1.10-50`. Apre solo una connessione TCP e la chiude subito, con al massimo 64 tentativi insieme e
+  un tempo massimo per indirizzo; i nomi arrivano dal DNS inverso.
+- **Limiti**: oltre una rete **/22** (1.024 indirizzi) la ricerca chiede conferma, e non va mai oltre una /16.
+  Senza conferma si cercano solo indirizzi **privati** (10.x, 172.16-31.x, 192.168.x), **CGNAT** (100.64-127.x)
+  e **link-local** (169.254.x); per un intervallo con indirizzi pubblici l'app chiede conferma prima di
+  partire. Se la sottorete di una scheda è più grande di una /22 viene proposta la /24 del tuo indirizzo.
+- **Tailscale**: legge `tailscale status --json` (solo lettura, non cambia niente in Tailscale) ed elenca i
+  dispositivi della tua rete con nome MagicDNS, IP 100.x, sistema operativo, se sono in linea e se il
+  Desktop remoto risponde. Le connessioni usano il nome MagicDNS, che resta valido anche se l'IP cambia.
+  Se Tailscale non è installato, è spento o non hai fatto l'accesso, un messaggio chiaro dice cosa fare.
+- **Altre VPN**: riconosce le schede di rete di Tailscale, ZeroTier, WireGuard, OpenVPN (anche TAP e DCO) e
+  di altre VPN (collegamenti PPP, client aziendali come AnyConnect, GlobalProtect, FortiClient) e ne cerca i
+  PC nella sottorete. I tipi di VPN sono «fornitori» separati nel Core: aggiungerne uno è una riga.
+- **Aggiunta senza doppioni**: si spuntano (o si selezionano) più PC e si aggiungono alla cartella scelta,
+  creata se serve («PC trovati in rete» di serie). Un PC già nell'elenco (stesso host o IP, stesso nome
+  breve o nome MagicDNS, stessa porta) è segnato «già presente» e non viene aggiunto di nuovo. Le nuove
+  connessioni non hanno utente né password: si chiedono alla prima connessione o si impostano con *Modifica*.
+- **Reti aziendali**: la ricerca è una piccola scansione delle porte; va usata solo su reti proprie o con il
+  permesso di chi le gestisce (i sistemi di sicurezza possono segnalarla). La finestra lo ricorda.
+
+**Compatibilità**: nessun cambiamento al formato di `connections.json` (resta la versione 7); i file dalla
+1.0.0 alla 1.5.1 si caricano e i PC trovati si aggiungono senza perdere niente.
+
 ## 1.5.1
 
 Correzioni segnalate il 23/10 sulla 1.5.0.

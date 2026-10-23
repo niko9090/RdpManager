@@ -235,10 +235,13 @@ public sealed partial class MainForm : Form
         help.DropDownItems.Add(new ToolStripSeparator());
         help.DropDownItems.Add(Item("&Informazioni", Keys.None, (_, _) => ShowAbout()));
 
+        var tools = new ToolStripMenuItem("S&trumenti");
+        tools.DropDownItems.Add(Item("Cerca &PC in rete…", Keys.None, (_, _) => ShowNetworkScan()));
+
         var workspaces = new ToolStripMenuItem("Spazi di la&voro");
         workspaces.DropDownItems.Add("(caricamento)");
         workspaces.DropDownOpening += (_, _) => FillWorkspacesMenu(workspaces);
-        _menu.Items.AddRange([file, conn, session, view, workspaces, help]);
+        _menu.Items.AddRange([file, conn, session, view, workspaces, tools, help]);
     }
 
     private ToolStrip BuildTreeToolbar()
@@ -259,6 +262,10 @@ public sealed partial class MainForm : Form
         header.Items.Add(new ToolStripLabel("Connessioni") { Font = new Font(Font, FontStyle.Bold) });
         _pinButton.Click += (_, _) => SetSidebarMode(_doc.Settings.SidebarMode == SidebarMode.Pinned ? SidebarMode.AutoHide : SidebarMode.Pinned);
         header.Items.Add(_pinButton);
+        header.Items.Add(new ToolStripButton("Cerca PC", null, (_, _) => ShowNetworkScan())
+        {
+            Alignment = ToolStripItemAlignment.Right, ToolTipText = "Cerca PC in rete (rete locale, Tailscale, altre VPN)",
+        });
         return header;
     }
 
