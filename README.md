@@ -26,6 +26,10 @@ Dalla 1.5.1: barra a schermo intero e barra laterale **ridimensionabili trascina
 *Monitor successivo* nella barra a schermo intero, `.rdpm` che porta le **password** di connessioni e
 profili di credenziali (proposte di serie, con un avviso se si sceglie di escluderle) e riepilogo
 dell'importazione.
+Dalla 1.6: **Cerca PC in rete** (*Strumenti*): uno **scanner** della porta RDP sulla rete locale o su un
+intervallo scritto a mano, i PC della rete **Tailscale** letti da `tailscale status --json` e quelli dietro
+**altre VPN** (ZeroTier, WireGuard, OpenVPN e altre), aggiunti a una cartella senza doppioni. La ricerca
+parte solo quando la chiedi (vedi «Cerca PC in rete»).
 Le novità di ogni versione sono in [CHANGELOG.md](CHANGELOG.md).
 
 Le sessioni usano il controllo ActiveX Desktop remoto di Windows (`mstscax.dll`, classe
@@ -362,6 +366,22 @@ Da fare su un PC dove RdpManager 1.5.0 è installato, con due monitor se possibi
 | 7 | Scegli «Senza password» → *Esporta…* | Un avviso dice quante password non andranno nel file e chiede conferma; con «No» si torna al dialogo. |
 | 8 | Esporta con le password; su un altro PC (o utente) importa con *Unisci*, dove una delle connessioni c'è già senza password | Un riepilogo dice quante connessioni, password e profili sono stati importati; la connessione già presente ora ha la password (o usa il profilo) e le connessioni con il profilo si connettono senza chiedere niente. |
 
+## Prova manuale 1.6.0
+
+Da fare su un PC dove RdpManager 1.5.1 è installato, in una rete con almeno un PC con il Desktop remoto
+acceso; per la scheda Tailscale serve Tailscale installato e connesso (e, per il passo 7, un PC senza).
+
+| # | Passo | Risultato atteso |
+|---|---|---|
+| 1 | Lascia che la 1.5.1 proponga l'aggiornamento e scegli «Aggiorna ora» | Si aggiorna in silenzio e si riapre con connessioni, profili, password e impostazioni di prima. |
+| 2 | *Strumenti → Cerca PC in rete…* (o «Cerca PC» in cima alla barra laterale) | Si apre la finestra con le schede Rete locale, Tailscale e Altre VPN; **non parte nessuna ricerca**. |
+| 3 | Rete locale: scegli la tua scheda di rete, «Avvia ricerca» | La barra avanza; compaiono i PC con il Desktop remoto acceso, con il nome DNS se c'è; quelli già nell'elenco sono «già presente» e non spuntati. «Annulla» ferma la ricerca. |
+| 4 | Scrivi `10.0.0.0/20` e «Avvia ricerca» | Una domanda avvisa che sono più di 1.024 indirizzi; con «No» non parte niente. |
+| 5 | Spunta due PC, scrivi una cartella nuova, «Aggiungi i selezionati»; poi premi di nuovo | Le connessioni compaiono nella cartella; la seconda volta «Nessun PC nuovo: 2 già nell'elenco». |
+| 6 | Scheda Tailscale → «Leggi la rete Tailscale» | Dispositivi con nome MagicDNS, IP 100.x, sistema, in linea e «risponde»/«non risponde» per il Desktop remoto; aggiunti, usano il nome MagicDNS. |
+| 7 | Su un PC senza Tailscale, stesso passo | Messaggio in rosso: Tailscale non è installato, con cosa fare; nessun errore. |
+| 8 | Scheda Altre VPN con una VPN accesa (ZeroTier, WireGuard, OpenVPN…) | La VPN è elencata con il suo tipo e la sua sottorete; la ricerca trova i PC dietro la VPN. |
+
 ## Cosa è stato provato e cosa no
 
 - **Provato automaticamente** (`dotnet test`): modello, salvataggio JSON e cifratura DPAPI, file `.rdp`,
@@ -402,6 +422,18 @@ Da fare su un PC dove RdpManager 1.5.0 è installato, con due monitor se possibi
   bordo trascinato con la sessione che si adatta e la misura salvata, barra laterale fissa e a comparsa,
   dialogo di esportazione e riepilogo dell'importazione. Schermate in `artifacts\screenshots-1.5.1`
   (prova `SaveScreenshotsOfTheV151Fixes`).
+- **1.6.0** (`dotnet test`): intervalli da maschera, CIDR e «da-a» (anche «.10-50»), errori spiegati,
+  limite /22 con conferma e /16 invalicabile, indirizzi privati, CGNAT, link-local e pubblici, scanner contro
+  un listener TCP locale (trova la porta aperta e non le chiuse), concorrenza limitata, annullamento, DNS
+  inverso che fallisce o è lento; `tailscale status --json` con dispositivi in linea e no, senza MagicDNS,
+  solo IPv6, stati «NeedsLogin»/«Stopped», JSON non valido, tailscale.exe trovato o assente;
+  classificazione delle schede (Tailscale, ZeroTier, WireGuard, OpenVPN/TAP/DCO, PPP e client aziendali,
+  schede normali) e fornitori aggiunti; doppioni per IP, nome MagicDNS, nome breve e porta; compatibilità
+  con i `connections.json` dalla 1.0.0 alla 1.5.0. Nella finestra vera, con fonti finte: nessuna ricerca
+  all'apertura, menu Strumenti e pulsante della barra laterale, conferme, annullamento, selezione multipla,
+  aggiunta a una cartella salvata su disco senza doppioni, messaggio senza Tailscale. Schermate in
+  `artifacts\screenshots-1.6.0` (prova `SaveScreenshotsOfTheV16NetworkSearch`). **Non provato**: una
+  ricerca su una rete vera con più PC, Tailscale vero, ZeroTier/WireGuard/OpenVPN veri.
 - **Antivirus**: scansione di Microsoft Defender sui file della 1.2.0 e della 1.3.0 (nessuna minaccia).
 - **Aggiornamento silenzioso provato a mano** (21/10/2026) sull'installazione del PC di sviluppo, che era
   alla 1.1.0: backup di programma e dati, Setup 1.3.0 della release con SHA256 verificato,
@@ -507,6 +539,33 @@ Windows Sandbox.
   cartella «Importate da mstsc» (senza doppioni). La cronologia si legge dal registro
   (`HKCU\Software\Microsoft\Terminal Server Client`) **in sola lettura e solo quando lo chiedi**; lì
   mstsc non tiene password.
+
+### Cerca PC in rete (1.6)
+
+*Strumenti → Cerca PC in rete…*, oppure il pulsante **Cerca PC** in cima alla barra laterale. La finestra
+non cerca niente finché non premi un pulsante.
+
+- **Rete locale**: scegli una scheda di rete (viene proposta la sua sottorete) oppure scrivi un intervallo:
+  `192.168.1.0/24`, `192.168.1.0/255.255.255.0`, `192.168.1.10-192.168.1.50`, `192.168.1.10-50` o un solo
+  indirizzo. Si può cambiare la porta (3389 di serie). Lo scanner apre una connessione TCP verso la porta e
+  la chiude subito, senza mandare dati, con al massimo 64 tentativi insieme e 0,6 s per indirizzo; chi
+  risponde viene elencato con il nome del DNS inverso. «Annulla» ferma la ricerca.
+- **Limiti**: senza conferma al massimo una rete **/22** (1.024 indirizzi) e solo indirizzi privati,
+  CGNAT (100.64.0.0/10) e link-local (169.254.0.0/16); per intervalli più grandi o con indirizzi pubblici
+  l'app chiede conferma. Oltre una /16 (65.536 indirizzi) non si cerca.
+- **Tailscale**: «Leggi la rete Tailscale» esegue `tailscale status --json` (sola lettura) e mostra i
+  dispositivi con nome MagicDNS, IP 100.x, sistema, in linea e, se lasci la spunta, se il Desktop remoto
+  risponde. I dispositivi spenti sono in grigio e non spuntati, ma si possono aggiungere. Se Tailscale non
+  c'è o non è connesso, un messaggio dice cosa fare.
+- **Altre VPN**: elenca le schede di rete riconosciute come Tailscale, ZeroTier, WireGuard, OpenVPN o altre
+  VPN e cerca nella loro sottorete (la /24 del tuo indirizzo se la sottorete è più grande di una /22).
+- **Aggiunta**: spunta (o seleziona) i PC, scegli o scrivi la cartella e premi «Aggiungi i selezionati».
+  I PC già nell'elenco (stesso host, IP, nome MagicDNS o nome breve, stessa porta) vengono saltati e il
+  riepilogo dice quanti. Le connessioni nuove sono senza utente e password.
+
+> **Reti aziendali**: cercare PC in una rete è una piccola scansione delle porte. Usala solo su reti tue o
+> che hai il permesso di controllare; in una rete aziendale chiedi prima all'amministratore: i sistemi di
+> sicurezza (IDS, antivirus di rete) possono segnalare la ricerca come attività sospetta.
 
 ### Profili di credenziali e Remote Desktop Gateway
 
@@ -793,7 +852,8 @@ RdpManager.sln
 Directory.Build.props     spegne Source Link: l'hash del commit faceva ricompilare a ogni commit (causa del
                           CS2012 nelle verifiche in parallelo); non va tolto
 src/RdpManager/
-  Core/   modello, salvataggio JSON, cifratura DPAPI, lettura/scrittura .rdp (senza interfaccia, testabile)
+  Core/   modello, salvataggio JSON, cifratura DPAPI, lettura/scrittura .rdp, scanner di rete, Tailscale e
+          VPN (senza interfaccia, testabile)
   Rdp/    hosting ActiveX (RdpClientHost : AxHost), dichiarazioni COM, avvio di mstsc
   UI/     finestra principale (schede, schermo intero, barra laterale, scorciatoie), dialoghi
 tests/RdpManager.Tests/   test xUnit (Core; categoria UI = prove con finestre e controllo RDP)
