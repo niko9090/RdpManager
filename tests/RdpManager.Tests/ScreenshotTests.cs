@@ -380,6 +380,96 @@ public sealed class ScreenshotTests : IDisposable
             ExceptionDispatchInfo.Throw(failure);
     }
 
+    [ScreenshotFact]
+    public void SaveScreenshotsOfTheV16NetworkSearch()
+    {
+        var outDir = Environment.GetEnvironmentVariable(FolderVariable)!;
+        Directory.CreateDirectory(outDir);
+        var doc = new ConnectionsDocument { Connections = [new RdpConnection { Name = "Server posta", Host = "192.168.50.20", Group = "Interni" }] };
+        doc.Settings.Theme = AppTheme.Dark;
+        Directory.CreateDirectory(_dir);
+        var store = new ConnectionStore(Path.Combine(_dir, "connections.json"));
+        store.Save(doc);
+        var status = TailscaleStatus.Parse("""
+        {
+          "BackendState": "Running", "MagicDNSSuffix": "esempio.ts.net",
+          "Peer": {
+            "a": { "HostName": "PC-Ufficio", "DNSName": "pc-ufficio.esempio.ts.net.", "OS": "windows", "TailscaleIPs": ["100.64.0.2"], "Online": true },
+            "b": { "HostName": "Portatile", "DNSName": "portatile.esempio.ts.net.", "OS": "windows", "TailscaleIPs": ["100.64.0.3"], "Online": false },
+            "c": { "HostName": "Magazzino", "DNSName": "magazzino.esempio.ts.net.", "OS": "windows", "TailscaleIPs": ["100.64.0.5"], "Online": true },
+            "d": { "HostName": "nas", "DNSName": "nas.esempio.ts.net.", "OS": "linux", "TailscaleIPs": ["100.64.0.4"], "Online": true }
+          }
+        }
+        """);
+        bool tailscaleInstalled = true;
+        var sources = new NetworkScanSources
+        {
+            Adapters = () =>
+            [
+                new("Ethernet", "Scheda di rete", System.Net.NetworkInformation.NetworkInterfaceType.Ethernet, System.Net.IPAddress.Parse("192.168.50.5"), 24, NetworkKind.Local),
+                new("ZeroTier One", "ZeroTier Virtual Port", System.Net.NetworkInformation.NetworkInterfaceType.Ethernet, System.Net.IPAddress.Parse("10.147.20.7"), 24, NetworkKind.ZeroTier),
+                new("ufficio", "WireGuard Tunnel", System.Net.NetworkInformation.NetworkInterfaceType.Unknown, System.Net.IPAddress.Parse("10.8.0.3"), 24, NetworkKind.WireGuard),
+            ],
+            Tailscale = _ => Task.FromResult(tailscaleInstalled
+                ? new TailscaleLookup(TailscaleLookupOutcome.Ok, status, "")
+                : new TailscaleLookup(TailscaleLookupOutcome.NotInstalled, null, TailscaleCli.NotInstalledMessage)),
+            Scanner = new NetworkScanner(
+                (ip, _) => Task.FromResult<string?>(ip.GetAddressBytes()[3] switch { 10 => "server-dati.ufficio.lan", 30 => "reception.ufficio.lan", _ => null }),
+                async (ip, _, _, ct) => { await Task.Delay(2, ct); return ip.GetAddressBytes()[3] is 10 or 20 or 30 or 41; }),
+            RdpCheck = (host, _, _) => Task.FromResult(!host.EndsWith(".4")),
+        };
+
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                using var form = new MainForm(store) { StartPosition = FormStartPosition.Manual, Location = new Point(40, 40), Size = new Size(1280, 800) };
+                form.NetworkScanSourcesForTests = sources;
+                form.Show();
+                Pump(300);
+                form.ShowNetworkScan();
+                var scan = form.NetworkScan!;
+                scan.StartPosition = FormStartPosition.Manual;
+                scan.Location = new Point(120, 100);
+                Pump(300);
+                var t = scan.LocalTab.StartAsync();
+                PumpUntil(() => t.IsCompleted, 30_000);
+                Save(scan, Path.Combine(outDir, "24-cerca-pc-rete-locale.png"));
+                scan.Tabs.SelectedIndex = 1;
+                var ts = scan.ReadTailscaleAsync();
+                PumpUntil(() => ts.IsCompleted, 30_000);
+                Save(scan, Path.Combine(outDir, "25-cerca-pc-tailscale.png"));
+                tailscaleInstalled = false;
+                ts = scan.ReadTailscaleAsync();
+                PumpUntil(() => ts.IsCompleted, 30_000);
+                Save(scan, Path.Combine(outDir, "26-cerca-pc-tailscale-assente.png"));
+                scan.Tabs.SelectedIndex = 2;
+                Pump(200);
+                Save(scan, Path.Combine(outDir, "27-cerca-pc-altre-vpn.png"));
+                scan.Tabs.SelectedIndex = 0;
+                scan.FolderBox.Text = "Ufficio";
+                scan.AddSelected();
+                Pump(300);
+                Save(scan, Path.Combine(outDir, "28-cerca-pc-aggiunti.png"));
+                scan.Close();
+                Pump(300);
+                Save(form, Path.Combine(outDir, "29-pc-aggiunti-nell-elenco.png"));
+                form.ExitApp();
+                Pump(200);
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        Assert.True(thread.Join(TimeSpan.FromSeconds(120)));
+        if (failure is not null)
+            ExceptionDispatchInfo.Throw(failure);
+    }
+
     private static void Save(Form form, string path)
     {
         form.Activate();
