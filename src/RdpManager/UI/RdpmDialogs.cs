@@ -2,20 +2,32 @@ using RdpManager.Core;
 
 namespace RdpManager.UI;
 
-/// <summary>Esportazione in .rdpm: password escluse oppure cifrate con una password del file.</summary>
+/// <summary>
+/// Esportazione in .rdpm: password cifrate con una password del file (proposta quando ci sono password salvate,
+/// dalla 1.5.1) oppure escluse, con un avviso se se ne perderebbero.
+/// </summary>
 public sealed class RdpmExportDialog : Form
 {
-    private readonly RadioButton _without = new() { Text = "Senza password", AutoSize = true, Checked = true };
+    private readonly RadioButton _without = new() { Text = "Senza password", AutoSize = true };
     private readonly RadioButton _with = new() { Text = "Con le password, cifrate con una password del file", AutoSize = true };
-    private readonly TextBox _password = new() { Width = 240, UseSystemPasswordChar = true, Enabled = false };
-    private readonly TextBox _confirm = new() { Width = 240, UseSystemPasswordChar = true, Enabled = false };
+    private readonly TextBox _password = new() { Width = 240, UseSystemPasswordChar = true };
+    private readonly TextBox _confirm = new() { Width = 240, UseSystemPasswordChar = true };
+    private readonly string? _withoutWarning;
     private readonly CheckBox _settings = new()
     {
         Text = "Includi le impostazioni dell'app (scorciatoie, tema, aggiornamenti…)", AutoSize = true, Margin = new Padding(3, 10, 3, 3),
     };
 
-    public RdpmExportDialog(int count)
+    public RdpmExportDialog(ConnectionsDocument doc)
     {
+        ArgumentNullException.ThrowIfNull(doc);
+        int count = doc.Connections.Count;
+        int passwords = RdpmFile.CountExportablePasswords(doc);
+        _withoutWarning = RdpmFile.WithoutPasswordsWarning(doc);
+        bool withPasswords = RdpmFile.ProposeWithPasswords(doc);
+        _with.Checked = withPasswords;
+        _without.Checked = !withPasswords;
+        _password.Enabled = _confirm.Enabled = withPasswords;
         Text = "Esporta connessioni";
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = MinimizeBox = false;
@@ -24,6 +36,9 @@ public sealed class RdpmExportDialog : Form
         AutoSizeMode = AutoSizeMode.GrowAndShrink;
         Padding = new Padding(10);
         Font = SystemFonts.MessageBoxFont ?? Font;
+        Confirm = question => MessageBox.Show(this, question, Text, MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+            MessageBoxDefaultButton.Button2) == DialogResult.Yes;
+        ShowProblem = problem => MessageBox.Show(this, problem, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
 
         var grid = new TableLayoutPanel { ColumnCount = 2, AutoSize = true };
         grid.Controls.Add(new Label { Text = "Password del file", AutoSize = true, Margin = new Padding(20, 6, 8, 3) });
@@ -32,7 +47,13 @@ public sealed class RdpmExportDialog : Form
         grid.Controls.Add(_confirm);
 
         var layout = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Dock = DockStyle.Fill };
-        layout.Controls.Add(new Label { Text = $"{count} connessioni e le loro cartelle.", AutoSize = true, Margin = new Padding(3, 3, 3, 8) });
+        var profiles = doc.CredentialProfiles.Count switch { 0 => "", 1 => ", 1 profilo di credenziali", var n => $", {n} profili di credenziali" };
+        var saved = passwords switch { 0 => "nessuna password salvata", 1 => "1 password salvata", _ => $"{passwords} password salvate" };
+        layout.Controls.Add(new Label
+        {
+            Text = $"{count} connessioni{profiles} e le loro cartelle; {saved}.", AutoSize = true, MaximumSize = new Size(380, 0),
+            Margin = new Padding(3, 3, 3, 8),
+        });
         layout.Controls.Add(_without);
         layout.Controls.Add(_with);
         layout.Controls.Add(grid);
@@ -61,16 +82,48 @@ public sealed class RdpmExportDialog : Form
         _with.CheckedChanged += (_, _) => _password.Enabled = _confirm.Enabled = _with.Checked;
         ok.Click += (_, _) =>
         {
-            if (!_with.Checked)
-                return;
-            string? problem = _password.Text.Length < 8 ? "La password del file deve avere almeno 8 caratteri."
-                : _password.Text != _confirm.Text ? "Le due password non coincidono." : null;
-            if (problem is null)
-                return;
-            MessageBox.Show(this, problem, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            DialogResult = DialogResult.None;
-            _password.Focus();
+            if (!CanAccept())
+                DialogResult = DialogResult.None;
         };
+        Shown += (_, _) =>
+        {
+            if (_with.Checked)
+                _password.Focus();
+        };
+    }
+
+    /// <summary>Domanda sì/no (l'avviso «senza password»); le prove la sostituiscono.</summary>
+    internal Func<string, bool> Confirm { get; set; }
+
+    /// <summary>Messaggio di errore (password del file troppo corta o diversa); le prove lo sostituiscono.</summary>
+    internal Action<string> ShowProblem { get; set; }
+
+    internal bool WithPasswordsChosen => _with.Checked;
+
+    /// <summary>Per le prove: sceglie con o senza password e scrive la password del file.</summary>
+    internal void ChooseForTests(bool withPasswords, string password = "", string? confirm = null)
+    {
+        _with.Checked = withPasswords;
+        _without.Checked = !withPasswords;
+        _password.Text = password;
+        _confirm.Text = confirm ?? password;
+    }
+
+    /// <summary>
+    /// Controlli prima di esportare: con le password, la password del file (almeno 8 caratteri, ripetuta uguale);
+    /// senza, la conferma dell'avviso se ci sono password salvate che non andrebbero nel file.
+    /// </summary>
+    internal bool CanAccept()
+    {
+        if (!_with.Checked)
+            return _withoutWarning is null || Confirm(_withoutWarning);
+        string? problem = _password.Text.Length < 8 ? "La password del file deve avere almeno 8 caratteri."
+            : _password.Text != _confirm.Text ? "Le due password non coincidono." : null;
+        if (problem is null)
+            return true;
+        ShowProblem(problem);
+        _password.Focus();
+        return false;
     }
 
     /// <summary>null = password escluse dal file.</summary>

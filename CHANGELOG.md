@@ -1,8 +1,40 @@
 # Novità di RdpManager
 
-## Non ancora rilasciato
+## 1.5.1
 
-**Correzioni della barra a schermo intero (1.5.0)**
+Correzioni segnalate il 23/10 sulla 1.5.0.
+
+**Monitor successivo nella barra a schermo intero**
+- Il pulsante per spostare l'app sull'altro monitor è di nuovo nella barra a schermo intero, a sinistra, a
+  destra e in basso, nella sezione «Azioni sulla sessione» (la correzione era pronta dopo la 1.5.0 ma non era
+  ancora stata rilasciata: vedi sotto).
+
+**Barre ridimensionabili trascinandone il bordo**
+- La barra a schermo intero si allarga o si restringe trascinando il bordo verso la sessione (il bordo
+  destro della barra sinistra, il sinistro di quella destra, quello in alto della barra in basso, dove
+  si cambia l'altezza). La sessione si adatta subito e, con «Adatta alla finestra», anche la risoluzione.
+  Limiti: da 120 a 600 pixel e mai oltre metà dello schermo. La misura resta salvata ed è la stessa di
+  *Impostazioni → Schermo intero → Larghezza*.
+- Anche la barra laterale della finestra si allarga trascinandone il bordo (da 180 a 600 pixel, lasciando
+  almeno 300 pixel alle sessioni), sia fissa sia a comparsa, e la larghezza resta salvata. Corretto un
+  difetto per cui, all'avvio, il bordo della barra fissa non si poteva trascinare.
+
+**Esportazione e importazione .rdpm con le password**
+- Nell'esportazione la scelta proposta è **«Con le password, cifrate»** quando ci sono password salvate
+  (delle connessioni o dei profili di credenziali); il dialogo dice quante sono. Scegliendo «Senza
+  password» compare un avviso che dice quante password non andranno nel file.
+- Le password dei **profili di credenziali condivisi** viaggiano come quelle delle connessioni, e le
+  connessioni restano collegate al loro profilo (anche per il gateway).
+- Nell'unione una connessione già presente senza password riceve quella del file; se nel file usava un
+  profilo e qui non ne ha, viene collegata al profilo importato. Un profilo già presente senza password
+  riceve quella del file. Le password già presenti non vengono mai sostituite.
+- Dopo l'importazione un **riepilogo** dice quante connessioni sono state aggiunte, quante erano già
+  presenti, quante **password** e quanti **profili di credenziali** sono stati importati.
+
+**Compatibilità**: i connections.json dalla 1.0.0 alla 1.5.0 si caricano senza perdite (la barra laterale
+ha la larghezza di prima, 280 pixel); il file passa alla versione 7 quando si salva qualcosa.
+
+**Correzioni della barra a schermo intero (dopo la 1.5.0)**
 - Pulsanti rapidi: il nome dell'azione non si sovrappone più alla scorciatoia. Se non ci stanno su una
   riga vanno su due (nome sopra, scorciatoia sotto a destra) e un nome troppo lungo si tronca con «…»;
   vale a sinistra, a destra e in basso, anche alla larghezza minima.

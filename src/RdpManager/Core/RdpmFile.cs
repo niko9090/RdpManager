@@ -29,14 +29,53 @@ public enum ImportMode
 /// <param name="ProfilesAdded">Profili di credenziali aggiunti.</param>
 /// <param name="QuickTextsAdded">Testi rapidi aggiunti.</param>
 /// <param name="SettingsApplied">Le impostazioni dell'app contenute nel file sono state applicate.</param>
+/// <param name="PasswordsImported">
+/// Password arrivate dal file (dalla 1.5.1): delle connessioni e dei profili aggiunti, più quelle date a una
+/// connessione o a un profilo già presente che non l'aveva.
+/// </param>
+/// <param name="ConnectionsLinkedToProfile">Connessioni già presenti, senza password, collegate al profilo del file.</param>
 public sealed record ImportResult(int Added, int Skipped, int Removed, int ProfilesAdded = 0, int QuickTextsAdded = 0,
-    bool SettingsApplied = false);
+    bool SettingsApplied = false, int PasswordsImported = 0, int ConnectionsLinkedToProfile = 0)
+{
+    /// <summary>Riepilogo da mostrare dopo l'importazione: connessioni, password e profili importati.</summary>
+    public string Summary()
+    {
+        var parts = new List<string> { Added == 1 ? "Aggiunta 1 connessione" : $"Aggiunte {Added} connessioni" };
+        if (Skipped > 0)
+            parts.Add($"{Skipped} già presenti");
+        if (Removed > 0)
+            parts.Add($"{Removed} sostituite");
+        var lines = new List<string> { string.Join(", ", parts) + "." };
+        lines.Add(PasswordsImported switch
+        {
+            0 => "Nessuna password importata.",
+            1 => "1 password importata.",
+            _ => $"{PasswordsImported} password importate.",
+        });
+        lines.Add(ProfilesAdded switch
+        {
+            0 => "Nessun profilo di credenziali nuovo.",
+            1 => "1 profilo di credenziali importato.",
+            _ => $"{ProfilesAdded} profili di credenziali importati.",
+        });
+        if (ConnectionsLinkedToProfile > 0)
+            lines.Add(ConnectionsLinkedToProfile == 1
+                ? "1 connessione già presente è stata collegata al suo profilo."
+                : $"{ConnectionsLinkedToProfile} connessioni già presenti sono state collegate al loro profilo.");
+        if (QuickTextsAdded > 0)
+            lines.Add(QuickTextsAdded == 1 ? "1 testo rapido aggiunto." : $"{QuickTextsAdded} testi rapidi aggiunti.");
+        if (SettingsApplied)
+            lines.Add("Impostazioni dell'app applicate.");
+        return string.Join("\n", lines);
+    }
+}
 
 /// <summary>
 /// Esportazione e importazione delle connessioni in un file .rdpm (JSON).
 /// Le password non vengono mai scritte in chiaro: si escludono, oppure si cifrano con AES-GCM
 /// usando una chiave ricavata dalla password del file con PBKDF2-SHA256.
-/// Le password DPAPI di connections.json non si esportano: valgono solo per l'utente Windows che le ha create.
+/// Le password DPAPI di connections.json non si copiano così come sono (valgono solo per l'utente Windows che le ha
+/// create): si esportano quelle decifrate in memoria, ricifrate con la password del file.
 /// Dalla 1.2 il file contiene anche i profili di credenziali (le loro password seguono le stesse regole) e i testi rapidi;
 /// la 1.1 legge questi file ignorando le parti nuove.
 /// </summary>
@@ -135,6 +174,34 @@ public static class RdpmFile
                 CryptographicOperations.ZeroMemory(key);
         }
         return JsonSerializer.Serialize(file, JsonOptions);
+    }
+
+    /// <summary>
+    /// Password che un'esportazione cifrata porta nel file: quelle delle connessioni e dei profili di credenziali
+    /// leggibili in memoria (non quelle DPAPI di un altro utente o PC, che restano illeggibili).
+    /// </summary>
+    public static int CountExportablePasswords(ConnectionsDocument doc)
+    {
+        ArgumentNullException.ThrowIfNull(doc);
+        return doc.Connections.Count(c => !string.IsNullOrEmpty(c.Password))
+               + doc.CredentialProfiles.Count(p => !string.IsNullOrEmpty(p.Password));
+    }
+
+    /// <summary>
+    /// Scelta proposta nell'esportazione (dalla 1.5.1): con le password, cifrate, quando ce n'è almeno una salvata;
+    /// senza, se non ce ne sono.
+    /// </summary>
+    public static bool ProposeWithPasswords(ConnectionsDocument doc) => CountExportablePasswords(doc) > 0;
+
+    /// <summary>Avviso da mostrare se si sceglie di esportare senza password pur avendone; null = nessun avviso.</summary>
+    public static string? WithoutPasswordsWarning(ConnectionsDocument doc)
+    {
+        int n = CountExportablePasswords(doc);
+        if (n == 0)
+            return null;
+        var what = n == 1 ? "c'è 1 password salvata" : $"ci sono {n} password salvate";
+        return $"Nelle connessioni e nei profili di credenziali {what}. Senza password il file non le conterrà " +
+               "e sull'altro PC andranno reinserite una per una.\n\nEsportare comunque senza password?";
     }
 
     public static void Save(string path, IEnumerable<RdpConnection> connections, IEnumerable<string>? groups = null,
@@ -257,7 +324,7 @@ public static class RdpmFile
         // Profili: un doppione (stesso Id, o stesso nome/utente/dominio) non si aggiunge e le connessioni importate
         // che lo usavano vengono collegate a quello già presente.
         var profileMap = new Dictionary<Guid, Guid>();
-        int profilesAdded = 0;
+        int profilesAdded = 0, passwords = 0, linked = 0;
         foreach (var p in imported.CredentialProfiles)
         {
             var existing = target.CredentialProfiles.FirstOrDefault(e => e.Id == p.Id)
@@ -265,13 +332,18 @@ public static class RdpmFile
             if (existing is not null)
             {
                 if (!existing.HasPassword && !string.IsNullOrEmpty(p.Password))
+                {
                     existing.Password = p.Password;
+                    passwords++;
+                }
                 profileMap[p.Id] = existing.Id;
                 continue;
             }
             target.CredentialProfiles.Add(p);
             profileMap[p.Id] = p.Id;
             profilesAdded++;
+            if (!string.IsNullOrEmpty(p.Password))
+                passwords++;
         }
         // Un riferimento a un profilo che non è nel file resta solo se il profilo esiste già qui.
         Guid? MapProfile(Guid? id) =>
@@ -290,14 +362,26 @@ public static class RdpmFile
             var existing = target.Connections.FirstOrDefault(e => e.Id == c.Id || e.IsSameTarget(c));
             if (existing is not null)
             {
-                // Il doppione non si aggiunge, ma se a quella esistente manca la password si prende quella del file.
+                // Il doppione non si aggiunge, ma se a quella esistente manca la password si prende quella del file;
+                // se nel file usava un profilo e qui non ne ha, la si collega al profilo, che porta la password.
                 if (!existing.HasPassword && !string.IsNullOrEmpty(c.Password))
+                {
                     existing.Password = c.Password;
+                    passwords++;
+                }
+                else if (!existing.HasPassword && existing.CredentialProfileId is null
+                         && target.FindProfile(c.CredentialProfileId) is not null)
+                {
+                    existing.CredentialProfileId = c.CredentialProfileId;
+                    linked++;
+                }
                 skipped++;
                 continue;
             }
             target.Connections.Add(c);
             added++;
+            if (!string.IsNullOrEmpty(c.Password))
+                passwords++;
         }
         foreach (var g in imported.Groups)
             target.AddFolder("", g);
@@ -316,7 +400,7 @@ public static class RdpmFile
             target.Settings.ApplyPortable(imported.Settings);
         if (mode == ImportMode.Replace)
             target.Settings.OpenSessions.RemoveAll(id => target.Find(id) is null);
-        return new ImportResult(added, skipped, removed, profilesAdded, quickTextsAdded, settingsApplied);
+        return new ImportResult(added, skipped, removed, profilesAdded, quickTextsAdded, settingsApplied, passwords, linked);
     }
 
     private static RdpmDocument ReadDocument(string json)
