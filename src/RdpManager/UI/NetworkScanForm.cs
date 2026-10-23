@@ -228,7 +228,14 @@ internal sealed class NetworkScanForm : Form
             // Si prova l'IP 100.x: non dipende dal DNS di Tailscale.
             var host = pc.Aliases.FirstOrDefault(a => IpRange.TryParseIPv4(a, out _)) ?? pc.Address;
             bool ok;
-            await gate.WaitAsync(ct);
+            try
+            {
+                await gate.WaitAsync(ct);
+            }
+            catch (OperationCanceledException)
+            {
+                return; // finestra chiusa mentre si aspettava il turno
+            }
             try
             {
                 ok = await _sources.RdpCheck(host, pc.Port, ct);
