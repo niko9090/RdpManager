@@ -456,6 +456,10 @@ acceso; per la scheda Tailscale serve Tailscale installato e connesso (e, per il
   al formato 7, fatta con la libreria installata su copie dei dati, conserva connessioni, cartelle,
   impostazioni e password cifrate (nella connessione e nel profilo di credenziali, con la connessione
   ancora collegata al profilo). Defender senza minacce sul Setup, sull'exe portatile e sui file installati.
+- **Aggiornamento silenzioso 1.5.1 → 1.6.0** (23/10/2026), stessa procedura: Setup 1.6.0 identico a quello
+  della release (SHA256 verificato), installer terminato con codice 0, exe alla 1.6.0, app riaperta da sola
+  («RdpManager 1.6.0 - Desktop remoti») e chiusa normalmente, connections.json identico (SHA256) a prima.
+  Defender senza minacce sul Setup e sui file installati.
 
 - **Provato con clic e tasti veri** sull'app compilata (ottobre 2026, un monitor, connessioni finte):
   doppio clic sull'elenco, Ctrl+Alt+Invio dentro la sessione, barra in alto dal bordo e clic su una
