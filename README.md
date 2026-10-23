@@ -22,6 +22,10 @@ delle scorciatoie con **F1**.
 Dalla 1.5: a schermo intero **in alto non c'è niente**; le sessioni connesse stanno nella **barra a schermo
 intero**, personalizzabile: a sinistra, a destra o in basso, fissa (la sessione non viene coperta), a
 comparsa o nascosta, con larghezza, ritardo e sezioni scelte e ordinate (vedi «Schermo intero dell'app»).
+Dalla 1.5.1: barra a schermo intero e barra laterale **ridimensionabili trascinandone il bordo**, pulsante
+*Monitor successivo* nella barra a schermo intero, `.rdpm` che porta le **password** di connessioni e
+profili di credenziali (proposte di serie, con un avviso se si sceglie di escluderle) e riepilogo
+dell'importazione.
 Le novità di ogni versione sono in [CHANGELOG.md](CHANGELOG.md).
 
 Le sessioni usano il controllo ActiveX Desktop remoto di Windows (`mstscax.dll`, classe
@@ -343,6 +347,21 @@ Da fare su un PC dove RdpManager 1.4.0 è installato, con almeno due PC remoti c
 | 10 | Sezione «Connessioni»: scrivi parte di un nome, Invio | L'elenco si restringe e Invio apre (o porta a) quella connessione. |
 | 11 | *File → Esporta (.rdpm)* con *Includi le impostazioni*; importa su un altro PC con *Applica anche le impostazioni* | La barra arriva con posizione, modalità e ordine delle sezioni. |
 
+## Prova manuale 1.5.1
+
+Da fare su un PC dove RdpManager 1.5.0 è installato, con due monitor se possibile.
+
+| # | Passo | Risultato atteso |
+|---|---|---|
+| 1 | Lascia che la 1.5.0 proponga l'aggiornamento e scegli «Aggiorna ora» | Si aggiorna in silenzio e si riapre con connessioni, profili, password e impostazioni di prima. |
+| 2 | **Ctrl+Alt+Invio**, poi nella barra a schermo intero «Azioni sulla sessione» → *Monitor successivo* | L'app passa a schermo intero sull'altro monitor (con un solo monitor il pulsante c'è ma è spento). Prova con la barra a sinistra, a destra e in basso. |
+| 3 | Porta il mouse sul bordo della barra verso la sessione e trascinalo | Il cursore diventa ↔ (↕ in basso); la barra si allarga, la sessione si restringe senza essere coperta e dopo circa 1 s la risoluzione si adatta. Oltre 600 pixel (o metà schermo) e sotto 120 non va. |
+| 4 | Esci e rientra a schermo intero; chiudi e riapri l'app | La barra ha la misura scelta trascinando, uguale a *Impostazioni → Schermo intero → Larghezza*. |
+| 5 | Fuori dallo schermo intero trascina il bordo destro della barra laterale (fissa, poi a comparsa) | Si allarga e si restringe; riaprendo l'app ha la stessa larghezza. |
+| 6 | Con connessioni e un profilo di credenziali con password: *File → Esporta connessioni (.rdpm)* | Il dialogo dice quante password ci sono e propone «Con le password, cifrate». |
+| 7 | Scegli «Senza password» → *Esporta…* | Un avviso dice quante password non andranno nel file e chiede conferma; con «No» si torna al dialogo. |
+| 8 | Esporta con le password; su un altro PC (o utente) importa con *Unisci*, dove una delle connessioni c'è già senza password | Un riepilogo dice quante connessioni, password e profili sono stati importati; la connessione già presente ora ha la password (o usa il profilo) e le connessioni con il profilo si connettono senza chiedere niente. |
+
 ## Cosa è stato provato e cosa no
 
 - **Provato automaticamente** (`dotnet test`): modello, salvataggio JSON e cifratura DPAPI, file `.rdp`,
@@ -372,6 +391,17 @@ Da fare su un PC dove RdpManager 1.4.0 è installato, con almeno due PC remoti c
   nell'ordine scelto, pulsanti rapidi = azioni delle scorciatoie, ricerca fra le connessioni, impostazioni;
   con il **mouse vero**: il bordo in alto non apre niente, il bordo sinistro apre la barra a comparsa.
   Schermate in `artifacts\screenshots-1.5` (prova `SaveScreenshotsOfTheV15FullScreenBar`).
+- **1.5.1** (`dotnet test`): `.rdpm` in andata e ritorno con la password nella connessione e nel profilo di
+  credenziali, connessioni ricollegate al profilo (anche per il gateway), unione con una connessione già
+  presente senza password (riceve la password o il profilo) o con la password (resta la sua), profilo già
+  presente con e senza password, sostituzione, password che restano dopo il salvataggio in
+  `connections.json`, scelta proposta e avviso dell'esportazione, riepilogo dell'importazione; limiti della
+  misura della barra trascinando il bordo (120-600 pixel, metà schermo) nelle tre posizioni, larghezza della
+  barra laterale (180-600, 300 pixel alle sessioni), compatibilità con i `connections.json` dalla 1.0.0 alla
+  1.5.0. Nella finestra vera: pulsante *Monitor successivo* nella barra a sinistra, a destra e in basso,
+  bordo trascinato con la sessione che si adatta e la misura salvata, barra laterale fissa e a comparsa,
+  dialogo di esportazione e riepilogo dell'importazione. Schermate in `artifacts\screenshots-1.5.1`
+  (prova `SaveScreenshotsOfTheV151Fixes`).
 - **Antivirus**: scansione di Microsoft Defender sui file della 1.2.0 e della 1.3.0 (nessuna minaccia).
 - **Aggiornamento silenzioso provato a mano** (21/10/2026) sull'installazione del PC di sviluppo, che era
   alla 1.1.0: backup di programma e dati, Setup 1.3.0 della release con SHA256 verificato,
@@ -435,6 +465,8 @@ Windows Sandbox.
   Barra laterale fissa*). A comparsa la barra si nasconde e riappare portando il mouse sul bordo
   sinistro della finestra, sopra le sessioni, anche a schermo intero. **Ctrl+Alt+B** la mostra o la
   nasconde in entrambi i modi.
+- **Larghezza** (dalla 1.5.1): si trascina il bordo destro della barra, fissa o a comparsa; da 180 a 600
+  pixel, lasciando almeno 300 pixel alle sessioni. Resta salvata.
 - In cima: **Preferiti** (★, clic destro → *Preferita* o Ctrl+Shift+F) e **Recenti** (ultime 8
   connessioni riuscite). Poi le cartelle.
 - **Stato** di ogni connessione, nel pallino sull'icona e nel suggerimento: *Connessa* (verde pieno),
@@ -543,17 +575,24 @@ Windows Sandbox.
 
 ### Esportazione e importazione (.rdpm)
 
-- **File → Esporta connessioni (.rdpm)**: scrive tutte le connessioni e le cartelle in un file.
-  Si sceglie fra *senza password* (le password non escono dal PC) e *con le password, cifrate con
-  una password del file* (almeno 8 caratteri; AES-256-GCM con chiave da PBKDF2-SHA256). Nel file
-  non c'è mai una password in chiaro.
+- **File → Esporta connessioni (.rdpm)**: scrive tutte le connessioni, le cartelle, i profili di
+  credenziali e i testi rapidi in un file. Si sceglie fra *con le password, cifrate con una password del
+  file* (almeno 8 caratteri; AES-256-GCM con chiave da PBKDF2-SHA256) e *senza password* (le password
+  non escono dal PC). Dalla 1.5.1, se ci sono password salvate (nelle connessioni o nei profili di
+  credenziali) la scelta proposta è **con le password** e il dialogo dice quante sono; scegliendo *senza*
+  compare un avviso che chiede conferma. Nel file non c'è mai una password in chiaro.
 - **File → Importa connessioni (.rdpm)**: se il file contiene password chiede la password del file
   (se è sbagliata non importa nulla e la richiede). Poi si sceglie:
   - **Unisci**: aggiunge solo le connessioni che mancano; un doppione (stesso host, porta, utente e
     dominio, oppure stesso identificativo) non viene duplicato, al massimo riceve la password se non
-    l'aveva;
+    l'aveva (o, se nel file usava un profilo di credenziali, viene collegato a quel profilo); un profilo
+    già presente senza password riceve quella del file. Le password che ci sono già non si toccano;
   - **Sostituisci**: connessioni e cartelle attuali vengono cancellate e sostituite da quelle del file
     (chiede conferma); profili di credenziali e testi rapidi restano, e quelli del file si aggiungono.
+- Le connessioni che usano un **profilo di credenziali** restano collegate al profilo, che arriva con la
+  sua password.
+- Alla fine un **riepilogo** dice quante connessioni sono state aggiunte o erano già presenti, quante
+  password e quanti profili di credenziali sono stati importati.
 - Serve per spostare l'elenco su un altro PC o un altro utente Windows: il `connections.json` non
   basta, perché le sue password DPAPI valgono solo per l'utente che le ha salvate.
 - **Impostazioni dell'app** (dalla 1.3): esportando si può spuntare *Includi le impostazioni dell'app*
@@ -640,7 +679,9 @@ Windows Sandbox.
     sessione tenendo il mouse sul bordo del suo lato per il *ritardo di comparsa* scelto, si richiude
     allontanandolo) o **nascosta** (solo con **Ctrl+Alt+B**). Con la barra fissa Ctrl+Alt+B la nasconde e
     la rimostra.
-  - *Larghezza* (in basso: altezza) e *ritardo di comparsa*.
+  - *Larghezza* (in basso: altezza) e *ritardo di comparsa*. Dalla 1.5.1 la misura si cambia anche
+    **trascinando il bordo** della barra verso la sessione (il cursore diventa ↔ o ↕): la sessione si
+    adatta subito, i limiti sono 120-600 pixel e metà dello schermo, e la misura resta salvata.
   - *Sezioni*, spuntate e ordinate con Su/Giù: **sessioni connesse** (con miniatura o compatte; le
     connesse hanno il numero di Ctrl+Alt+1, 2, …, clic per passarci), **preferiti**, **tutte le
     connessioni** con la casella di ricerca (Invio o doppio clic per connettersi), **spazi di lavoro**,

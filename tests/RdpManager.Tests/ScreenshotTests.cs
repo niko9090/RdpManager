@@ -283,6 +283,103 @@ public sealed class ScreenshotTests : IDisposable
             ExceptionDispatchInfo.Throw(failure);
     }
 
+    /// <summary>
+    /// 1.5.1: monitor successivo nella barra (sinistra, destra, in basso), barra allargata trascinandone il bordo,
+    /// dialogo di esportazione che propone le password, barra laterale della finestra allargata.
+    /// </summary>
+    [ScreenshotFact]
+    public void SaveScreenshotsOfTheV151Fixes()
+    {
+        var outDir = Environment.GetEnvironmentVariable(FolderVariable)!;
+        Directory.CreateDirectory(outDir);
+        RdpConnection C(string name, string group, string? color = null) =>
+            new() { Name = name, Host = name.ToLowerInvariant().Replace(' ', '-') + ".invalid", Group = group, Color = color, Password = "x" };
+        var profile = new CredentialProfile { Name = "Amministratore", Username = "admin", Password = "y" };
+        var doc = new ConnectionsDocument
+        {
+            Connections = [C("Magazzino", "Clienti/Rossi", "#E67E22"), C("Ufficio", "Clienti/Rossi", "#2E86DE"), C("Laboratorio", "Interni", "#27AE60")],
+            CredentialProfiles = [profile],
+        };
+        doc.Connections[2].Password = null;
+        doc.Connections[2].CredentialProfileId = profile.Id;
+        doc.Settings.Theme = AppTheme.Dark;
+        doc.Settings.SidebarWidth = 380;
+        Directory.CreateDirectory(_dir);
+        var store = new ConnectionStore(Path.Combine(_dir, "connections.json"));
+        store.Save(doc);
+
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                using var form = new MainForm(store) { StartPosition = FormStartPosition.Manual, Location = new Point(40, 40), Size = new Size(1280, 800) };
+                form.Show();
+                Pump(400);
+                Save(form, Path.Combine(outDir, "19-barra-laterale-allargata.png"));
+                foreach (var c in form.Document.Connections)
+                    form.OpenSession(c);
+                Pump(300);
+                var views = form.AllViews.ToList();
+                PumpUntil(() => views.All(v => v.State == SessionState.Disconnected), 30_000);
+                foreach (var v in views)
+                    v.SetStateForTests(SessionState.Connected, "Connessa");
+                form.Tabs.SelectedIndex = 0;
+                Pump(300);
+
+                form.ToggleFullScreen();
+                var sections = new List<BarSectionSetting> { new(BarSection.SessionActions), new(BarSection.ConnectedSessions), new(BarSection.QuickButtons) };
+                (string File, BarPosition Position, int Drag)[] shots =
+                [
+                    ("20-monitor-barra-sinistra-allargata.png", BarPosition.Left, 120),
+                    ("21-monitor-barra-destra.png", BarPosition.Right, 0),
+                    ("22-monitor-barra-in-basso.png", BarPosition.Bottom, 0),
+                ];
+                foreach (var (file, position, drag) in shots)
+                {
+                    form.ApplyFullScreenBarForTests(new FullScreenBarSettings
+                    {
+                        Position = position, Mode = BarMode.Fixed, Width = position == BarPosition.Bottom ? 210 : 260,
+                        Sections = sections.Select(x => new BarSectionSetting(x.Kind, x.Visible)).ToList(),
+                    });
+                    Pump(300);
+                    if (drag != 0)
+                    {
+                        var grip = form.FullScreenBarControl.Grip;
+                        var start = grip.PointToScreen(Point.Empty);
+                        grip.SimulateDrag(start, new Point(start.X + drag, start.Y));
+                    }
+                    Pump(500);
+                    Save(form, Path.Combine(outDir, file));
+                }
+                form.ToggleFullScreen();
+                Pump(200);
+
+                using (var export = new RdpmExportDialog(form.Document) { StartPosition = FormStartPosition.Manual, Location = new Point(200, 200) })
+                {
+                    ThemeManager.Apply(export);
+                    export.Show(form);
+                    Pump(400);
+                    Save(export, Path.Combine(outDir, "23-esporta-con-le-password.png"));
+                    export.Close();
+                }
+                foreach (var v in views)
+                    v.SetStateForTests(SessionState.Disconnected, "Disconnessa");
+                form.ExitApp();
+                Pump(200);
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        Assert.True(thread.Join(TimeSpan.FromSeconds(120)));
+        if (failure is not null)
+            ExceptionDispatchInfo.Throw(failure);
+    }
+
     private static void Save(Form form, string path)
     {
         form.Activate();
