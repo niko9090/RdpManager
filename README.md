@@ -418,6 +418,12 @@ Da fare su un PC dove RdpManager 1.5.0 è installato, con due monitor se possibi
   SHA256 verificato, installer terminato con codice 0, exe alla 1.5.0, app riaperta da sola («RdpManager
   1.5.0 - Desktop remoti») e chiusa normalmente, 0 differenze negli SHA256 dei dati utente, Defender senza
   minacce sul Setup, sull'exe portatile e sui file installati.
+- **Aggiornamento silenzioso 1.5.0 → 1.5.1** (23/10/2026), stessa procedura: Setup 1.5.1 della release con
+  SHA256 verificato, installer terminato con codice 0, exe alla 1.5.1, app riaperta da sola («RdpManager
+  1.5.1 - Desktop remoti») e chiusa normalmente, connections.json identico (SHA256) a prima. La conversione
+  al formato 7, fatta con la libreria installata su copie dei dati, conserva connessioni, cartelle,
+  impostazioni e password cifrate (nella connessione e nel profilo di credenziali, con la connessione
+  ancora collegata al profilo). Defender senza minacce sul Setup, sull'exe portatile e sui file installati.
 
 - **Provato con clic e tasti veri** sull'app compilata (ottobre 2026, un monitor, connessioni finte):
   doppio clic sull'elenco, Ctrl+Alt+Invio dentro la sessione, barra in alto dal bordo e clic su una
