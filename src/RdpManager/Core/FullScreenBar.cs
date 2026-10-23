@@ -280,6 +280,43 @@ public static class FullScreenBarLayout
         return new Result(session, bar, false);
     }
 
+    /// <summary>Spessore della maniglia sul bordo interno della barra: trascinandola si cambia la misura (dalla 1.5.1).</summary>
+    public const int GripThickness = 6;
+
+    /// <summary>
+    /// Maniglia per ridimensionare, in coordinate della barra (0,0 = angolo della barra): sul bordo verso la sessione,
+    /// cioè a destra della barra sinistra, a sinistra della barra destra, in alto della barra in basso.
+    /// </summary>
+    public static Rectangle ResizeGrip(Size bar, BarPosition position) => position switch
+    {
+        BarPosition.Right => new Rectangle(0, 0, Math.Min(GripThickness, bar.Width), bar.Height),
+        BarPosition.Bottom => new Rectangle(0, 0, bar.Width, Math.Min(GripThickness, bar.Height)),
+        _ => new Rectangle(Math.Max(0, bar.Width - GripThickness), 0, Math.Min(GripThickness, bar.Width), bar.Height),
+    };
+
+    /// <summary>Misura massima della barra in <paramref name="area"/>: il limite delle impostazioni, mai oltre metà area.</summary>
+    public static int MaxThickness(Rectangle area, BarPosition position)
+    {
+        int half = (position == BarPosition.Bottom ? area.Height : area.Width) / 2;
+        return Math.Clamp(half, FullScreenBarSettings.MinWidth, FullScreenBarSettings.MaxWidth);
+    }
+
+    /// <summary>
+    /// Nuova larghezza (o altezza, in basso) trascinando la maniglia da <paramref name="dragStart"/> a
+    /// <paramref name="current"/> (coordinate dello schermo): la barra cresce quando il bordo va verso la sessione,
+    /// sempre entro <see cref="FullScreenBarSettings.MinWidth"/> e <see cref="MaxThickness"/>.
+    /// </summary>
+    public static int DragThickness(BarPosition position, int startThickness, Point dragStart, Point current, Rectangle area)
+    {
+        int delta = position switch
+        {
+            BarPosition.Right => dragStart.X - current.X,
+            BarPosition.Bottom => dragStart.Y - current.Y,
+            _ => current.X - dragStart.X,
+        };
+        return Math.Clamp(startThickness + delta, FullScreenBarSettings.MinWidth, MaxThickness(area, position));
+    }
+
     /// <summary>Vero se il punto (coordinate dello schermo) sta sul bordo di <paramref name="area"/> dove si apre la barra.</summary>
     public static bool IsOnRevealEdge(Point p, Rectangle area, BarPosition position)
     {

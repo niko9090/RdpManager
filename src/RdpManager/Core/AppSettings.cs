@@ -38,6 +38,27 @@ public enum SidebarMode
     AutoHide,
 }
 
+/// <summary>Limiti della barra laterale della finestra, ridimensionabile trascinandone il bordo (dalla 1.5.1).</summary>
+public static class WindowSidebar
+{
+    public const int DefaultWidth = 280;
+    public const int MinWidth = 180;
+    public const int MaxWidth = 600;
+
+    /// <summary>Spazio che resta sempre alle sessioni accanto alla barra.</summary>
+    public const int MinSessionWidth = 300;
+
+    /// <summary>
+    /// Larghezza da usare in una finestra larga <paramref name="available"/>: quella salvata entro i limiti, ridotta se
+    /// non lascerebbe <see cref="MinSessionWidth"/> alle sessioni (ma mai sotto <see cref="MinWidth"/>).
+    /// </summary>
+    public static int Fit(int width, int available)
+    {
+        int max = Math.Clamp(available - MinSessionWidth, MinWidth, MaxWidth);
+        return Math.Clamp(width, MinWidth, max);
+    }
+}
+
 /// <summary>Impostazioni dell'app, salvate in connections.json insieme alle connessioni.</summary>
 public sealed class AppSettings
 {
@@ -112,6 +133,14 @@ public sealed class AppSettings
     /// </summary>
     public FullScreenBarSettings? FullScreenBar { get; set; }
 
+    // --- Dalla 1.5.1 ---
+
+    /// <summary>
+    /// Larghezza della barra laterale della finestra, scelta trascinandone il bordo. Assente nei file 1.0-1.5:
+    /// vale <see cref="WindowSidebar.DefaultWidth"/>, la larghezza fissa di prima.
+    /// </summary>
+    public int SidebarWidth { get; set; } = WindowSidebar.DefaultWidth;
+
     /// <summary>La barra a schermo intero, creata dalle impostazioni di prima se manca.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public FullScreenBarSettings Bar => FullScreenBar ??= FullScreenBarSettings.FromLegacy(SidebarMode);
@@ -157,6 +186,7 @@ public sealed class AppSettings
         VerboseLog = src.VerboseLog;
         ConnectionOrder = src.ConnectionOrder;
         LockAfterMinutes = src.LockAfterMinutes;
+        SidebarWidth = src.SidebarWidth;
         FullScreenBar = src.Bar.Clone();
         PreferredMonitor = monitor;
         OpenSessions = open;
@@ -210,6 +240,7 @@ public sealed class AppSettings
         if (LockPin is { IsValid: false })
             LockPin = null;
         LockAfterMinutes = Math.Clamp(LockAfterMinutes, 0, 24 * 60);
+        SidebarWidth = Math.Clamp(SidebarWidth, WindowSidebar.MinWidth, WindowSidebar.MaxWidth);
         Bar.Normalize();
     }
 }

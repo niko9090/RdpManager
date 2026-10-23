@@ -171,7 +171,7 @@ public class RdpmFileTests
 
         var result = RdpmFile.ApplyImport(target, imported, ImportMode.Merge);
 
-        Assert.Equal(new ImportResult(Added: 3, Skipped: 3, Removed: 0), result);
+        Assert.Equal(new ImportResult(Added: 3, Skipped: 3, Removed: 0, PasswordsImported: 2), result);
         Assert.Equal(5, target.Connections.Count);
         Assert.Equal(["Mio A", "Mio D", "Server B", "Senza password", "Nuovo"], target.Connections.Select(c => c.Name));
         // Il doppione resta quello locale, ma riceve la password che non aveva.
