@@ -87,10 +87,16 @@ Si scelgono in *File → Impostazioni → Avvio e aggiornamenti*:
   file in **`SHA256SUMS.txt`** allegato alla release; i file non validi vengono cancellati. Solo dopo la
   verifica compare un **avviso non modale** con le novità della release e tre scelte:
   - **Aggiorna ora**: se ci sono sessioni aperte chiede conferma (verranno chiuse e poi riaperte), salva le
-    sessioni aperte, chiude l'app e avvia l'installer in silenzio
-    (`/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER /RELAUNCH=1`); a installazione finita
-    RdpManager si riapre con le stesse sessioni;
-  - **Alla chiusura**: installa nello stesso modo quando chiudi l'app, senza riaprirla;
+    sessioni aperte, le disconnette in ordine e chiude l'app. Dalla 1.6.1 l'installazione la fa un
+    **programma di aggiornamento separato**: prima di chiudersi l'app copia la versione in uso in
+    `%LOCALAPPDATA%\RdpManager\update-runner\riserva` e avvia quella copia con `--aggiorna`. La copia aspetta
+    che RdpManager sia chiuso, ricontrolla lo SHA256, avvia l'installer in silenzio
+    (`/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER /LOG=…`), controlla il codice di uscita e la
+    versione installata e riapre RdpManager con le stesse sessioni. Se qualcosa va storto rimette la
+    versione precedente dalla copia e la riapre con un messaggio. I passi finiscono in
+    `%LOCALAPPDATA%\RdpManager\logs\aggiornamento.log`, il log dell'installer accanto (`setup-X.Y.Z-….log`);
+  - **Alla chiusura**: installa nello stesso modo quando chiudi l'app, senza riaprirla (la riapre solo per
+    avvisare se l'aggiornamento non è riuscito);
   - **Più tardi**: lo ripropone dopo 24 ore o al prossimo avvio.
 - **Solo avviso**: segnala la versione nuova nella barra di stato; clic = stesso avviso.
 - **Spenti**: nessun controllo automatico.
@@ -365,6 +371,16 @@ Da fare su un PC dove RdpManager 1.5.0 è installato, con due monitor se possibi
 | 6 | Con connessioni e un profilo di credenziali con password: *File → Esporta connessioni (.rdpm)* | Il dialogo dice quante password ci sono e propone «Con le password, cifrate». |
 | 7 | Scegli «Senza password» → *Esporta…* | Un avviso dice quante password non andranno nel file e chiede conferma; con «No» si torna al dialogo. |
 | 8 | Esporta con le password; su un altro PC (o utente) importa con *Unisci*, dove una delle connessioni c'è già senza password | Un riepilogo dice quante connessioni, password e profili sono stati importati; la connessione già presente ora ha la password (o usa il profilo) e le connessioni con il profilo si connettono senza chiedere niente. |
+
+## Prova manuale 1.6.1
+
+Da fare su un PC dove RdpManager 1.6.0 è installato, con almeno due sessioni connesse a un PC di prova.
+
+| # | Passo | Risultato atteso |
+|---|---|---|
+| 1 | Con due sessioni connesse, lascia che la 1.6.0 proponga l'aggiornamento e scegli «Aggiorna ora» | L'app si chiude; l'installer aspetta che sia chiusa, aggiorna in silenzio e la riapre alla 1.6.1 con le due sessioni; connessioni e impostazioni uguali a prima. |
+| 2 | Alla versione successiva (1.7.0), di nuovo con due sessioni connesse, «Aggiorna ora» | Compare «Aggiornamento di RdpManager in corso…»; poi l'app si riapre aggiornata con le sessioni. In `%LOCALAPPDATA%\RdpManager\logs` ci sono `aggiornamento.log` (attesa, verifica, codice 0, versione verificata, riaperto) e il log dell'installer. |
+| 3 | Prova di errore: chiudi RdpManager, avvialo da un prompt con `set RDPMANAGER_PROVA_AGGIORNAMENTO_FALLITO=1`, poi «Aggiorna ora» | Il programma di aggiornamento installa, finge che la verifica della versione fallisca, rimette la versione di prima e la riapre con il messaggio «L'aggiornamento … non è riuscito … È stata riaperta la versione precedente». |
 
 ## Prova manuale 1.6.0
 

@@ -1,5 +1,27 @@
 # Novità di RdpManager
 
+## 1.6.1
+
+**Aggiornamento automatico con le sessioni aperte, corretto**
+- Prima, con «Aggiorna ora» e delle sessioni connesse, l'installer partiva mentre RdpManager stava ancora
+  chiudendo le connessioni: trovava i file in uso e l'aggiornamento poteva fallire in silenzio, senza
+  riaprire l'app.
+- Ora «Aggiorna ora» **salva le sessioni aperte**, le **disconnette in ordine** (senza riconnessioni
+  automatiche) e chiude l'app. Prima di chiudersi copia la versione in uso in
+  `%LOCALAPPDATA%\RdpManager\update-runner\riserva` e da lì avvia il **programma di aggiornamento**, che:
+  aspetta che RdpManager sia davvero chiuso; ricontrolla lo SHA256 dell'installer (**un file non verificato
+  non viene mai eseguito**); installa in silenzio scrivendo un **log**
+  (`%LOCALAPPDATA%\RdpManager\logs\setup-X.Y.Z-….log`, più `aggiornamento.log` con i passi); controlla il
+  codice di uscita e la **versione installata**; riapre RdpManager, che riapre le sessioni di prima.
+  Intanto una finestrella dice «Aggiornamento di RdpManager in corso…».
+- **Se l'aggiornamento non riesce** (installer fallito o troppo lento, versione sbagliata, file non
+  verificato) rimette la **versione precedente** dalla copia di riserva e la riapre con un messaggio che
+  spiega cosa è successo e dove sta il log. Senza una copia di riserva completa non installa nulla.
+- Anche «Alla chiusura» usa il programma di aggiornamento (senza riaprire l'app se va tutto bene).
+- L'installer, quando parte in silenzio, aspetta fino a 60 secondi che `RdpManager.exe` sia chiuso e, se
+  resta appeso, lo chiude: così anche l'aggiornamento dalla 1.6.0 (che avvia l'installer direttamente)
+  non trova più i file in uso.
+
 ## 1.6.0
 
 **Cerca PC in rete** (*Strumenti → Cerca PC in rete…*, o il pulsante «Cerca PC» in cima alla barra laterale)
