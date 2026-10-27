@@ -148,6 +148,18 @@ public sealed class UiV13Tests : IDisposable
 
     // ---------- aggiornamento automatico con conferma ----------
 
+    /// <summary>Installazione finta in una cartella temporanea: il programma di aggiornamento ne fa la copia di riserva.</summary>
+    private void UseFakeInstall(MainForm form)
+    {
+        var install = Path.Combine(_dir, "installata");
+        Directory.CreateDirectory(Path.Combine(install, "runtimes"));
+        File.WriteAllText(Path.Combine(install, UpdateJob.ExeName), "MZ app finta");
+        File.WriteAllText(Path.Combine(install, InstallLocation.UninstallerName), "MZ disinstallatore finto");
+        File.WriteAllText(Path.Combine(install, "runtimes", "libreria.dll"), "dll finta");
+        form.InstallDirOverride = install;
+        form.UpdateRunnerFolder = Path.Combine(_dir, "update-runner");
+    }
+
     private PendingUpdate PrepareVerified(MainForm form, string version = "9.9.9")
     {
         var path = Path.Combine(_dir, $"RdpManager-Setup-{version}.exe");
@@ -169,6 +181,7 @@ public sealed class UiV13Tests : IDisposable
             using var form = new MainForm(StoreWith(Unreachable("Uno"))) { StartPosition = FormStartPosition.Manual };
             form.StartInstaller = started.Add;
             form.PortableOverride = false;
+            UseFakeInstall(form);
             form.Show();
             Pump(300);
             PrepareVerified(form);
@@ -190,13 +203,20 @@ public sealed class UiV13Tests : IDisposable
             Pump(200);
             Assert.True(form.IsDisposed);
         });
+        // Alla chiusura parte il programma di aggiornamento (la copia di riserva), che installa senza riaprire.
         var psi = Assert.Single(started);
-        Assert.Equal(InstallLocation.SilentArguments(relaunch: false), psi.Arguments);
-        Assert.EndsWith("RdpManager-Setup-9.9.9.exe", psi.FileName);
+        Assert.Equal(Path.Combine(_dir, "update-runner", "riserva", UpdateJob.ExeName), psi.FileName);
+        var job = UpdateJob.TryParse(psi.ArgumentList.ToList());
+        Assert.NotNull(job);
+        Assert.False(job.Relaunch);
+        Assert.EndsWith("RdpManager-Setup-9.9.9.exe", job.InstallerPath);
+        Assert.Equal(new Version(9, 9, 9), job.ExpectedVersion);
+        Assert.Equal(Environment.ProcessId, job.AppProcessId);
+        Assert.True(File.Exists(Path.Combine(job.BackupDir, "runtimes", "libreria.dll")));
     }
 
     [Fact]
-    public void UpdateNow_SavesSessionsForReopening_AndStartsTheSilentInstallerWithRelaunch()
+    public void UpdateNow_SavesSessionsForReopening_AndStartsTheUpdaterThatReopensTheApp()
     {
         var started = new List<ProcessStartInfo>();
         var store = StoreWith(Unreachable("Uno"), Unreachable("Due"));
@@ -207,6 +227,7 @@ public sealed class UiV13Tests : IDisposable
             using var form = new MainForm(store) { StartPosition = FormStartPosition.Manual };
             form.StartInstaller = started.Add;
             form.PortableOverride = false;
+            UseFakeInstall(form);
             form.ConfirmOverride = q => { asked = q; return true; };
             form.Show();
             Pump(300);
@@ -221,8 +242,14 @@ public sealed class UiV13Tests : IDisposable
         });
         Assert.Contains("2 sessioni aperte verranno chiuse", asked);
         var psi = Assert.Single(started);
-        Assert.Equal(InstallLocation.SilentArguments(relaunch: true), psi.Arguments);
-        Assert.Contains("/RELAUNCH=1", psi.Arguments);
+        var job = UpdateJob.TryParse(psi.ArgumentList.ToList());
+        Assert.NotNull(job);
+        Assert.True(job.Relaunch);
+        Assert.Equal(Path.Combine(_dir, "installata"), job.InstallDir);
+        Assert.Equal(Path.GetFullPath(store.FilePath), job.DataFile); // riapre lo stesso elenco
+        Assert.DoesNotContain("/RELAUNCH", job.InstallerArguments()); // riapre il programma di aggiornamento, non l'installer
+        Assert.Contains("/LOG=", job.InstallerArguments());
+        Assert.True(File.Exists(Path.Combine(job.BackupDir, UpdateJob.ExeName)));
 
         var saved = store.Load().Settings;
         Assert.True(saved.ReopenOnceAfterUpdate);
@@ -250,6 +277,7 @@ public sealed class UiV13Tests : IDisposable
             using var form = new MainForm(StoreWith(Unreachable("Uno"))) { StartPosition = FormStartPosition.Manual };
             form.StartInstaller = started.Add;
             form.PortableOverride = false;
+            UseFakeInstall(form);
             form.Show();
             Pump(300);
             var ready = PrepareVerified(form);

@@ -50,8 +50,11 @@ Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
 ; Chiude RdpManager se è aperto durante un aggiornamento. Dopo un aggiornamento silenzioso chiesto dall'app
-; (parametro /RELAUNCH=1) lo riapre la voce di [Run] con Check: ShouldRelaunch.
-CloseApplications=yes
+; (parametro /RELAUNCH=1, usato fino alla 1.6.0) lo riapre la voce di [Run] con Check: ShouldRelaunch.
+; Dalla 1.6.1 l'app avvia invece il suo programma di aggiornamento, che aspetta la chiusura, installa senza
+; /RELAUNCH e riapre da sé. In ogni caso InitializeSetup aspetta che RdpManager.exe sia davvero chiuso (con le
+; sessioni connesse l'uscita può durare qualche secondo) e «force» chiude l'app se resta appesa.
+CloseApplications=force
 RestartApplications=no
 
 [Languages]
@@ -76,6 +79,43 @@ Filename: "{app}\{#AppExe}"; Flags: nowait; Check: ShouldRelaunch
 ; non vengono mai toccati.
 
 [Code]
+// Vero se il file si può aprire in scrittura esclusiva: un exe in esecuzione non lo consente.
+function FileIsFree(const FileName: String): Boolean;
+var
+  Stream: TFileStream;
+begin
+  Result := True;
+  if not FileExists(FileName) then
+    Exit;
+  try
+    Stream := TFileStream.Create(FileName, fmOpenReadWrite or fmShareExclusive);
+    Stream.Free;
+  except
+    Result := False;
+  end;
+end;
+
+// Prima di installare: se RdpManager si sta ancora chiudendo (sessioni che si disconnettono) lo aspetta fino a
+// 60 secondi, così l'installazione non trova i file in uso. Se resta aperto ci pensa CloseApplications.
+function InitializeSetup: Boolean;
+var
+  Exe: String;
+  Waited: Integer;
+begin
+  Result := True;
+  if not WizardSilent then
+    Exit; // installazione a mano: CloseApplications chiede all'utente
+  Exe := ExpandConstant('{localappdata}\Programs\{#AppName}\{#AppExe}');
+  Waited := 0;
+  while (not FileIsFree(Exe)) and (Waited < 60000) do
+  begin
+    Sleep(500);
+    Waited := Waited + 500;
+  end;
+  if Waited > 0 then
+    Log(Format('Atteso %d ms la chiusura di RdpManager', [Waited]));
+end;
+
 // Vero se l'installer è stato avviato con /RELAUNCH=1 (o /RELAUNCH): solo allora l'app si riapre da sola.
 function ShouldRelaunch: Boolean;
 var
