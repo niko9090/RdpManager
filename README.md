@@ -382,6 +382,19 @@ Da fare su un PC dove RdpManager 1.6.0 è installato, con almeno due sessioni co
 | 2 | Alla versione successiva (1.7.0), di nuovo con due sessioni connesse, «Aggiorna ora» | Compare «Aggiornamento di RdpManager in corso…»; poi l'app si riapre aggiornata con le sessioni. In `%LOCALAPPDATA%\RdpManager\logs` ci sono `aggiornamento.log` (attesa, verifica, codice 0, versione verificata, riaperto) e il log dell'installer. |
 | 3 | Prova di errore: chiudi RdpManager, avvialo da un prompt con `set RDPMANAGER_PROVA_AGGIORNAMENTO_FALLITO=1`, poi «Aggiorna ora» | Il programma di aggiornamento installa, finge che la verifica della versione fallisca, rimette la versione di prima e la riapre con il messaggio «L'aggiornamento … non è riuscito … È stata riaperta la versione precedente». |
 
+**Esiti del 27/10/2026** (dettagli in `verifica/aggiornamento-1.6.1.md`, script `verifica/aggiornamento.ps1`), con due
+sessioni aperte in schede verso un PC di prova:
+
+- 1.6.0 → 1.6.1 (installer avviato come lo avvia la 1.6.0, con `/RELAUNCH=1`): **riuscito**. L'installer ha aspettato
+  la chiusura, ha installato (codice 0, log `/LOG` presente) e ha riaperto l'app alla 1.6.1 con le due schede;
+  `connections.json` (con le impostazioni) identico prima e dopo (SHA256).
+- Programma di aggiornamento della 1.6.1, installazione riuscita: **riuscito** (versione verificata, app riaperta con le
+  due schede, dati identici).
+- Installer con SHA256 sbagliato: **mai eseguito** (nessun log dell'installer), riaperta la 1.6.1 con il messaggio,
+  cartella installata e dati identici.
+- Installer che termina con errore (codice 1) ed errore simulato dopo l'installazione: **versione precedente rimessa**
+  dalla copia di riserva e riaperta con il messaggio e le due schede; cartella installata e dati identici.
+
 ## Prova manuale 1.6.0
 
 Da fare su un PC dove RdpManager 1.5.1 è installato, in una rete con almeno un PC con il Desktop remoto
