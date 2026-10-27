@@ -259,6 +259,13 @@ public sealed class RdpSessionView : UserControl
 
     private int MaxAttempts => Math.Clamp(Connection.AutoReconnectMaxAttempts, 0, ReconnectPolicy.MaxAllowedAttempts);
 
+    /// <summary>Disconnessione prima di chiudere l'app (aggiornamento): niente riconnessione automatica dopo.</summary>
+    public void DisconnectForShutdown()
+    {
+        _closing = true;
+        Disconnect();
+    }
+
     public void Disconnect()
     {
         _pendingConnect = false;

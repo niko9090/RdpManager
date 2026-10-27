@@ -107,6 +107,7 @@ public sealed partial class MainForm : Form
 
         Load += (_, _) => PlaceOnPreferredMonitor();
         Shown += (_, _) => ReopenSessions();
+        Shown += (_, _) => ShowUpdateFailure();
         if (_backgroundChecks)
         {
             Shown += async (_, _) => await CheckReachabilityAsync(_doc.Connections.ToList());

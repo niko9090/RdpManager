@@ -472,6 +472,8 @@ public sealed partial class MainForm
             _doc.Settings.OpenSessions = open;
             SaveConnections();
         }
+        if (_closingForUpdate)
+            DisconnectSessionsInOrder(views, TimeSpan.FromSeconds(8));
         UnregisterSessionHotkeys();
         _edgeTimer.Stop();
         _reachTimer.Stop();

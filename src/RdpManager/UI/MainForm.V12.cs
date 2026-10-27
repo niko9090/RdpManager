@@ -807,8 +807,9 @@ public sealed partial class MainForm
     }
 
     /// <summary>
-    /// «Aggiorna ora»: con sessioni aperte chiede conferma (verranno chiuse e riaperte), salva le sessioni per la
-    /// riapertura e chiude l'app; l'installer silenzioso parte alla chiusura e riapre RdpManager (/RELAUNCH=1).
+    /// «Aggiorna ora»: con sessioni aperte chiede conferma (verranno chiuse e riaperte), prepara il programma di
+    /// aggiornamento (copia della versione in uso, che fa anche da riserva), salva le sessioni, le disconnette in
+    /// ordine e chiude l'app; il programma di aggiornamento installa, verifica e riapre RdpManager con le sessioni.
     /// </summary>
     internal void InstallNow()
     {
@@ -823,6 +824,8 @@ public sealed partial class MainForm
                 "Aggiornamento", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
+        if (!PrepareUpdateRunner(quiet: false))
+            return;
         _installNowRequested = _closingForUpdate = true;
         ExitApp();
         if (!IsDisposed && Visible)
@@ -832,30 +835,124 @@ public sealed partial class MainForm
         }
     }
 
-    /// <summary>Ricontrolla lo SHA256 e avvia l'installer silenzioso; un file non verificato non si esegue mai.</summary>
+    /// <summary>Cartella del programma di aggiornamento (le prove ne usano una temporanea).</summary>
+    internal string UpdateRunnerFolder { get; set; } = UpdateJob.DefaultRunnerFolder;
+
+    /// <summary>Per le prove: cartella installata da usare al posto di quella dell'exe.</summary>
+    internal string? InstallDirOverride { get; set; }
+
+    private string InstallDir => InstallDirOverride ?? Path.GetDirectoryName(Path.GetFullPath(Application.ExecutablePath))!;
+    private string RunnerBackupDir => Path.Combine(UpdateRunnerFolder, "riserva");
+    private bool _runnerReady;
+
+    /// <summary>
+    /// Copia la cartella installata in update-runner\riserva: da lì parte il programma di aggiornamento (fuori dalla
+    /// cartella che l'installer sovrascrive) e da lì si rimette la versione in uso se l'aggiornamento non riesce.
+    /// </summary>
+    internal bool PrepareUpdateRunner(bool quiet)
+    {
+        _runnerReady = false;
+        var old = Cursor.Current;
+        try
+        {
+            Cursor.Current = Cursors.WaitCursor;
+            if (!quiet)
+                ShowNotice("Preparazione dell'aggiornamento…");
+            AppLog.Default?.Info("Aggiornamento: copia di riserva della versione in uso");
+            FolderBackup.Copy(InstallDir, RunnerBackupDir);
+            _runnerReady = true;
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            AppLog.Default?.Error("Copia di riserva non riuscita: aggiornamento non avviato", ex);
+            if (!quiet)
+                MessageBox.Show(this, "Non riesco a preparare la copia di riserva della versione in uso, quindi l'aggiornamento non parte:\n" + ex.Message,
+                    "Aggiornamento", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return false;
+        }
+        finally
+        {
+            Cursor.Current = old;
+        }
+    }
+
+    /// <summary>Lavoro per il programma di aggiornamento (null se l'installer non è più verificato).</summary>
+    internal UpdateJob? CreateUpdateJob(bool relaunch)
+    {
+        if (_updates.Ready is not { } ready || _updates.VerifiedInstallerToRun() is not { } installer)
+            return null;
+        var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture);
+        var data = string.Equals(Path.GetFullPath(_store.FilePath), Path.GetFullPath(ConnectionStore.DefaultPath), StringComparison.OrdinalIgnoreCase)
+            ? null : Path.GetFullPath(_store.FilePath);
+        return new UpdateJob(Environment.ProcessId, installer, ready.Sha256, InstallDir, RunnerBackupDir,
+            ready.Release.Version, AppInfo.Version,
+            Path.Combine(AppLog.DefaultDirectory, "aggiornamento.log"),
+            Path.Combine(AppLog.DefaultDirectory, $"setup-{ready.Release.Version.ToString(3)}-{stamp}.log"),
+            data, Environment.GetEnvironmentVariable(UpdateJob.SimulateFailureVariable) == "1", relaunch);
+    }
+
+    /// <summary>
+    /// Avvia il programma di aggiornamento (dalla copia di riserva) che aspetta la chiusura e installa; senza copia
+    /// pronta («Alla chiusura») la prepara adesso. Un file non verificato non si esegue mai.
+    /// </summary>
     private void StartVerifiedInstaller(bool relaunch)
     {
-        var installer = _updates.VerifiedInstallerToRun();
-        if (installer is null)
+        if (!_runnerReady && !PrepareUpdateRunner(quiet: true))
+            return;
+        var job = CreateUpdateJob(relaunch);
+        if (job is null)
         {
             AppLog.Default?.Warning("Installer non più verificato alla chiusura: non avviato");
             return;
         }
         try
         {
-            AppLog.Default?.Info($"Avvio dell'installer silenzioso (riapertura: {(relaunch ? "sì" : "no")})");
-            StartInstaller(new ProcessStartInfo(installer)
+            AppLog.Default?.Info($"Avvio del programma di aggiornamento (riapertura: {(relaunch ? "sì" : "no")})");
+            var psi = new ProcessStartInfo(Path.Combine(job.BackupDir, UpdateJob.ExeName))
             {
-                Arguments = InstallLocation.SilentArguments(relaunch),
-                UseShellExecute = true,
-                WorkingDirectory = Path.GetDirectoryName(installer)!,
-            });
+                UseShellExecute = false,
+                WorkingDirectory = job.BackupDir,
+            };
+            foreach (var a in job.ToArguments())
+                psi.ArgumentList.Add(a);
+            StartInstaller(psi);
         }
         catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
         {
-            AppLog.Default?.Error("Avvio dell'installer non riuscito", ex);
-            MessageBox.Show("Impossibile avviare l'installer: " + ex.Message, "Aggiornamento", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            AppLog.Default?.Error("Avvio del programma di aggiornamento non riuscito", ex);
+            MessageBox.Show("Impossibile avviare l'aggiornamento: " + ex.Message, "Aggiornamento", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
+    }
+
+    /// <summary>
+    /// Prima di chiudere per l'aggiornamento: disconnette le sessioni una per una, senza riconnessioni, e aspetta
+    /// (al massimo <paramref name="timeout"/>) che il controllo RDP le dia per chiuse, così l'app esce subito e pulita.
+    /// </summary>
+    internal static void DisconnectSessionsInOrder(IReadOnlyList<RdpSessionView> views, TimeSpan timeout)
+    {
+        foreach (var v in views)
+            v.DisconnectForShutdown();
+        var until = DateTime.UtcNow + timeout;
+        while (views.Any(v => v.State is SessionState.Connected or SessionState.Connecting) && DateTime.UtcNow < until)
+        {
+            Application.DoEvents();
+            Thread.Sleep(50);
+        }
+        int left = views.Count(v => v.State is SessionState.Connected or SessionState.Connecting);
+        AppLog.Default?.Info($"Aggiornamento: {views.Count - left} sessioni disconnesse" + (left > 0 ? $", {left} ancora aperte (chiuse con il controllo)" : ""));
+    }
+
+    /// <summary>Messaggio del programma di aggiornamento quando l'aggiornamento non è riuscito (argomento --aggiornamento-fallito).</summary>
+    internal string? UpdateFailureMessage { get; set; }
+
+    private void ShowUpdateFailure()
+    {
+        if (UpdateFailureMessage is not { } text)
+            return;
+        UpdateFailureMessage = null;
+        AppLog.Default?.Warning("Avvio dopo un aggiornamento non riuscito");
+        BeginInvoke(() => MessageBox.Show(this, text, "Aggiornamento non riuscito", MessageBoxButtons.OK, MessageBoxIcon.Warning));
     }
 
     // ---------- esportazione di un file .rdp ----------
