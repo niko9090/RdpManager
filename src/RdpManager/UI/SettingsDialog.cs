@@ -3,7 +3,7 @@ using RdpManager.Core;
 namespace RdpManager.UI;
 
 /// <summary>Impostazioni dell'app: aspetto, area di notifica, monitor, barre, schermo intero, avvio, cronologia, scorciatoie.</summary>
-public sealed class SettingsDialog : Form
+public sealed class SettingsDialog : TouchForm
 {
     private readonly AppSettings _settings;
     private readonly Dictionary<ShortcutAction, ShortcutBox> _boxes = [];
@@ -48,8 +48,6 @@ public sealed class SettingsDialog : Form
         MaximizeBox = MinimizeBox = false;
         ShowInTaskbar = false;
         StartPosition = FormStartPosition.CenterParent;
-        AutoSize = true;
-        AutoSizeMode = AutoSizeMode.GrowAndShrink;
         Padding = new Padding(10);
         Font = SystemFonts.MessageBoxFont ?? Font;
 
@@ -185,11 +183,10 @@ public sealed class SettingsDialog : Form
         tabs.TabPages.Add(Page("Schermo intero", full));
         tabs.TabPages.Add(Page("Scorciatoie", shortcuts));
         tabs.TabPages.Add(Page("Avvio, blocco e aggiornamenti", startup));
-        // Il TabControl non si adatta da solo al contenuto: la pagina più grande decide la dimensione.
-        Control[] pages = [general, full, shortcuts, startup];
-        var size = new Size(pages.Max(p => p.PreferredSize.Width) + 24, pages.Max(p => p.PreferredSize.Height) + 48);
-        tabs.Size = size;
-        tabs.Dock = DockStyle.None;
+        // Il TabControl non si adatta da solo al contenuto: la pagina più grande decide la dimensione (ArrangeForTouch);
+        // se non sta nello schermo, le pagine scorrono.
+        _pages = [general, full, shortcuts, startup];
+        _tabs = tabs;
 
         var ok = new Button { Text = "OK", DialogResult = DialogResult.OK, AutoSize = true };
         var cancel = new Button { Text = "Annulla", DialogResult = DialogResult.Cancel, AutoSize = true };
@@ -201,7 +198,20 @@ public sealed class SettingsDialog : Form
 
         Controls.Add(tabs);
         Controls.Add(buttons);
+        _buttons = buttons;
         ThemeManager.Apply(this);
+    }
+
+    private Control[] _pages = [];
+    private TabControl _tabs = null!;
+    private FlowLayoutPanel _buttons = null!;
+
+    /// <summary>Misura voluta: quella della pagina più grande più l'intestazione e i pulsanti (poi ridotta allo schermo).</summary>
+    protected override void ArrangeForTouch()
+    {
+        int tabsHeight = _tabs.ItemSize.Height * Math.Max(1, _tabs.RowCount) + 16;
+        ClientSize = new Size(_pages.Max(p => p.PreferredSize.Width) + 24 + Padding.Horizontal,
+            _pages.Max(p => p.PreferredSize.Height) + tabsHeight + _buttons.GetPreferredSize(Size.Empty).Height + Padding.Vertical);
     }
 
     private static void OpenFolder(string dir)
@@ -252,6 +262,7 @@ public sealed class SettingsDialog : Form
     private static TabPage Page(string title, Control content)
     {
         var page = new TabPage(title) { Padding = new Padding(6), AutoScroll = true };
+        content.Dock = DockStyle.Top; // si adatta al contenuto: se la pagina è più bassa, scorre
         page.Controls.Add(content);
         return page;
     }

@@ -1,5 +1,20 @@
 # Novità di RdpManager
 
+## In arrivo (uso col tocco)
+
+**Si usa anche col dito e senza tastiera, su schermi piccoli (per esempio 1366x912 al 150%)**
+- Bersagli di almeno 40 px logici: pulsanti, caselle, righe degli elenchi, linguette, voci dei menu, barra della
+  sessione e pulsanti della barra a schermo intero.
+- In fondo alla **barra laterale** (che resta a sinistra: niente in alto) ci sono i pulsanti **Collega**,
+  **Scollega**, **Precedente**, **Successiva**, **Schermo intero** e **Tastiera**: le azioni principali senza
+  tasto destro né scorciatoie.
+- **Tieni premuto** su una connessione o su una scheda al posto del clic destro.
+- **Tastiera su schermo** (TabTip, altrimenti osk.exe): pulsante «Tastiera» nella barra della sessione, nella
+  barra a schermo intero e nel menu Sessione; i tasti vanno alla sessione visibile.
+- I dialoghi non sono mai più grandi dell'area di lavoro: il modulo di modifica della connessione scorre con
+  OK e Annulla sempre visibili, le impostazioni hanno le pagine che scorrono, la finestra principale rientra
+  nello schermo. Scalano con i dpi del monitor.
+
 ## 1.6.1
 
 **Aggiornamento automatico con le sessioni aperte, corretto**

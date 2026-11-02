@@ -3,7 +3,7 @@ using RdpManager.Core;
 namespace RdpManager.UI;
 
 /// <summary>Finestra di aggiunta/modifica di una connessione. Modifica l'oggetto solo con OK.</summary>
-public sealed class ConnectionDialog : Form
+public sealed class ConnectionDialog : TouchForm
 {
     private readonly RdpConnection _target;
     private readonly TextBox _name = new() { Width = 280 };
@@ -58,6 +58,18 @@ public sealed class ConnectionDialog : Form
         (AudioMode.None, "Nessun audio"),
     ];
 
+    private readonly TableLayoutPanel _grid = new() { ColumnCount = 2, AutoSize = true, Dock = DockStyle.Top };
+    private readonly Panel _scroll = new() { Dock = DockStyle.Fill, AutoScroll = true };
+    private FlowLayoutPanel _buttons = null!;
+
+    /// <summary>Misura della finestra: tutto il modulo se ci sta, altrimenti quanto l'area di lavoro permette (e il resto scorre).</summary>
+    protected override void ArrangeForTouch()
+    {
+        var form = _grid.GetPreferredSize(Size.Empty);
+        ClientSize = new Size(form.Width + Padding.Horizontal + SystemInformation.VerticalScrollBarWidth,
+            form.Height + _buttons.GetPreferredSize(Size.Empty).Height + Padding.Vertical);
+    }
+
     public ConnectionDialog(RdpConnection target, IEnumerable<string> groups, string title,
         IReadOnlyList<CredentialProfile>? profiles = null)
     {
@@ -67,12 +79,11 @@ public sealed class ConnectionDialog : Form
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = MinimizeBox = false;
         StartPosition = FormStartPosition.CenterParent;
-        AutoSize = true;
-        AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        // Il modulo è lungo: sta in un riquadro che scorre, con OK e Annulla sempre visibili in basso (schermi piccoli).
         Padding = new Padding(10);
         Font = SystemFonts.MessageBoxFont ?? Font;
 
-        var grid = new TableLayoutPanel { ColumnCount = 2, AutoSize = true, Dock = DockStyle.Fill };
+        var grid = _grid;
         void Row(string label, Control control)
         {
             grid.Controls.Add(new Label { Text = label, AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(3, 7, 10, 3) });
@@ -120,8 +131,10 @@ public sealed class ConnectionDialog : Form
         AcceptButton = ok;
         CancelButton = cancel;
 
-        Controls.Add(grid);
+        _scroll.Controls.Add(grid);
+        Controls.Add(_scroll);
         Controls.Add(buttons);
+        _buttons = buttons;
 
         _group.Items.AddRange(groups.Cast<object>().ToArray());
         _showPassword.CheckedChanged += (_, _) => _password.UseSystemPasswordChar = !_showPassword.Checked;
