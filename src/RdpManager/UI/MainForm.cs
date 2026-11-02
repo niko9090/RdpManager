@@ -238,6 +238,7 @@ public sealed partial class MainForm : Form
 
         var tools = new ToolStripMenuItem("S&trumenti");
         tools.DropDownItems.Add(Item("Cerca &PC in rete…", Keys.None, (_, _) => ShowNetworkScan()));
+        tools.DropDownItems.Add(Item("&VPN (WireGuard)…", Keys.None, (_, _) => ShowVpn()));
 
         var workspaces = new ToolStripMenuItem("Spazi di la&voro");
         workspaces.DropDownItems.Add("(caricamento)");

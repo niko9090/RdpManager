@@ -1,5 +1,13 @@
 # Novità di RdpManager
 
+## Non ancora rilasciato
+
+**VPN WireGuard integrata (in preparazione, al posto di Tailscale)**
+- «Strumenti → VPN (WireGuard)…»: crea le chiavi (la privata resta cifrata con DPAPI), mostra la chiave pubblica e il
+  frammento `[Peer]` da aggiungere al server (syncnetpro.com:51820, rete 10.66.0.0/24), accende e spegne il tunnel.
+- Il tunnel usa `tunnel.dll` e `wireguard.dll` (WireGuard per Windows, embeddable-dll-service) nella cartella del
+  programma; vanno messe in `src\RdpManager\Vpn\dll\amd64` (vedi LEGGIMI.txt). Accendere e spegnere chiedono UAC.
+
 ## 1.6.1
 
 **Aggiornamento automatico con le sessioni aperte, corretto**
