@@ -73,6 +73,7 @@ public sealed partial class ConnectionsDocument
         string Move(string g) => RdpConnection.NormalizeGroup(newPath + g[path.Length..]);
         foreach (var c in Connections.Where(c => IsInFolder(c.Group, path)))
             c.Group = Move(c.Group);
+        MoveFolderSettings(path, newPath);
         Groups = AllGroups().Select(g => IsInFolder(g, path) ? Move(g) : g)
             .Distinct(StringComparer.CurrentCultureIgnoreCase).ToList();
         return newPath;
@@ -150,6 +151,7 @@ public sealed partial class ConnectionsDocument
         var parent = ParentFolder(path);
         foreach (var c in Connections.Where(c => IsInFolder(c.Group, path)))
             c.Group = parent;
+        DropFolderSettings(path);
         Groups = AllGroups().Where(g => !IsInFolder(g, path)).ToList();
         return parent;
     }
@@ -210,6 +212,11 @@ public sealed class ConnectionStore
         doc.QuickTexts.RemoveAll(t => t is null);
         foreach (var t in doc.QuickTexts)
             t.Repair();
+        doc.FolderSettings ??= [];
+        doc.FolderSettings.RemoveAll(f => f is null);
+        foreach (var f in doc.FolderSettings)
+            f.Repair();
+        doc.FolderSettings.RemoveAll(f => f.Path.Length == 0);
         doc.Workspaces ??= [];
         doc.Workspaces.RemoveAll(w => w is null);
         foreach (var w in doc.Workspaces)
@@ -268,6 +275,7 @@ public sealed class ConnectionStore
             }).ToList(),
             QuickTexts = doc.QuickTexts.Select(t => t.Clone()).ToList(),
             Workspaces = doc.Workspaces.Select(w => w.Clone()).ToList(),
+            FolderSettings = doc.FolderSettings.Select(f => f.Clone()).ToList(),
         };
 
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(FilePath))!);
