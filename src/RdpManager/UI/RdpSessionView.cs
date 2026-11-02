@@ -546,9 +546,13 @@ public sealed class RdpSessionView : UserControl
         Try(() => ocx.AdvancedSettings8.AudioCaptureRedirectionMode = c.RedirectMicrophone);
         if (c.HasGateway)
             ConfigureGateway(ocx, c);
-        if (AllowCredentialPrompt)
+        var prompt = CredentialPromptPolicy.For(!string.IsNullOrEmpty(c.Password), AllowCredentialPrompt);
+        if (!prompt.Strict)
         {
-            Try(() => _rdp!.NonScriptable?.put_PromptForCredentials(string.IsNullOrEmpty(c.Password)));
+            // Il controllo nuovo parte con la richiesta permessa: con una password salvata va vietata a ogni
+            // connessione, altrimenti dopo una caduta Windows richiede di nuovo le credenziali.
+            Try(() => _rdp!.NonScriptable?.put_PromptForCredentials(prompt.PromptForCredentials));
+            Try(() => (_rdp!.Ocx as IMsRdpClientNonScriptable5)?.put_AllowPromptingForCredentials(prompt.AllowPrompting));
         }
         else
         {
