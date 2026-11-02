@@ -54,6 +54,12 @@ public sealed class RdpmExportDialog : Form
             Text = $"{count} connessioni{profiles} e le loro cartelle; {saved}.", AutoSize = true, MaximumSize = new Size(380, 0),
             Margin = new Padding(3, 3, 3, 8),
         });
+        if (RdpmFile.UnreadablePasswordsWarning(doc) is { } unreadable)
+            layout.Controls.Add(new Label
+            {
+                Text = unreadable, AutoSize = true, ForeColor = Color.Firebrick, MaximumSize = new Size(380, 0),
+                Margin = new Padding(3, 0, 3, 8),
+            });
         layout.Controls.Add(_without);
         layout.Controls.Add(_with);
         layout.Controls.Add(grid);

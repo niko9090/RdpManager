@@ -188,6 +188,28 @@ public static class RdpmFile
     }
 
     /// <summary>
+    /// Password salvate che questo PC non riesce a leggere (cifrate DPAPI da un altro utente o PC, o ancora sigillate):
+    /// non possono entrare nel file e andrebbero reinserite.
+    /// </summary>
+    public static int CountUnreadablePasswords(ConnectionsDocument doc)
+    {
+        ArgumentNullException.ThrowIfNull(doc);
+        return doc.Connections.Count(c => string.IsNullOrEmpty(c.Password) && !string.IsNullOrEmpty(c.ProtectedPassword))
+               + doc.CredentialProfiles.Count(p => string.IsNullOrEmpty(p.Password) && !string.IsNullOrEmpty(p.ProtectedPassword));
+    }
+
+    /// <summary>Avviso sulle password che non si possono esportare; null = nessuna.</summary>
+    public static string? UnreadablePasswordsWarning(ConnectionsDocument doc)
+    {
+        int n = CountUnreadablePasswords(doc);
+        if (n == 0)
+            return null;
+        var what = n == 1 ? "1 password salvata non si può leggere" : $"{n} password salvate non si possono leggere";
+        return $"{what} su questo PC (cifrate da un altro utente Windows o PC) e non entrerà nel file. " +
+               "Apri la connessione o il profilo, reinserisci la password e riesporta.";
+    }
+
+    /// <summary>
     /// Scelta proposta nell'esportazione (dalla 1.5.1): con le password, cifrate, quando ce n'è almeno una salvata;
     /// senza, se non ce ne sono.
     /// </summary>

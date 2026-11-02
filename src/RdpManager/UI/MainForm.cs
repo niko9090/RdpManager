@@ -830,7 +830,8 @@ public sealed partial class MainForm : Form
         int withPassword = password is null ? 0 : RdpmFile.CountExportablePasswords(_doc);
         var profiles = _doc.CredentialProfiles.Count > 0 ? $", {_doc.CredentialProfiles.Count} profili" : "";
         ShowNotice($"Esportate {_doc.Connections.Count} connessioni{profiles}{(includeSettings ? " e le impostazioni" : "")} in {Path.GetFileName(save.FileName)}" +
-                   (password is null ? " (senza password)" : $" ({withPassword} password cifrate)"));
+                   (password is null ? " (senza password)" : $" ({withPassword} password cifrate)") +
+                   (password is not null && RdpmFile.CountUnreadablePasswords(_doc) is > 0 and var lost ? $"; {lost} non leggibili su questo PC" : ""));
         AppLog.Default?.Info($"Esportazione .rdpm: {_doc.Connections.Count} connessioni, impostazioni {(includeSettings ? "sì" : "no")}, password {(password is null ? "escluse" : "cifrate")}");
     }
 
