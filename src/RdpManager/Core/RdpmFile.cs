@@ -108,14 +108,14 @@ public static class RdpmFile
     {
         ArgumentNullException.ThrowIfNull(doc);
         return Export(doc.Connections, doc.AllGroups(), filePassword, iterations, doc.CredentialProfiles, doc.QuickTexts,
-            includeSettings ? doc.Settings.ForExport() : null);
+            includeSettings ? doc.Settings.ForExport() : null, doc.FolderSettings);
     }
 
     /// <param name="filePassword">null o vuota = password escluse; altrimenti le password vengono cifrate con questa.</param>
     public static string Export(IEnumerable<RdpConnection> connections, IEnumerable<string>? groups = null,
         string? filePassword = null, int iterations = DefaultIterations,
         IEnumerable<CredentialProfile>? profiles = null, IEnumerable<QuickText>? quickTexts = null,
-        AppSettings? settings = null)
+        AppSettings? settings = null, IEnumerable<FolderSettings>? folderSettings = null)
     {
         ArgumentNullException.ThrowIfNull(connections);
         var file = new RdpmDocument
@@ -167,6 +167,7 @@ public static class RdpmFile
                 file.CredentialProfiles.Add(new RdpmProfileEntry { Profile = copy, EncryptedPassword = sealedPassword });
             }
             file.QuickTexts = (quickTexts ?? []).Select(t => t.Clone()).ToList();
+            file.FolderSettings = (folderSettings ?? []).Select(f => f.Clone()).ToList();
         }
         finally
         {
@@ -185,6 +186,28 @@ public static class RdpmFile
         ArgumentNullException.ThrowIfNull(doc);
         return doc.Connections.Count(c => !string.IsNullOrEmpty(c.Password))
                + doc.CredentialProfiles.Count(p => !string.IsNullOrEmpty(p.Password));
+    }
+
+    /// <summary>
+    /// Password salvate che questo PC non riesce a leggere (cifrate DPAPI da un altro utente o PC, o ancora sigillate):
+    /// non possono entrare nel file e andrebbero reinserite.
+    /// </summary>
+    public static int CountUnreadablePasswords(ConnectionsDocument doc)
+    {
+        ArgumentNullException.ThrowIfNull(doc);
+        return doc.Connections.Count(c => string.IsNullOrEmpty(c.Password) && !string.IsNullOrEmpty(c.ProtectedPassword))
+               + doc.CredentialProfiles.Count(p => string.IsNullOrEmpty(p.Password) && !string.IsNullOrEmpty(p.ProtectedPassword));
+    }
+
+    /// <summary>Avviso sulle password che non si possono esportare; null = nessuna.</summary>
+    public static string? UnreadablePasswordsWarning(ConnectionsDocument doc)
+    {
+        int n = CountUnreadablePasswords(doc);
+        if (n == 0)
+            return null;
+        var what = n == 1 ? "1 password salvata non si può leggere" : $"{n} password salvate non si possono leggere";
+        return $"{what} su questo PC (cifrate da un altro utente Windows o PC) e non entrerà nel file. " +
+               "Apri la connessione o il profilo, reinserisci la password e riesporta.";
     }
 
     /// <summary>
@@ -283,6 +306,14 @@ public static class RdpmFile
                 }
                 doc.CredentialProfiles.Add(p);
             }
+            foreach (var fs in file.FolderSettings ?? [])
+            {
+                if (fs is null)
+                    continue;
+                fs.Repair();
+                if (fs.Path.Length > 0 && !fs.IsEmpty)
+                    doc.FolderSettings.Add(fs);
+            }
             foreach (var t in file.QuickTexts ?? [])
             {
                 if (t is null)
@@ -319,6 +350,7 @@ public static class RdpmFile
             removed = target.Connections.Count;
             target.Connections = [];
             target.Groups = [];
+            target.FolderSettings = [];
         }
 
         // Profili: un doppione (stesso Id, o stesso nome/utente/dominio) non si aggiunge e le connessioni importate
@@ -385,6 +417,13 @@ public static class RdpmFile
         }
         foreach (var g in imported.Groups)
             target.AddFolder("", g);
+        // Impostazioni delle cartelle: quelle già presenti qui restano; le altre si aggiungono (profilo rimappato).
+        foreach (var fs in imported.FolderSettings)
+        {
+            if (target.FindFolderSettings(fs.Path) is not null)
+                continue;
+            target.SetFolderSettings(fs.Path, MapProfile(fs.CredentialProfileId), fs.Resolution, fs.DesktopWidth, fs.DesktopHeight);
+        }
 
         // Testi rapidi: si aggiungono quelli che mancano (stesso Id o stesso testo); non si tolgono mai.
         int quickTextsAdded = 0;
@@ -485,6 +524,7 @@ public static class RdpmFile
         public List<RdpmEntry> Connections { get; set; } = [];
         public List<RdpmProfileEntry> CredentialProfiles { get; set; } = [];
         public List<QuickText> QuickTexts { get; set; } = [];
+        public List<FolderSettings> FolderSettings { get; set; } = [];
         public AppSettings? Settings { get; set; }
     }
 

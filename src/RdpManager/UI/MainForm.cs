@@ -240,6 +240,7 @@ public sealed partial class MainForm : Form
 
         var tools = new ToolStripMenuItem("S&trumenti");
         tools.DropDownItems.Add(Item("Cerca &PC in rete…", Keys.None, (_, _) => ShowNetworkScan()));
+        tools.DropDownItems.Add(Item("&VPN (WireGuard)…", Keys.None, (_, _) => ShowVpn()));
 
         var workspaces = new ToolStripMenuItem("Spazi di la&voro");
         workspaces.DropDownItems.Add("(caricamento)");
@@ -273,7 +274,7 @@ public sealed partial class MainForm : Form
         return header;
     }
 
-    private ToolStripMenuItem _miConnect = null!, _miConnectFolder = null!, _miMstsc = null!, _miWake = null!,
+    private ToolStripMenuItem _miConnect = null!, _miConnectFolder = null!, _miFolderSettings = null!, _miMstsc = null!, _miWake = null!,
         _miCheck = null!, _miFavorite = null!, _miEdit = null!, _miDuplicate = null!, _miDelete = null!, _miHistory = null!, _miExportRdp = null!;
 
     private void BuildContextMenus()
@@ -286,6 +287,7 @@ public sealed partial class MainForm : Form
         }
         _miConnect = Add("Connetti", (_, _) => ConnectSelected());
         _miConnectFolder = Add("Connetti tutta la cartella", (_, _) => ConnectFolder(SelectedFolderPath));
+        _miFolderSettings = Add("Impostazioni della cartella…", (_, _) => EditFolderSettings(SelectedFolderPath));
         _miMstsc = Add("Apri con mstsc", (_, _) => { if (SelectedConnection is { } c) LaunchMstsc(c); });
         _miExportRdp = Add("Esporta come file .rdp…", (_, _) => { if (SelectedConnection is { } c) ExportRdpFile(c); });
         _miWake = Add("Accendi (Wake-on-LAN)", async (_, _) => { if (SelectedConnection is { } c) await WakeAsync(c); });
@@ -311,7 +313,7 @@ public sealed partial class MainForm : Form
             _miConnect.Enabled = _miMstsc.Enabled = _miDuplicate.Enabled = _miFavorite.Enabled = _miHistory.Enabled = _miExportRdp.Enabled = isConn;
             _miWake.Enabled = c is not null && WakeOnLan.IsValidMac(c.MacAddress);
             _miWake.ToolTipText = _miWake.Enabled ? null : "Indica il MAC nella modifica della connessione";
-            _miConnectFolder.Visible = isFolder;
+            _miConnectFolder.Visible = _miFolderSettings.Visible = isFolder;
             _miCheck.Enabled = isConn || isFolder;
             _miFavorite.Checked = c?.IsFavorite == true;
             _miEdit.Enabled = isConn || isFolder;
@@ -350,14 +352,25 @@ public sealed partial class MainForm : Form
         _tree.AfterExpand += (_, e) => { if (CollapseKey(e.Node) is { } k && _search.TextLength == 0) _collapsed.Remove(k); };
 
         // Trascinamento delle connessioni nelle cartelle.
-        _tree.ItemDrag += (_, e) => { if (e.Item is TreeNode { Tag: RdpConnection }) DoDragDrop(e.Item, DragDropEffects.Move); };
+        _tree.ItemDrag += (_, e) => { if (e.Item is TreeNode { Tag: RdpConnection or FolderTag }) DoDragDrop(e.Item, DragDropEffects.Move); };
         _tree.DragOver += (_, e) =>
             e.Effect = e.Data?.GetDataPresent(typeof(TreeNode)) == true ? DragDropEffects.Move : DragDropEffects.None;
         _tree.DragDrop += (_, e) =>
         {
-            if (e.Data?.GetData(typeof(TreeNode)) is not TreeNode { Tag: RdpConnection c })
+            if (e.Data?.GetData(typeof(TreeNode)) is not TreeNode dragged)
                 return;
             var target = _tree.GetNodeAt(_tree.PointToClient(new Point(e.X, e.Y)));
+            if (dragged.Tag is FolderTag moving)
+            {
+                if (DropFolder(moving.Path, target?.Tag) is { } newPath)
+                {
+                    SaveConnections();
+                    RefreshTree(new FolderTag(newPath));
+                }
+                return;
+            }
+            if (dragged.Tag is not RdpConnection c)
+                return;
             if (DropConnection(c, target?.Tag))
             {
                 SaveConnections();
@@ -402,6 +415,18 @@ public sealed partial class MainForm : Form
         RdpConnection => false,
         QuickTag or SectionTag => false, // Preferiti e Recenti hanno un ordine proprio
         _ => _doc.MoveConnection(moving.Id, null, ""),
+    };
+
+    /// <summary>
+    /// Cartella trascinata: dentro un'altra cartella, o nella radice se si lascia sul vuoto o su una sezione.
+    /// Restituisce il nuovo percorso, null se non si può (dentro se stessa, nome già presente).
+    /// </summary>
+    internal string? DropFolder(string moving, object? target) => target switch
+    {
+        FolderTag f => _doc.MoveFolder(moving, f.Path),
+        RdpConnection other => _doc.MoveFolder(moving, other.Group),
+        QuickTag or SectionTag => null,
+        _ => _doc.MoveFolder(moving, ""),
     };
 
     private static string? CollapseKey(TreeNode? node) => node?.Tag switch
@@ -738,6 +763,19 @@ public sealed partial class MainForm : Form
         RefreshTree(new FolderTag(newPath));
     }
 
+    /// <summary>Impostazioni comuni della cartella (profilo di credenziali e risoluzione) ereditate dalle sue connessioni.</summary>
+    internal void EditFolderSettings(string path)
+    {
+        if (path.Length == 0)
+            return;
+        using var dlg = new FolderSettingsDialog(path, _doc.FindFolderSettings(path), _doc.CredentialProfiles);
+        if (dlg.ShowDialog(this) != DialogResult.OK)
+            return;
+        _doc.SetFolderSettings(path, dlg.ProfileId, dlg.Resolution, dlg.DesktopWidth, dlg.DesktopHeight);
+        SaveConnections();
+        RefreshTree(new FolderTag(path));
+    }
+
     private void DeleteFolder(string path)
     {
         var parent = ConnectionsDocument.ParentFolder(path);
@@ -833,7 +871,8 @@ public sealed partial class MainForm : Form
         int withPassword = password is null ? 0 : RdpmFile.CountExportablePasswords(_doc);
         var profiles = _doc.CredentialProfiles.Count > 0 ? $", {_doc.CredentialProfiles.Count} profili" : "";
         ShowNotice($"Esportate {_doc.Connections.Count} connessioni{profiles}{(includeSettings ? " e le impostazioni" : "")} in {Path.GetFileName(save.FileName)}" +
-                   (password is null ? " (senza password)" : $" ({withPassword} password cifrate)"));
+                   (password is null ? " (senza password)" : $" ({withPassword} password cifrate)") +
+                   (password is not null && RdpmFile.CountUnreadablePasswords(_doc) is > 0 and var lost ? $"; {lost} non leggibili su questo PC" : ""));
         AppLog.Default?.Info($"Esportazione .rdpm: {_doc.Connections.Count} connessioni, impostazioni {(includeSettings ? "sì" : "no")}, password {(password is null ? "escluse" : "cifrate")}");
     }
 

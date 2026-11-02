@@ -116,6 +116,11 @@ public sealed class RdpConnection
     /// <summary>Sessione tenuta sveglia: segnale periodico del controllo contro le disconnessioni per inattività.</summary>
     public bool KeepAlive { get; set; }
 
+    // --- Dalla 1.6.2 ---
+
+    /// <summary>Usa la risoluzione impostata sulla cartella (se ce n'è una) invece della propria.</summary>
+    public bool InheritFolderResolution { get; set; }
+
     /// <summary>Vero se il gateway è attivo e ha un host.</summary>
 
     [JsonIgnore]

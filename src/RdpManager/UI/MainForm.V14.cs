@@ -420,7 +420,7 @@ public sealed partial class MainForm
                 item.Visible = group;
             else
                 // Fuori dalla selezione multipla: tutte le voci singole, «Connetti tutta la cartella» solo sulle cartelle.
-                item.Visible = !group && (item != _miConnectFolder || isFolder);
+                item.Visible = !group && ((item != _miConnectFolder && item != _miFolderSettings) || isFolder);
         }
         if (group)
         {

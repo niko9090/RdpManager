@@ -1,0 +1,12 @@
+Qui vanno le DLL di WireGuard per Windows (x64):
+
+  tunnel.dll     (servizio del tunnel, esporta WireGuardTunnelService)
+  wireguard.dll  (driver wireguard-nt, caricato da tunnel.dll)
+
+Da dove prenderle: pacchetto «embeddable-dll-service» ufficiale
+  https://download.wireguard.com/embeddable-dll-service/   (cartella amd64\ dello zip)
+Verificare la firma digitale (WireGuard LLC) prima di copiarle.
+
+Con le DLL qui, la compilazione e la pubblicazione le copiano accanto a RdpManager.exe e l'installer le include
+(il [Files] dell'installer prende tutta la cartella di pubblicazione). Senza DLL l'app funziona e la VPN
+segnala che mancano.

@@ -1,6 +1,6 @@
 # Novità di RdpManager
 
-## In arrivo (uso col tocco)
+## Non ancora rilasciato
 
 **Si usa anche col dito e senza tastiera, su schermi piccoli (per esempio 1366x912 al 150%)**
 - Bersagli di almeno 40 px logici: pulsanti, caselle, righe degli elenchi, linguette, voci dei menu, barra della
@@ -14,6 +14,12 @@
 - I dialoghi non sono mai più grandi dell'area di lavoro: il modulo di modifica della connessione scorre con
   OK e Annulla sempre visibili, le impostazioni hanno le pagine che scorrono, la finestra principale rientra
   nello schermo. Scalano con i dpi del monitor.
+
+**VPN WireGuard integrata (in preparazione, al posto di Tailscale)**
+- «Strumenti → VPN (WireGuard)…»: crea le chiavi (la privata resta cifrata con DPAPI), mostra la chiave pubblica e il
+  frammento `[Peer]` da aggiungere al server (syncnetpro.com:51820, rete 10.66.0.0/24), accende e spegne il tunnel.
+- Il tunnel usa `tunnel.dll` e `wireguard.dll` (WireGuard per Windows, embeddable-dll-service) nella cartella del
+  programma; vanno messe in `src\RdpManager\Vpn\dll\amd64` (vedi LEGGIMI.txt). Accendere e spegnere chiedono UAC.
 
 ## 1.6.1
 

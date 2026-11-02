@@ -16,6 +16,7 @@ public sealed class ConnectionDialog : TouchForm
     private readonly ComboBox _group = new() { Width = 280, DropDownStyle = ComboBoxStyle.DropDown };
     private readonly RadioButton _fit = new() { Text = "Adatta alla finestra", AutoSize = true };
     private readonly RadioButton _fixed = new() { Text = "Fissa:", AutoSize = true };
+    private readonly CheckBox _inheritResolution = new() { Text = "Usa la risoluzione della cartella", AutoSize = true };
     private readonly NumericUpDown _width = new() { Minimum = 640, Maximum = 8192, Width = 70 };
     private readonly NumericUpDown _height = new() { Minimum = 480, Maximum = 8192, Width = 70 };
     private readonly CheckBox _clipboard = new() { Text = "Condividi appunti", AutoSize = true };
@@ -114,6 +115,7 @@ public sealed class ConnectionDialog : TouchForm
         Row("Credenziali gateway", _gatewayCredentials);
         Row("Cartella", _group);
         Row("Risoluzione", Flow(_fit, _fixed, _width, new Label { Text = "×", AutoSize = true, Margin = new Padding(0, 6, 0, 0) }, _height));
+        Row("", Flow(_inheritResolution, Help("Se la cartella ha una risoluzione impostata («Impostazioni della cartella…»), vale quella al posto di questa.")));
         Row("Risorse", Flow(_clipboard, _drives, _printers, _microphone));
         Row("Audio", _audio);
         Row("Qualità", Flow(_quality, _keepAlive, Help("Rete locale: 32 bit e tutti gli effetti. Connessione lenta: 16 bit, niente sfondo, animazioni e temi, compressione. Automatica: decide il client misurando la rete. «Tieni sveglia» manda un segnale ogni minuto per evitare le disconnessioni per inattività di router e firewall. Valgono anche per «Apri con mstsc» e i file .rdp.")));
@@ -178,6 +180,7 @@ public sealed class ConnectionDialog : TouchForm
         _gatewayCredentials.SelectionChangeCommitted += (_, _) => _gatewayCredentialsTouched = true;
         UpdateGatewayFields();
         _group.Text = target.Group;
+        _inheritResolution.Checked = target.InheritFolderResolution;
         _fit.Checked = target.ResolutionMode == ResolutionMode.FitToWindow;
         _fixed.Checked = !_fit.Checked;
         _width.Value = Math.Clamp(target.DesktopWidth, 640, 8192);
@@ -293,6 +296,7 @@ public sealed class ConnectionDialog : TouchForm
         }
         _target.Group = RdpConnection.NormalizeGroup(_group.Text);
         _target.ResolutionMode = _fit.Checked ? ResolutionMode.FitToWindow : ResolutionMode.Fixed;
+        _target.InheritFolderResolution = _inheritResolution.Checked;
         _target.DesktopWidth = (int)_width.Value;
         _target.DesktopHeight = (int)_height.Value;
         _target.RedirectClipboard = _clipboard.Checked;

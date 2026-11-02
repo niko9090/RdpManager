@@ -82,7 +82,8 @@ public sealed partial class ConnectionsDocument
     public ResolvedCredentials ResolveCredentials(RdpConnection c)
     {
         ArgumentNullException.ThrowIfNull(c);
-        return FindProfile(c.CredentialProfileId) is { } p
+        var p = FindProfile(c.CredentialProfileId) ?? InheritedProfile(c);
+        return p is not null
             ? new ResolvedCredentials(p.Username, p.Domain, p.Password, p.Id)
             : new ResolvedCredentials(c.Username, c.Domain, c.Password);
     }
@@ -114,6 +115,12 @@ public sealed partial class ConnectionsDocument
         copy.Password = creds.Password;
         if (creds.ProfileId is not null)
             copy.ProtectedPassword = null;
+        if (c.InheritFolderResolution && FolderSettingsFor(c.Group) is { Resolution: { } mode } folder)
+        {
+            copy.ResolutionMode = mode;
+            copy.DesktopWidth = folder.DesktopWidth;
+            copy.DesktopHeight = folder.DesktopHeight;
+        }
         return copy;
     }
 
@@ -147,6 +154,9 @@ public sealed partial class ConnectionsDocument
                 c.GatewayCredentials = GatewayCredentialsSource.SameAsConnection;
             }
         }
+        foreach (var f in FolderSettings.Where(f => f.CredentialProfileId == profileId))
+            f.CredentialProfileId = null;
+        FolderSettings.RemoveAll(f => f.IsEmpty);
         CredentialProfiles.Remove(profile);
         return true;
     }
