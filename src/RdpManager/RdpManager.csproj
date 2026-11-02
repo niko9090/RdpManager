@@ -38,6 +38,14 @@
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
   </ItemGroup>
 
+  <!--
+    DLL ufficiali di WireGuard per Windows (embeddable-dll-service): tunnel.dll e wireguard.dll, da copiare in
+    Vpn\dll\amd64 (vedi LEGGIMI.txt lì). Se ci sono, finiscono accanto a RdpManager.exe (e quindi nell'installer).
+  -->
+  <ItemGroup>
+    <None Include="Vpn\dll\amd64\*.dll" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="RdpManager.Tests" />
   </ItemGroup>
