@@ -202,4 +202,54 @@ public class RdpmFileTests
         Assert.Equal("DISPLAY9", target.Settings.PreferredMonitor);
         Assert.Empty(target.Settings.OpenSessions);
     }
+
+    [Fact]
+    public void Export_AfterStoreRoundTrip_CarriesPasswordsOfConnectionsAndProfiles()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "rdpm-store-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            var profile = new CredentialProfile { Name = "Admin", Username = "admin", Password = "PwProfilo!1" };
+            var doc = new ConnectionsDocument { Connections = Sample(), CredentialProfiles = [profile] };
+            doc.Connections[1].CredentialProfileId = profile.Id;
+            var store = new ConnectionStore(path);
+            store.Save(doc);
+
+            // Come all'avvio dell'app: si legge con le password ancora cifrate e poi si decifrano.
+            var loaded = store.Load(decryptPasswords: false);
+            loaded.UnsealPasswords();
+            Assert.Equal(3, RdpmFile.CountExportablePasswords(loaded));
+
+            var back = RdpmFile.Import(RdpmFile.Export(loaded, FilePassword, FastIterations), FilePassword);
+            Assert.Equal(Secret1, back.Connections[0].Password);
+            Assert.Equal(Secret2, back.Connections[1].Password);
+            Assert.Equal("PwProfilo!1", back.CredentialProfiles[0].Password);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void UnreadablePasswords_AreCountedAndWarnedAbout_NotSilentlyLost()
+    {
+        // Password salvata con DPAPI di un altro utente o PC: qui non si può decifrare, quindi non può viaggiare.
+        var doc = new ConnectionsDocument
+        {
+            Connections =
+            [
+                new RdpConnection { Name = "Leggibile", Host = "a.example.test", Password = Secret1 },
+                new RdpConnection { Name = "Illeggibile", Host = "b.example.test", ProtectedPassword = "AAAA" },
+            ],
+            CredentialProfiles = [new CredentialProfile { Name = "P", Username = "u", ProtectedPassword = "BBBB" }],
+        };
+
+        Assert.Equal(1, RdpmFile.CountExportablePasswords(doc));
+        Assert.Equal(2, RdpmFile.CountUnreadablePasswords(doc));
+        var warning = RdpmFile.UnreadablePasswordsWarning(doc);
+        Assert.NotNull(warning);
+        Assert.Contains("2 password", warning);
+        Assert.Null(RdpmFile.UnreadablePasswordsWarning(new ConnectionsDocument()));
+    }
 }
