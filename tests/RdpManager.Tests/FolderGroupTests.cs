@@ -1,4 +1,3 @@
-using System.Text.Json;
 using RdpManager.Core;
 
 namespace RdpManager.Tests;
@@ -255,7 +254,6 @@ public sealed class FolderGroupTests : IDisposable
     public void Un_rdpm_senza_impostazioni_di_gruppo_si_importa()
     {
         var json = RdpmFile.Export([Conn("Z", "G")], ["G"]);
-        using var parsed = JsonDocument.Parse(json);
         var imported = RdpmFile.Import(json);
         Assert.Empty(imported.FolderSettings);
         Assert.Equal(["G"], imported.AllGroups());
