@@ -1,0 +1,23 @@
+# Server WireGuard per RdpManager (rete 10.66.0.0/24, porta 51820/UDP).
+# Immagine linuxserver/wireguard: usa il modulo del kernel se c'e'
+# e ripiega su wireguard-go (userspace) quando su DSM il modulo manca.
+services:
+  wireguard:
+    image: lscr.io/linuxserver/wireguard:latest
+    container_name: wireguard
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.ip_forward=1
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Rome
+    volumes:
+      # wg0.conf, chiavi e script stanno qui (la cartella accanto a questo file)
+      - ./config:/config/wg_confs
+      - ./scripts:/scripts:ro
+    ports:
+      - 51820:51820/udp
+    restart: unless-stopped
