@@ -271,6 +271,8 @@ public sealed class TouchUiTests : IDisposable
             new WorkspacesDialog(doc),
             new PinSetDialog(),
             new ChoiceDialog("Cartella", "Scegli", ["A", "B"], "A", editable: true),
+            new SyncAccountDialog(new SyncService(Path.Combine(Path.GetTempPath(), "rdpm-touch-" + Guid.NewGuid().ToString("N") + ".sync")),
+                () => Task.FromResult(new SyncOutcome(SyncStatus.UpToDate, "")), () => null),
         ];
     }
 

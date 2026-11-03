@@ -671,6 +671,20 @@ non cerca niente finché non premi un pulsante.
   con il ripristino dei predefiniti) e *Avvio e aggiornamenti* (riapertura delle sessioni, modalità degli
   aggiornamenti, cronologia, log dettagliato e cartella dei log).
 
+### Account di sincronizzazione (stesso login = stesse cose)
+
+**Strumenti › Account e sincronizzazione…** collega questo PC a un account del server `rdpm-sync` (vedi
+`server/rdpm-sync/LEGGIMI.md` per avviarlo sul Synology e creare l'account). Si indicano l'indirizzo (predefinito
+`http://10.66.0.1:8787`, raggiungibile con la VPN accesa), il nome utente e la password, poi **Accedi**. Sugli altri PC
+basta lo stesso login: connessioni, cartelle, profili di credenziali e testi rapidi sono gli stessi.
+
+- La sincronizzazione parte da sola all'avvio, poco dopo ogni modifica e ogni 5 minuti; **Sincronizza ora** la forza.
+- Il documento è cifrato sul PC con la password dell'account: il server non vede nulla in chiaro. **Se si perde la
+  password i dati sul server non si recuperano.** Sul PC la password dell'account è salvata con DPAPI, come le altre.
+- Senza server raggiungibile (VPN spenta) si lavora in locale e compare un avviso nella barra di stato; le modifiche
+  partono appena il server torna. **Esci dall'account** ferma la sincronizzazione senza toccare le connessioni locali.
+- Lo stato (server, utente, token) sta accanto all'elenco, in `connections.json.sync`.
+
 ### Esportazione e importazione (.rdpm)
 
 - **File → Esporta connessioni (.rdpm)**: scrive tutte le connessioni, le cartelle, i profili di
