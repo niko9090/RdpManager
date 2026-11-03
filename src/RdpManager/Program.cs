@@ -9,18 +9,17 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
-        // «--wg-service <file.conf>»: questo processo è il servizio del tunnel WireGuard (tunnel.dll); nessuna interfaccia.
-        if (args.Length >= 2 && args[0].Equals(VpnHelper.ServiceArgument, StringComparison.OrdinalIgnoreCase))
+        var programData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "RdpManager");
+        // «--vpn-service <nome>»: questo processo è il servizio del tunnel WireGuard (wireguard-nt); nessuna interfaccia.
+        if (VpnServiceArgs.TryParse(args, out var tunnelName))
         {
-            Environment.Exit(WireGuardNative.RunTunnelService(args[1]) ? 0 : 1);
+            Environment.Exit(VpnServiceHost.Run(tunnelName, programData));
             return;
         }
-        // «--vpn-helper su|giu …»: assistente elevato (UAC) che registra o rimuove il servizio del tunnel.
+        // «--vpn-helper su|giu|rimuovi …»: assistente elevato (UAC) che registra, ferma o rimuove il servizio del tunnel.
         if (VpnHelper.IsHelperMode(args))
         {
-            var helper = new VpnHelper(new ScServiceManager(),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "RdpManager"),
-                Environment.ProcessPath ?? Application.ExecutablePath);
+            var helper = new VpnHelper(new ScServiceManager(), programData, Environment.ProcessPath ?? Application.ExecutablePath);
             Environment.Exit(helper.Run(args));
             return;
         }

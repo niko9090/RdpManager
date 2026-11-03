@@ -40,7 +40,7 @@ public static class WireGuardKeys
     /// <summary>Vero se è una chiave WireGuard ben formata: base64 di esattamente 32 byte.</summary>
     public static bool IsValidKey(string? key) => TryDecode(key, out _);
 
-    private static bool TryDecode(string? key, out byte[] bytes)
+    internal static bool TryDecode(string? key, out byte[] bytes)
     {
         bytes = [];
         if (string.IsNullOrWhiteSpace(key) || key.Length != 44)

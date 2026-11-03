@@ -27,6 +27,9 @@ public interface IWireGuardTunnel
 
     /// <summary>Spegne il tunnel. Se è già spento non fa nulla.</summary>
     void Spegni();
+
+    /// <summary>Ultimo stato scritto dal servizio (handshake, byte); null se spento o non ancora disponibile.</summary>
+    VpnStatus? Dettagli => null;
 }
 
 /// <summary>Chi esegue un'azione con i diritti di amministratore (nella versione vera: RdpManager.exe con elevazione UAC).</summary>
@@ -36,18 +39,22 @@ public interface IVpnElevator
     int RunHelper(IReadOnlyList<string> args);
 }
 
-/// <summary>Lettura dello stato del servizio del tunnel (non richiede diritti di amministratore).</summary>
-public interface IVpnServiceQuery
+/// <summary>Controllo del servizio del tunnel senza diritti di amministratore (il servizio ne dà i permessi agli utenti).</summary>
+public interface IVpnServiceControl
 {
     TunnelState Query(string serviceName);
+    bool Exists(string serviceName);
+    /// <exception cref="InvalidOperationException">Il gestore dei servizi rifiuta (per esempio permessi mancanti).</exception>
+    void Start(string serviceName);
+    /// <exception cref="InvalidOperationException">Il gestore dei servizi rifiuta.</exception>
+    void Stop(string serviceName);
 }
 
-/// <summary>Gestione del servizio Windows del tunnel (richiede amministratore: la chiama solo l'assistente elevato).</summary>
-public interface IServiceManager : IVpnServiceQuery
+/// <summary>Gestione del servizio Windows del tunnel (creare e cancellare richiede amministratore: la chiama solo l'assistente elevato).</summary>
+public interface IServiceManager : IVpnServiceControl
 {
-    bool Exists(string serviceName);
     void Create(string serviceName, string displayName, string binaryPathWithArgs);
-    void Start(string serviceName);
-    void Stop(string serviceName);
+    /// <summary>Permette agli utenti locali di avviare e fermare il servizio (e leggerne lo stato) senza UAC.</summary>
+    void GrantUserControl(string serviceName);
     void Delete(string serviceName);
 }

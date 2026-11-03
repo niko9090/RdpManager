@@ -108,23 +108,28 @@ sudo docker exec wireguard sh /scripts/rimuovi-pc.sh NomePC
   `PostUp`/`PostDown` di `wg0.conf` (gia' presenti, con NAT verso la LAN) e che il
   client abbia `192.168.1.0/24` tra gli indirizzi permessi.
 
-## 7. I file tunnel.dll e wireguard.dll nel client
+## 7. La DLL wireguard.dll nel client
 
-Il client RdpManager include il servizio tunnel di WireGuard per Windows. Servono due
-DLL, che **non** sono nel repository e vanno scaricate dal sito ufficiale:
+Il client RdpManager **non** usa `tunnel.dll` (WireGuard non la pubblica gia' compilata e firmata):
+parla direttamente con il driver **wireguard-nt**, tramite il suo `wireguard.dll` ufficiale, da un
+servizio Windows fornito da `RdpManager.exe` stesso. Serve quindi un solo file, gia' incluso nel
+repository in `src/RdpManager/Vpn/dll/amd64/wireguard.dll` (wireguard-nt 1.1, firmato WireGuard LLC)
+e copiato accanto a `RdpManager.exe` e nell'installer.
 
-1. Da <https://download.wireguard.com/wireguard-nt/> e dal pacchetto
-   **embeddable-dll-service**: <https://git.zx2c4.com/wireguard-windows/about/embeddable-dll-service/>
-   (le versioni compilate sono su <https://download.wireguard.com/windows-client/>; cerca
-   il pacchetto `wireguard-embeddable-dll-service-*.zip`).
-2. Estrai lo zip in una cartella a parte e prendi dalla cartella **amd64** i file
-   `tunnel.dll` e `wireguard.dll`.
-3. Copiali in `src/RdpManager/Vpn/dll/amd64/`.
-4. **Verifica la firma**: tasto destro sul file -> Proprieta' -> Firme digitali, deve
+Per aggiornarlo:
+
+1. Scarica <https://download.wireguard.com/wireguard-nt/wireguard-nt-1.1.zip> (o la versione
+   nuova dalla stessa cartella) in una cartella a parte ed estrailo.
+2. Prendi `bin/amd64/wireguard.dll` e copialo in `src/RdpManager/Vpn/dll/amd64/`.
+3. **Verifica la firma**: tasto destro sul file -> Proprieta' -> Firme digitali, deve
    comparire "WireGuard LLC" e la firma valida. Oppure in PowerShell:
 
 ```
-Get-AuthenticodeSignature .\tunnel.dll, .\wireguard.dll | Format-List Status, SignerCertificate
+Get-AuthenticodeSignature .\wireguard.dll | Format-List Status, SignerCertificate
 ```
 
-   `Status` deve essere `Valid`. Se non lo e', non usare i file.
+   `Status` deve essere `Valid`. Se non lo e', non usare il file.
+
+La prima volta che accendi la VPN Windows chiede una conferma UAC (installa il servizio
+`RdpManagerVpn`); poi accendere e spegnere non chiedono piu' nulla, finche' non cambi la
+configurazione (chiavi, indirizzo, server).
