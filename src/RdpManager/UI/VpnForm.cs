@@ -121,8 +121,8 @@ public sealed class VpnForm : TouchForm
             {
                 if (!_profile.HasKey)
                     throw new VpnException("Prima crea le chiavi.");
-                if (!WireGuardNative.DllsPresent)
-                    throw new VpnException("Mancano tunnel.dll e wireguard.dll nella cartella del programma.");
+                if (!WireGuardNative.DllPresent)
+                    throw new VpnException("Manca wireguard.dll nella cartella del programma.");
                 _tunnel.Accendi(_profile.ToConfig());
             }
         }
@@ -137,12 +137,19 @@ public sealed class VpnForm : TouchForm
         }
     }
 
+    private static string Details(VpnStatus? d)
+        => d is null
+            ? ""
+            : d.LastHandshakeUtc is { } hs
+                ? $" (ultimo contatto col server {Math.Max(0, (int)(DateTime.UtcNow - hs).TotalSeconds)} s fa, inviati {d.TxBytes:N0} B, ricevuti {d.RxBytes:N0} B)"
+                : " (in attesa del primo contatto col server)";
+
     private void RefreshState()
     {
         var s = _tunnel.Stato;
         _status.Text = s switch
         {
-            TunnelState.Acceso => "Acceso",
+            TunnelState.Acceso => "Acceso" + Details(_tunnel.Dettagli),
             TunnelState.InAvvio => "In avvio…",
             TunnelState.InArresto => "In arresto…",
             TunnelState.Errore => "Errore",

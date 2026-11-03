@@ -68,7 +68,7 @@ public class WireGuardServerPackageTests
         Assert.Contains(Network, text);
         Assert.Contains(Endpoint, text);
         Assert.Contains("192.168.1.199", text);
-        Assert.Contains("tunnel.dll", text);
+        Assert.Contains("wireguard-nt", text);
         Assert.Contains("wireguard.dll", text);
         Assert.Contains("src/RdpManager/Vpn/dll/amd64/", text);
     }

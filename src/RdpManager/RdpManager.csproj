@@ -39,8 +39,8 @@
   </ItemGroup>
 
   <!--
-    DLL ufficiali di WireGuard per Windows (embeddable-dll-service): tunnel.dll e wireguard.dll, da copiare in
-    Vpn\dll\amd64 (vedi LEGGIMI.txt lì). Se ci sono, finiscono accanto a RdpManager.exe (e quindi nell'installer).
+    wireguard.dll ufficiale (wireguard-nt 1.1, firmata WireGuard LLC) in Vpn\dll\amd64 (vedi LEGGIMI.txt lì): finisce
+    accanto a RdpManager.exe (e quindi nell'installer). Il tunnel usa direttamente la sua API, nessun'altra DLL.
   -->
   <ItemGroup>
     <None Include="Vpn\dll\amd64\*.dll" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

@@ -193,6 +193,7 @@ public class WireGuardTunnelTests : IDisposable
         public TunnelState State = TunnelState.Spento;
         public bool Present;
         public bool StartFails;
+        public bool StopDenied;
         public List<string> Calls = [];
         public string? BinPath;
 
@@ -200,7 +201,14 @@ public class WireGuardTunnelTests : IDisposable
         public bool Exists(string name) => Present;
         public void Create(string name, string display, string bin) { Calls.Add("create"); Present = true; BinPath = bin; }
         public void Start(string name) { Calls.Add("start"); State = StartFails ? TunnelState.Errore : TunnelState.Acceso; }
-        public void Stop(string name) { Calls.Add("stop"); State = TunnelState.Spento; }
+        public void Stop(string name)
+        {
+            if (StopDenied)
+                throw new InvalidOperationException("accesso negato");
+            Calls.Add("stop");
+            State = TunnelState.Spento;
+        }
+        public void GrantUserControl(string name) => Calls.Add("grant");
         public void Delete(string name) { Calls.Add("delete"); Present = false; }
     }
 
@@ -230,7 +238,8 @@ public class WireGuardTunnelTests : IDisposable
     {
         var svc = new FakeServices();
         var el = new InProcessElevator(svc, Path.Combine(_dir, "pd"), code);
-        return (new WireGuardNtTunnel(el, svc, Path.Combine(_dir, "stage")), svc, el);
+        var pd = Path.Combine(_dir, "pd");
+        return (new WireGuardNtTunnel(el, svc, Path.Combine(_dir, "stage"), VpnPaths.InstalledHash(pd)) { Sleep = _ => { } }, svc, el);
     }
 
     [Fact]
@@ -240,9 +249,12 @@ public class WireGuardTunnelTests : IDisposable
         Assert.Equal(TunnelState.Spento, t.Stato);
         t.Accendi(Config());
         Assert.Equal(TunnelState.Acceso, t.Stato);
-        Assert.Equal(["create", "start"], svc.Calls);
-        Assert.Contains("--wg-service", svc.BinPath);
-        Assert.Empty(Directory.GetFiles(_dir, "*.conf", SearchOption.AllDirectories));
+        Assert.Equal(["create", "grant", "start"], svc.Calls);
+        Assert.Contains("--vpn-service RdpManager", svc.BinPath);
+        Assert.DoesNotContain("tunnel.dll", svc.BinPath);
+        // la chiave in chiaro resta solo nella cartella protetta di ProgramData, mai nella cartella dell'utente
+        Assert.Empty(Directory.GetFiles(Path.Combine(_dir, "stage"), "*.conf"));
+        Assert.Single(Directory.GetFiles(Path.Combine(_dir, "pd"), "*.conf", SearchOption.AllDirectories));
         Assert.Equal(["--vpn-helper", "su"], el.Runs[0][..2]);
     }
 
@@ -284,7 +296,7 @@ public class WireGuardTunnelTests : IDisposable
     }
 
     [Fact]
-    public void Spegni_StopsAndRemoves_AndIsIdempotent()
+    public void Spegni_StopsKeepsServiceInstalled_AndIsIdempotent()
     {
         var (t, svc, el) = Make();
         t.Spegni();
@@ -292,8 +304,70 @@ public class WireGuardTunnelTests : IDisposable
         t.Accendi(Config());
         t.Spegni();
         Assert.Equal(TunnelState.Spento, t.Stato);
+        Assert.True(svc.Present);
+        Assert.Equal(["create", "grant", "start", "stop"], svc.Calls);
+        Assert.Single(el.Runs); // solo l'installazione ha chiesto UAC
+    }
+
+    [Fact]
+    public void Accendi_SecondTimeWithSameConfig_StartsWithoutUac()
+    {
+        var (t, svc, el) = Make();
+        var cfg = Config();
+        t.Accendi(cfg);
+        t.Spegni();
+        t.Accendi(cfg);
+        Assert.Single(el.Runs);
+        Assert.Equal(["create", "grant", "start", "stop", "start"], svc.Calls);
+        Assert.Equal(TunnelState.Acceso, t.Stato);
+    }
+
+    [Fact]
+    public void Accendi_WithChangedConfig_GoesThroughHelperAgain()
+    {
+        var (t, svc, el) = Make();
+        t.Accendi(Config());
+        t.Spegni();
+        t.Accendi(Config());
+        Assert.Equal(2, el.Runs.Count);
+        Assert.Equal(["create", "grant", "start", "stop", "delete", "create", "grant", "start"], svc.Calls);
+    }
+
+    [Fact]
+    public void Spegni_WhenUserCannotStop_FallsBackToHelper()
+    {
+        var (t, svc, el) = Make();
+        t.Accendi(Config());
+        svc.StopDenied = true;
+        t.Spegni();
+        Assert.Equal(["--vpn-helper", "giu"], el.Runs[^1]);
+        Assert.Equal(TunnelState.Spento, t.Stato);
+    }
+
+    [Fact]
+    public void Helper_Rimuovi_DeletesServiceAndFiles()
+    {
+        var (t, svc, el) = Make();
+        t.Accendi(Config());
+        t.Rimuovi();
         Assert.False(svc.Present);
-        Assert.Equal(["create", "start", "stop", "delete"], svc.Calls);
+        Assert.Empty(Directory.GetFiles(Path.Combine(_dir, "pd"), "*", SearchOption.AllDirectories));
+        Assert.Equal(["--vpn-helper", "rimuovi"], el.Runs[^1]);
+    }
+
+    [Fact]
+    public void Dettagli_ReadsStatusFileOnlyWhenOn()
+    {
+        var svc = new FakeServices();
+        var file = Path.Combine(_dir, "stato.txt");
+        Directory.CreateDirectory(_dir);
+        var st = new VpnStatus(new DateTime(2026, 11, 3, 8, 0, 0, DateTimeKind.Utc), 10, 20, new DateTime(2026, 11, 3, 8, 0, 2, DateTimeKind.Utc));
+        File.WriteAllText(file, st.Format());
+        var t = new WireGuardNtTunnel(new InProcessElevator(svc, _dir), svc, _dir, null, file);
+        Assert.Null(t.Dettagli);
+        svc.Present = true;
+        svc.State = TunnelState.Acceso;
+        Assert.Equal(st, t.Dettagli);
     }
 
     [Fact]

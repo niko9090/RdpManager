@@ -1,16 +1,14 @@
-Qui vanno le DLL di WireGuard per Windows (x64):
+Qui sta la DLL di WireGuard per Windows (x64):
 
-  tunnel.dll     (servizio del tunnel, esporta WireGuardTunnelService)
-  wireguard.dll  (driver wireguard-nt, caricato da tunnel.dll)
+  wireguard.dll  (driver wireguard-nt 1.1, firmata WireGuard LLC)
 
-Da dove prenderle: pacchetto «embeddable-dll-service» ufficiale
-  https://download.wireguard.com/embeddable-dll-service/   (cartella amd64\ dello zip)
-Verificare la firma digitale (WireGuard LLC) prima di copiarle.
+RdpManager usa direttamente l'API di wireguard-nt (WireGuardCreateAdapter, WireGuardSetConfiguration, ...) da un
+servizio Windows fornito da RdpManager.exe stesso (--vpn-service): non serve nessun'altra DLL.
 
-Con le DLL qui, la compilazione e la pubblicazione le copiano accanto a RdpManager.exe e l'installer le include
-(il [Files] dell'installer prende tutta la cartella di pubblicazione). Senza DLL l'app funziona e la VPN
-segnala che mancano.
+Da dove viene: https://download.wireguard.com/wireguard-nt/wireguard-nt-1.1.zip (cartella bin\amd64).
+Per aggiornarla: scaricare lo zip ufficiale in una cartella a parte e verificare la firma digitale prima di copiarla:
+  Get-AuthenticodeSignature .\wireguard.dll | Format-List Status, SignerCertificate
+Status deve essere Valid e il firmatario WireGuard LLC (lo controlla anche un test).
 
-STATO: wireguard.dll (wireguard-nt 1.1, firmata WireGuard LLC, Authenticode Valid) e' inclusa, da
-download.wireguard.com/wireguard-nt/wireguard-nt-1.1.zip (bin\amd64). tunnel.dll NON e' ancora inclusa: WireGuard non
-pubblica un binario ufficiale firmato (embeddable-dll-service su download.wireguard.com non esiste; tunnel.dll si ottiene solo compilando wireguard-windows).
+La compilazione e la pubblicazione la copiano accanto a RdpManager.exe e l'installer la include (il [Files]
+dell'installer prende tutta la cartella di pubblicazione). Solo x64: su ARM64 la VPN integrata non e' disponibile.

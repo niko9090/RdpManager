@@ -6,49 +6,26 @@ using System.Security.Principal;
 
 namespace RdpManager.Vpn;
 
-/// <summary>
-/// Tutta la parte che tocca Windows e le DLL di WireGuard, isolata qui perché i test usano le finte (<see cref="IServiceManager"/>,
-/// <see cref="IVpnElevator"/>). Le DLL (tunnel.dll, wireguard.dll) vanno nella cartella del programma, vedi Vpn\dll\LEGGIMI.txt.
-/// </summary>
+/// <summary>Presenza di wireguard.dll (wireguard-nt ufficiale) accanto al programma.</summary>
 internal static class WireGuardNative
 {
-    /// <summary>
-    /// Cuore del servizio (<c>RdpManager.exe --wg-service file.conf</c>): chiama <c>WireGuardTunnelService</c> di tunnel.dll,
-    /// che si registra presso il gestore dei servizi e resta qui finché il servizio non viene fermato. Falso = non è riuscito.
-    /// </summary>
-    public static bool RunTunnelService(string confPath)
-    {
-        var dll = Path.Combine(AppContext.BaseDirectory, "tunnel.dll");
-        if (!File.Exists(dll) || !File.Exists(Path.Combine(AppContext.BaseDirectory, "wireguard.dll")))
-            return false;
-        // wireguard.dll è cercata da tunnel.dll nella sua stessa cartella.
-        if (NativeLibrary.Load(dll) is var handle && handle == IntPtr.Zero)
-            return false;
-        var export = NativeLibrary.GetExport(handle, "WireGuardTunnelService");
-        var fn = Marshal.GetDelegateForFunctionPointer<TunnelServiceFn>(export);
-        return fn(confPath);
-    }
-
-    [UnmanagedFunctionPointer(CallingConvention.Cdecl, CharSet = CharSet.Unicode)]
-    [return: MarshalAs(UnmanagedType.U1)]
-    private delegate bool TunnelServiceFn([MarshalAs(UnmanagedType.LPWStr)] string confFile);
-
-    public static bool DllsPresent
-        => File.Exists(Path.Combine(AppContext.BaseDirectory, "tunnel.dll"))
-           && File.Exists(Path.Combine(AppContext.BaseDirectory, "wireguard.dll"));
+    public static bool DllPresent => File.Exists(Path.Combine(AppContext.BaseDirectory, "wireguard.dll"));
 }
 
-/// <summary>Stato dei servizi tramite il gestore dei servizi di Windows (basta l'utente normale).</summary>
-public sealed class ScQuery : IVpnServiceQuery
+/// <summary>Stato e controllo del servizio tramite il gestore dei servizi di Windows (basta l'utente normale, se il servizio gli dà i permessi).</summary>
+public sealed class ScControl : IVpnServiceControl
 {
+    private const int ScManagerConnect = 1;
+    private const int ServiceQueryStatus = 4, ServiceStart = 0x10, ServiceStop = 0x20;
+
     public TunnelState Query(string serviceName)
     {
-        var scm = OpenSCManager(null, null, 1);
+        var scm = OpenSCManager(null, null, ScManagerConnect);
         if (scm == IntPtr.Zero)
             return TunnelState.Errore;
         try
         {
-            var svc = OpenService(scm, serviceName, 4);
+            var svc = OpenService(scm, serviceName, ServiceQueryStatus);
             if (svc == IntPtr.Zero)
                 return Marshal.GetLastWin32Error() == 1060 ? TunnelState.Spento : TunnelState.Errore; // 1060: servizio inesistente
             try
@@ -63,6 +40,62 @@ public sealed class ScQuery : IVpnServiceQuery
                         _ => TunnelState.Errore,
                     }
                     : TunnelState.Errore;
+            }
+            finally
+            {
+                CloseServiceHandle(svc);
+            }
+        }
+        finally
+        {
+            CloseServiceHandle(scm);
+        }
+    }
+
+    public bool Exists(string serviceName)
+    {
+        var scm = OpenSCManager(null, null, ScManagerConnect);
+        if (scm == IntPtr.Zero)
+            return false;
+        try
+        {
+            var svc = OpenService(scm, serviceName, ServiceQueryStatus);
+            if (svc == IntPtr.Zero)
+                return Marshal.GetLastWin32Error() != 1060; // permesso negato = esiste ma non è leggibile
+            CloseServiceHandle(svc);
+            return true;
+        }
+        finally
+        {
+            CloseServiceHandle(scm);
+        }
+    }
+
+    public void Start(string serviceName) => WithService(serviceName, ServiceStart, svc =>
+    {
+        if (!StartService(svc, 0, IntPtr.Zero) && Marshal.GetLastWin32Error() != 1056) // 1056: già avviato
+            throw new InvalidOperationException($"Avvio del servizio non riuscito (errore {Marshal.GetLastWin32Error()}).");
+    });
+
+    public void Stop(string serviceName) => WithService(serviceName, ServiceStop, svc =>
+    {
+        if (!ControlService(svc, 1, out _) && Marshal.GetLastWin32Error() is not (1062 or 1061)) // già fermo / in transizione
+            throw new InvalidOperationException($"Arresto del servizio non riuscito (errore {Marshal.GetLastWin32Error()}).");
+    });
+
+    private static void WithService(string serviceName, int access, Action<IntPtr> action)
+    {
+        var scm = OpenSCManager(null, null, ScManagerConnect);
+        if (scm == IntPtr.Zero)
+            throw new InvalidOperationException($"Gestore dei servizi non accessibile (errore {Marshal.GetLastWin32Error()}).");
+        try
+        {
+            var svc = OpenService(scm, serviceName, access);
+            if (svc == IntPtr.Zero)
+                throw new InvalidOperationException($"Servizio non accessibile (errore {Marshal.GetLastWin32Error()}).");
+            try
+            {
+                action(svc);
             }
             finally
             {
@@ -93,28 +126,38 @@ public sealed class ScQuery : IVpnServiceQuery
 
     [DllImport("advapi32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool StartService(IntPtr service, int argc, IntPtr argv);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ControlService(IntPtr service, int control, out ServiceStatus status);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool CloseServiceHandle(IntPtr handle);
 }
 
-/// <summary>Creazione e controllo dei servizi con sc.exe: solo da processo elevato (l'assistente <see cref="VpnHelper"/>).</summary>
+/// <summary>Creazione e rimozione dei servizi con sc.exe: solo da processo elevato (l'assistente <see cref="VpnHelper"/>).</summary>
 public sealed class ScServiceManager : IServiceManager
 {
-    private readonly ScQuery _query = new();
+    // SDDL: SYSTEM e amministratori tutto; gli utenti interattivi leggono lo stato, avviano e fermano il servizio.
+    private const string Sddl = "D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;LCRPWPLORC;;;IU)";
 
-    public TunnelState Query(string serviceName) => _query.Query(serviceName);
+    private readonly ScControl _control = new();
 
-    public bool Exists(string serviceName) => Sc("query", serviceName) == 0;
+    public TunnelState Query(string serviceName) => _control.Query(serviceName);
+
+    public bool Exists(string serviceName) => _control.Exists(serviceName);
 
     public void Create(string serviceName, string displayName, string binaryPathWithArgs)
-    {
-        Require(Sc("create", serviceName, "binPath=", binaryPathWithArgs, "start=", "demand", "DisplayName=", displayName,
+        => Require(Sc("create", serviceName, "binPath=", binaryPathWithArgs, "start=", "demand", "DisplayName=", displayName,
             "depend=", "Nsi/TcpIp"), "create");
-        Sc("sidtype", serviceName, "unrestricted"); // come il servizio ufficiale di WireGuard
-    }
 
-    public void Start(string serviceName) => Require(Sc("start", serviceName), "start");
+    public void GrantUserControl(string serviceName) => Require(Sc("sdset", serviceName, Sddl), "sdset");
 
-    public void Stop(string serviceName) => Sc("stop", serviceName);
+    public void Start(string serviceName) => _control.Start(serviceName);
+
+    public void Stop(string serviceName) => _control.Stop(serviceName);
 
     public void Delete(string serviceName) => Require(Sc("delete", serviceName), "delete");
 

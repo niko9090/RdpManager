@@ -16,7 +16,9 @@ public sealed partial class MainForm
         }
         var staging = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RdpManager", "vpn");
         var exe = Environment.ProcessPath ?? Application.ExecutablePath;
-        _vpn = new VpnForm(new WireGuardNtTunnel(new ProcessElevator(exe), new ScQuery(), staging));
+        var programData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "RdpManager");
+        _vpn = new VpnForm(new WireGuardNtTunnel(new ProcessElevator(exe), new ScControl(), staging,
+            VpnPaths.InstalledHash(programData), VpnPaths.Status(programData)));
         _vpn.FormClosed += (_, _) => _vpn = null;
         _vpn.Show(this);
     }
