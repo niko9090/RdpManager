@@ -15,54 +15,38 @@ Dati della rete (devono coincidere con il client RdpManager):
 
 ## 1. Prerequisiti
 
-1. In DSM apri **Centro pacchetti** e installa **Container Manager**.
+1. Su **DSM 7.1** il pacchetto si chiama **Docker** (Container Manager esiste da DSM 7.2).
+   Da SSH: `sudo /usr/syno/bin/synopkg install_from_server Docker`, poi `sudo /usr/syno/bin/synopkg start Docker`.
+   Se l'installazione fallisce in "preinst" (impossibile creare la cartella condivisa `docker`),
+   scarica l'.spk e installalo con `synopkg install`; in caso di errore crea prima la cartella con
+   `sudo /usr/syno/sbin/synoshare --add docker "" /volume1/docker "" "" "" 0 0`.
 2. Attiva SSH: **Pannello di controllo -> Terminale e SNMP -> Abilita servizio SSH**.
-3. Collegati dal PC: `ssh tuoutente@192.168.1.199` (serve un utente amministratore).
+3. Collegati dal PC con un utente amministratore.
 
 ## 2. Copiare la cartella
 
-1. Con **File Station** crea la cartella condivisa `docker/wireguard` (o una a tua scelta).
-2. Copia dentro tutto il contenuto di `wireguard-synology`: `docker-compose.yml`,
-   `config/` e `scripts/`.
-3. I file `.sh` devono avere fine riga LF (nel repository e' garantito da `.gitattributes`).
-   Se li modifichi con Blocco note, salvali con fine riga Unix.
+Copia tutto il contenuto di `wireguard-synology` (`Dockerfile`, `docker-compose.yml`, `config/`, `scripts/`)
+in `/volume1/docker/wireguard`. I file `.sh` devono avere fine riga LF.
 
 ## 3. Avvio
 
-Da SSH, nella cartella copiata (ad esempio `/volume1/docker/wireguard`):
+Il kernel 4.4 di DSM 7.1 non ha il modulo WireGuard e `nf_tables` non funziona: il `Dockerfile`
+parte da `linuxserver/wireguard` e aggiunge **wireguard-go** (userspace) e **iptables-legacy**
+(l'immagine ufficiale non li ha e si blocca all'avvio). Il pacchetto Docker di DSM 7.1 ha
+`docker-compose` 1.28 (non `docker compose`):
 
 ```
 cd /volume1/docker/wireguard
-sudo docker compose up -d
-sudo docker logs wireguard
+sudo env PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin COMPOSE_HTTP_TIMEOUT=600 /usr/local/bin/docker-compose up -d --build
+sudo /usr/local/bin/docker exec wireguard sh /scripts/prima-generazione.sh
+sudo /usr/local/bin/docker restart wireguard
+sudo /usr/local/bin/docker exec wireguard wg show wg0
 ```
 
-Il primo avvio non trova ancora `wg0.conf`: e' normale. Genera le chiavi:
-
-```
-sudo docker exec wireguard sh /scripts/prima-generazione.sh
-sudo docker restart wireguard
-```
-
-Lo script crea `config/wg0.conf` dal modello e stampa la chiave pubblica del server.
-
-### Se su DSM manca il modulo del kernel WireGuard
-
-L'immagine `linuxserver/wireguard` ripiega da sola su **wireguard-go** (versione
-in userspace): nei log vedrai `wireguard-go` invece del modulo. Funziona, un po'
-piu' lenta ma adatta a un uso con Desktop Remoto.
-Se il container non parte nemmeno cosi' (per esempio `/dev/net/tun` assente), crea il
-file all'avvio del NAS con un'attivita' pianificata (utente root, "Attivita' di avvio"):
-
-```
-modprobe tun 2>/dev/null; [ -c /dev/net/tun ] || { mkdir -p /dev/net; mknod /dev/net/tun c 10 200; chmod 600 /dev/net/tun; }
-```
-
-Alternativa se proprio non va: una **VM Linux leggera** (Debian minimale, 512 MB di RAM,
-da Virtual Machine Manager) con `apt install wireguard`, la stessa `wg0.conf` in
-`/etc/wireguard/` e `systemctl enable --now wg-quick@wg0`. Gli script `.sh` funzionano
-uguali (impostando `WG_DIR=/etc/wireguard`). L'inoltro verso la LAN richiede
-`net.ipv4.ip_forward=1` nella VM.
+Il primo avvio senza `wg0.conf` e' normale; `prima-generazione.sh` crea `config/wg0.conf` dal
+modello e stampa la chiave pubblica del server. Il container ha `restart: unless-stopped` e
+il pacchetto Docker parte da solo all'avvio del NAS. `config/` contiene le chiavi del server
+e i profili: e' escluso dal repository (`.gitignore`).
 
 ## 4. Router, firewall e DNS
 
@@ -82,7 +66,7 @@ uguali (impostando `WG_DIR=/etc/wireguard`). L'inoltro verso la LAN richiede
 3. Sul Synology:
 
 ```
-sudo docker exec wireguard sh /scripts/aggiungi-pc.sh NomePC "CHIAVE_PUBBLICA_DEL_PC"
+sudo /usr/local/bin/docker exec wireguard sh /scripts/aggiungi-pc.sh NomePC "CHIAVE_PUBBLICA_DEL_PC"
 ```
 
    Facoltativo, terzo parametro, l'indirizzo voluto (es. `10.66.0.7`). Senza, lo script
@@ -90,16 +74,26 @@ sudo docker exec wireguard sh /scripts/aggiungi-pc.sh NomePC "CHIAVE_PUBBLICA_DE
    interrompere gli altri PC e stampa la chiave pubblica del server e l'endpoint.
 4. Inserisci quei due dati nel pannello VPN di RdpManager e attiva la VPN.
 
+Per fare tutto sul server, senza passare dal client (genera anche le chiavi del PC):
+
+```
+sudo /usr/local/bin/docker exec wireguard sh /scripts/crea-profilo-client.sh NomePC
+sudo cat /volume1/docker/wireguard/config/profili/NomePC.conf
+```
+
+Il profilo (con la chiave privata del PC) resta in `config/profili/` (solo root) e va copiato
+fuori dal repository.
+
 Altri comandi:
 
 ```
-sudo docker exec wireguard sh /scripts/elenca-pc.sh
-sudo docker exec wireguard sh /scripts/rimuovi-pc.sh NomePC
+sudo /usr/local/bin/docker exec wireguard sh /scripts/elenca-pc.sh
+sudo /usr/local/bin/docker exec wireguard sh /scripts/rimuovi-pc.sh NomePC
 ```
 
 ## 6. Controlli
 
-- Sul Synology: `sudo docker exec wireguard wg show` -> deve comparire il PC con un
+- Sul Synology: `sudo /usr/local/bin/docker exec wireguard wg show` -> deve comparire il PC con un
   "latest handshake" di pochi secondi dopo l'attivazione.
 - Dal PC con la VPN attiva: `ping 10.66.0.1`.
 - Se non risponde: controlla porta UDP sul router, regola del firewall DSM, DNS di

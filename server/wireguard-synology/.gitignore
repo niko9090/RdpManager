@@ -1,0 +1,5 @@
+# Segreti generati sul NAS: mai nel repository
+config/wg0.conf
+config/server.key
+config/server.pub
+config/profili/
