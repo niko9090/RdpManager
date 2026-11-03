@@ -102,6 +102,12 @@ sudo /usr/local/bin/docker exec wireguard sh /scripts/rimuovi-pc.sh NomePC
   `PostUp`/`PostDown` di `wg0.conf` (gia' presenti, con NAT verso la LAN) e che il
   client abbia `192.168.1.0/24` tra gli indirizzi permessi.
 
+## 6b. Server di sincronizzazione
+
+Il `docker-compose.yml` pubblica `127.0.0.1:8787:8787`: la porta serve al contenitore `rdpm-sync`
+(`server/rdpm-sync`), che usa la rete di questo contenitore e risponde ai client VPN su
+`http://10.66.0.1:8787`. Se ricrei questo contenitore, ricrea anche `rdpm-sync` (vedi il suo LEGGIMI).
+
 ## 7. La DLL wireguard.dll nel client
 
 Il client RdpManager **non** usa `tunnel.dll` (WireGuard non la pubblica gia' compilata e firmata):
