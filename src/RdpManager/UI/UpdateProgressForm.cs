@@ -6,7 +6,7 @@ namespace RdpManager.UI;
 /// Finestrella del programma di aggiornamento: «Aggiornamento di RdpManager in corso…» mentre la copia di riserva
 /// aspetta la chiusura dell'app, installa in silenzio, verifica e riapre. Il lavoro vero è in <see cref="UpdateRunner"/>.
 /// </summary>
-internal sealed class UpdateProgressForm : Form
+internal sealed class UpdateProgressForm : TouchForm
 {
     private readonly Label _text = new() { Dock = DockStyle.Top, Height = 48, TextAlign = ContentAlignment.MiddleLeft };
 

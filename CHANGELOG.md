@@ -12,6 +12,30 @@
 - Contratto per il cliente in `docs/sync-server-api.md`; avvio e primo account in `server/rdpm-sync/LEGGIMI.md`.
   Il cliente in RdpManager arriverà in un lavoro successivo.
 
+## Non ancora rilasciato
+
+**Si usa anche col dito e senza tastiera, su schermi piccoli (per esempio 1366x912 al 150%)**
+- Bersagli di almeno 40 px logici: pulsanti, caselle, righe degli elenchi, linguette, voci dei menu, barra della
+  sessione e pulsanti della barra a schermo intero.
+- In fondo alla **barra laterale** (che resta a sinistra: niente in alto) ci sono i pulsanti **Collega**,
+  **Scollega**, **Precedente**, **Successiva**, **Schermo intero** e **Tastiera**: le azioni principali senza
+  tasto destro né scorciatoie.
+- **Tieni premuto** su una connessione o su una scheda al posto del clic destro.
+- **Tastiera su schermo** (TabTip, altrimenti osk.exe): pulsante «Tastiera» nella barra della sessione, nella
+  barra a schermo intero e nel menu Sessione; i tasti vanno alla sessione visibile.
+- I dialoghi non sono mai più grandi dell'area di lavoro: il modulo di modifica della connessione scorre con
+  OK e Annulla sempre visibili, le impostazioni hanno le pagine che scorrono, la finestra principale rientra
+  nello schermo. Scalano con i dpi del monitor.
+
+**VPN WireGuard integrata (in preparazione, al posto di Tailscale)**
+- «Strumenti → VPN (WireGuard)…»: crea le chiavi (la privata resta cifrata con DPAPI), mostra la chiave pubblica e il
+  frammento `[Peer]` da aggiungere al server (syncnetpro.com:51820, rete 10.66.0.0/24), accende e spegne il tunnel.
+- Il tunnel usa direttamente il driver **wireguard-nt**: `wireguard.dll` ufficiale (versione 1.1, firmata WireGuard LLC) è
+  inclusa nel programma e nell'installer, senza altre DLL né installazioni separate (`tunnel.dll` non serve più).
+  Un servizio Windows fornito da RdpManager.exe stesso tiene su il tunnel, con indirizzo e rotte; si installa con
+  una conferma UAC la prima volta, poi accendere e spegnere non la chiedono più. Lo stato mostra l'ultimo contatto col server.
+  Non ancora provato con il driver vero su un PC (solo prove automatiche sulle strutture e sui comandi).
+
 ## 1.6.1
 
 **Aggiornamento automatico con le sessioni aperte, corretto**

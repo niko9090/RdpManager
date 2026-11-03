@@ -3,7 +3,7 @@ using RdpManager.Core;
 namespace RdpManager.UI;
 
 /// <summary>Finestra di aggiunta/modifica di una connessione. Modifica l'oggetto solo con OK.</summary>
-public sealed class ConnectionDialog : Form
+public sealed class ConnectionDialog : TouchForm
 {
     private readonly RdpConnection _target;
     private readonly TextBox _name = new() { Width = 280 };
@@ -16,6 +16,7 @@ public sealed class ConnectionDialog : Form
     private readonly ComboBox _group = new() { Width = 280, DropDownStyle = ComboBoxStyle.DropDown };
     private readonly RadioButton _fit = new() { Text = "Adatta alla finestra", AutoSize = true };
     private readonly RadioButton _fixed = new() { Text = "Fissa:", AutoSize = true };
+    private readonly CheckBox _inheritResolution = new() { Text = "Usa la risoluzione della cartella", AutoSize = true };
     private readonly NumericUpDown _width = new() { Minimum = 640, Maximum = 8192, Width = 70 };
     private readonly NumericUpDown _height = new() { Minimum = 480, Maximum = 8192, Width = 70 };
     private readonly CheckBox _clipboard = new() { Text = "Condividi appunti", AutoSize = true };
@@ -58,6 +59,18 @@ public sealed class ConnectionDialog : Form
         (AudioMode.None, "Nessun audio"),
     ];
 
+    private readonly TableLayoutPanel _grid = new() { ColumnCount = 2, AutoSize = true, Dock = DockStyle.Top };
+    private readonly Panel _scroll = new() { Dock = DockStyle.Fill, AutoScroll = true };
+    private FlowLayoutPanel _buttons = null!;
+
+    /// <summary>Misura della finestra: tutto il modulo se ci sta, altrimenti quanto l'area di lavoro permette (e il resto scorre).</summary>
+    protected override void ArrangeForTouch()
+    {
+        var form = _grid.GetPreferredSize(Size.Empty);
+        ClientSize = new Size(form.Width + Padding.Horizontal + SystemInformation.VerticalScrollBarWidth,
+            form.Height + _buttons.GetPreferredSize(Size.Empty).Height + Padding.Vertical);
+    }
+
     public ConnectionDialog(RdpConnection target, IEnumerable<string> groups, string title,
         IReadOnlyList<CredentialProfile>? profiles = null)
     {
@@ -67,12 +80,11 @@ public sealed class ConnectionDialog : Form
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = MinimizeBox = false;
         StartPosition = FormStartPosition.CenterParent;
-        AutoSize = true;
-        AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        // Il modulo è lungo: sta in un riquadro che scorre, con OK e Annulla sempre visibili in basso (schermi piccoli).
         Padding = new Padding(10);
         Font = SystemFonts.MessageBoxFont ?? Font;
 
-        var grid = new TableLayoutPanel { ColumnCount = 2, AutoSize = true, Dock = DockStyle.Fill };
+        var grid = _grid;
         void Row(string label, Control control)
         {
             grid.Controls.Add(new Label { Text = label, AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(3, 7, 10, 3) });
@@ -103,6 +115,7 @@ public sealed class ConnectionDialog : Form
         Row("Credenziali gateway", _gatewayCredentials);
         Row("Cartella", _group);
         Row("Risoluzione", Flow(_fit, _fixed, _width, new Label { Text = "×", AutoSize = true, Margin = new Padding(0, 6, 0, 0) }, _height));
+        Row("", Flow(_inheritResolution, Help("Se la cartella ha una risoluzione impostata («Impostazioni della cartella…»), vale quella al posto di questa.")));
         Row("Risorse", Flow(_clipboard, _drives, _printers, _microphone));
         Row("Audio", _audio);
         Row("Qualità", Flow(_quality, _keepAlive, Help("Rete locale: 32 bit e tutti gli effetti. Connessione lenta: 16 bit, niente sfondo, animazioni e temi, compressione. Automatica: decide il client misurando la rete. «Tieni sveglia» manda un segnale ogni minuto per evitare le disconnessioni per inattività di router e firewall. Valgono anche per «Apri con mstsc» e i file .rdp.")));
@@ -120,8 +133,10 @@ public sealed class ConnectionDialog : Form
         AcceptButton = ok;
         CancelButton = cancel;
 
-        Controls.Add(grid);
+        _scroll.Controls.Add(grid);
+        Controls.Add(_scroll);
         Controls.Add(buttons);
+        _buttons = buttons;
 
         _group.Items.AddRange(groups.Cast<object>().ToArray());
         _showPassword.CheckedChanged += (_, _) => _password.UseSystemPasswordChar = !_showPassword.Checked;
@@ -165,6 +180,7 @@ public sealed class ConnectionDialog : Form
         _gatewayCredentials.SelectionChangeCommitted += (_, _) => _gatewayCredentialsTouched = true;
         UpdateGatewayFields();
         _group.Text = target.Group;
+        _inheritResolution.Checked = target.InheritFolderResolution;
         _fit.Checked = target.ResolutionMode == ResolutionMode.FitToWindow;
         _fixed.Checked = !_fit.Checked;
         _width.Value = Math.Clamp(target.DesktopWidth, 640, 8192);
@@ -280,6 +296,7 @@ public sealed class ConnectionDialog : Form
         }
         _target.Group = RdpConnection.NormalizeGroup(_group.Text);
         _target.ResolutionMode = _fit.Checked ? ResolutionMode.FitToWindow : ResolutionMode.Fixed;
+        _target.InheritFolderResolution = _inheritResolution.Checked;
         _target.DesktopWidth = (int)_width.Value;
         _target.DesktopHeight = (int)_height.Value;
         _target.RedirectClipboard = _clipboard.Checked;

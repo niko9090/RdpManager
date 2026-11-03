@@ -86,7 +86,7 @@ internal sealed class LockForm : Form
 }
 
 /// <summary>Impostazione del PIN: due volte, solo cifre.</summary>
-internal sealed class PinSetDialog : Form
+internal sealed class PinSetDialog : TouchForm
 {
     private readonly TextBox _pin = new() { Width = 180, UseSystemPasswordChar = true, MaxLength = PinLock.MaxLength };
     private readonly TextBox _confirm = new() { Width = 180, UseSystemPasswordChar = true, MaxLength = PinLock.MaxLength };
@@ -127,7 +127,7 @@ internal sealed class PinSetDialog : Form
 // ---------- importazione CSV ----------
 
 /// <summary>Anteprima dell'importazione da CSV: associazione delle colonne ai campi, cartella, esito di ogni riga.</summary>
-internal sealed class CsvImportDialog : Form
+internal sealed class CsvImportDialog : TouchForm
 {
     private readonly CsvTable _table;
     private readonly ConnectionsDocument _doc;
@@ -218,7 +218,7 @@ internal sealed class CsvImportDialog : Form
 
 // ---------- riepilogo delle scorciatoie (F1) ----------
 
-internal sealed class ShortcutsDialog : Form
+internal sealed class ShortcutsDialog : TouchForm
 {
     public ShortcutsDialog(IReadOnlyList<ShortcutLine> lines)
     {
@@ -251,7 +251,7 @@ internal sealed class ShortcutsDialog : Form
 
 // ---------- spazi di lavoro ----------
 
-internal sealed class WorkspacesDialog : Form
+internal sealed class WorkspacesDialog : TouchForm
 {
     private readonly ConnectionsDocument _doc;
     private readonly ListBox _list = new() { Width = 380, Height = 220, IntegralHeight = false };
@@ -365,7 +365,7 @@ internal sealed class WorkspacesDialog : Form
 
 // ---------- scelta da un elenco (azioni di gruppo) ----------
 
-internal sealed class ChoiceDialog : Form
+internal sealed class ChoiceDialog : TouchForm
 {
     private readonly ComboBox _choice = new() { Width = 320 };
 

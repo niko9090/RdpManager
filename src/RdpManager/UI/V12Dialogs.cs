@@ -35,7 +35,7 @@ internal static class DialogStyle
 // ---------- profili di credenziali ----------
 
 /// <summary>Aggiunta o modifica di un profilo di credenziali. Modifica l'oggetto solo con OK.</summary>
-internal sealed class ProfileEditDialog : Form
+internal sealed class ProfileEditDialog : TouchForm
 {
     private readonly CredentialProfile _target;
     private readonly TextBox _name = new() { Width = 260 };
@@ -104,7 +104,7 @@ internal sealed class ProfileEditDialog : Form
 }
 
 /// <summary>Elenco dei profili di credenziali: nuovo, modifica, elimina. Lavora direttamente sul documento.</summary>
-internal sealed class CredentialProfilesDialog : Form
+internal sealed class CredentialProfilesDialog : TouchForm
 {
     private readonly ConnectionsDocument _doc;
     private readonly ListBox _list = new() { Width = 420, Height = 220, IntegralHeight = false };
@@ -210,7 +210,7 @@ internal sealed class CredentialProfilesDialog : Form
 
 // ---------- testi rapidi ----------
 
-internal sealed class QuickTextEditDialog : Form
+internal sealed class QuickTextEditDialog : TouchForm
 {
     private readonly QuickText _target;
     private readonly TextBox _name = new() { Width = 460 };
@@ -255,7 +255,7 @@ internal sealed class QuickTextEditDialog : Form
 }
 
 /// <summary>Elenco dei testi rapidi: nuovo, modifica, elimina, ordine. Lavora direttamente sul documento.</summary>
-internal sealed class QuickTextsDialog : Form
+internal sealed class QuickTextsDialog : TouchForm
 {
     private readonly ConnectionsDocument _doc;
     private readonly ListBox _list = new() { Width = 420, Height = 240, IntegralHeight = false };
@@ -367,7 +367,7 @@ internal sealed class QuickTextsDialog : Form
 // ---------- cronologia ----------
 
 /// <summary>Cronologia delle connessioni: inizio, fine, durata, motivo; filtro per connessione e svuotamento.</summary>
-internal sealed class HistoryDialog : Form
+internal sealed class HistoryDialog : TouchForm
 {
     private readonly ConnectionHistory _history;
     private readonly ListView _list = new()
@@ -463,9 +463,9 @@ internal sealed class HistoryDialog : Form
 // ---------- cronologia di mstsc ----------
 
 /// <summary>Scelta dei PC da importare dalla cronologia di mstsc (letta solo dopo la richiesta dell'utente).</summary>
-internal sealed class MstscImportDialog : Form
+internal sealed class MstscImportDialog : TouchForm
 {
-    private readonly CheckedListBox _list = new() { Width = 480, Height = 260, CheckOnClick = true, IntegralHeight = false };
+    private readonly TouchCheckedListBox _list = new() { Width = 480, Height = 260, CheckOnClick = true, IntegralHeight = false };
     private readonly IReadOnlyList<MstscHistoryItem> _items;
 
     public MstscImportDialog(IReadOnlyList<MstscHistoryItem> items, ConnectionsDocument doc)

@@ -24,7 +24,7 @@ internal sealed class NetworkScanSources
 /// lettura di Tailscale cominciano solo con i pulsanti. I PC spuntati (o selezionati) vanno nella cartella scelta,
 /// senza doppioni; la finestra resta aperta per altre ricerche.
 /// </summary>
-internal sealed class NetworkScanForm : Form
+internal sealed class NetworkScanForm : TouchForm
 {
     private readonly ConnectionsDocument _doc;
     private readonly NetworkScanSources _sources;

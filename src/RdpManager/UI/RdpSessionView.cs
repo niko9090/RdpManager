@@ -61,6 +61,7 @@ public sealed class RdpSessionView : UserControl
         _bar.Items.Add(_detachButton);
         _bar.Items.Add(_monitorButton);
         _bar.Items.Add(_sendButton);
+        _bar.Items.Add(new ToolStripButton("Tastiera", null, (_, _) => OpenScreenKeyboard()) { ToolTipText = "Apre la tastiera su schermo di Windows: i tasti vanno a questa sessione" });
         _bar.Items.Add(new ToolStripButton("Apri con mstsc", null, (_, _) => OpenWithMstsc()) { ToolTipText = "Apre la connessione con il client Desktop remoto di Windows" });
         _bar.Items.Add(new ToolStripButton("Chiudi", null, (_, _) => CloseRequested?.Invoke(this, EventArgs.Empty)) { Alignment = ToolStripItemAlignment.Right });
         _reconnectButton.Click += (_, _) => Connect();
@@ -70,6 +71,9 @@ public sealed class RdpSessionView : UserControl
         _host.Controls.Add(_message);
         Controls.Add(_host);
         Controls.Add(_bar);
+        // Barra e menu da dito (40 px logici): i dpi veri si sanno solo con la finestra creata.
+        HandleCreated += (_, _) => TouchUi.Apply(_bar);
+        DpiChangedAfterParent += (_, _) => TouchUi.Apply(_bar);
 
         _host.Resize += (_, _) => { if (State == SessionState.Connected) { _resizeTimer.Stop(); _resizeTimer.Start(); } };
         _resizeTimer.Tick += (_, _) => { _resizeTimer.Stop(); ApplyFitToWindow(); };
@@ -289,6 +293,14 @@ public sealed class RdpSessionView : UserControl
     {
         try { MstscLauncher.Launch(Effective); }
         catch (Exception ex) { MessageBox.Show(this, "Impossibile avviare mstsc.exe: " + ex.Message, "RdpManager", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+    }
+
+    /// <summary>Apre la tastiera su schermo di Windows e rimette il fuoco nella sessione, così i tasti arrivano lì.</summary>
+    public void OpenScreenKeyboard()
+    {
+        TouchUi.OpenScreenKeyboard(FindForm());
+        if (IsHandleCreated)
+            BeginInvoke(FocusSession);
     }
 
     /// <summary>Porta il fuoco della tastiera dentro la sessione remota.</summary>
@@ -546,9 +558,13 @@ public sealed class RdpSessionView : UserControl
         Try(() => ocx.AdvancedSettings8.AudioCaptureRedirectionMode = c.RedirectMicrophone);
         if (c.HasGateway)
             ConfigureGateway(ocx, c);
-        if (AllowCredentialPrompt)
+        var prompt = CredentialPromptPolicy.For(!string.IsNullOrEmpty(c.Password), AllowCredentialPrompt);
+        if (!prompt.Strict)
         {
-            Try(() => _rdp!.NonScriptable?.put_PromptForCredentials(string.IsNullOrEmpty(c.Password)));
+            // Il controllo nuovo parte con la richiesta permessa: con una password salvata va vietata a ogni
+            // connessione, altrimenti dopo una caduta Windows richiede di nuovo le credenziali.
+            Try(() => _rdp!.NonScriptable?.put_PromptForCredentials(prompt.PromptForCredentials));
+            Try(() => (_rdp!.Ocx as IMsRdpClientNonScriptable5)?.put_AllowPromptingForCredentials(prompt.AllowPrompting));
         }
         else
         {

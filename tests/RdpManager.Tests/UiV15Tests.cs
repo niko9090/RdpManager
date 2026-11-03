@@ -279,7 +279,7 @@ public sealed class UiV15Tests(ITestOutputHelper output) : IDisposable
             Assert.Contains(BarSection.SessionActions, bar.ShownSections); // di serie
             var buttons = Descendants(bar).OfType<FullScreenSideBar.ActionButton>().Where(b => b.Tag is SessionBarAction).ToList();
             Assert.Equal(FullScreenBarLayout.SessionActions, buttons.Select(b => (SessionBarAction)b.Tag!));
-            Assert.Equal(["Invia Ctrl+Alt+Canc", "Foto della sessione", "Monitor successivo"], buttons.Select(b => b.Text));
+            Assert.Equal(["Invia Ctrl+Alt+Canc", "Foto della sessione", "Monitor successivo", "Tastiera su schermo"], buttons.Select(b => b.Text));
 
             var done = new List<(SessionBarAction, RdpSessionView?)>();
             form.SessionActionForTests = a => done.Add((a, form.CurrentView));
@@ -351,16 +351,21 @@ public sealed class UiV15Tests(ITestOutputHelper output) : IDisposable
             form.ApplyFullScreenBarForTests(new FullScreenBarSettings { Position = BarPosition.Left, Mode = BarMode.AutoReveal, RevealDelayMs = 200 });
             form.ToggleFullScreen();
             form.HideFullScreenBarOverlayForTests();
-            WindowAttention.BringToFront(form);
-            if (!PumpUntil(() => Form.ActiveForm == form, 3000))
-            {
-                output.WriteLine("Windows non ha dato il primo piano alla finestra di prova: parte con il mouse vero non eseguita.");
-                return;
-            }
             var saved = Cursor.Position;
             try
             {
                 var screen = form.Bounds;
+                // Punto di partenza fisso: se il mouse vero era già sul bordo sinistro, la barra si apre prima della prova.
+                Cursor.Position = new Point(screen.Left + screen.Width / 2, screen.Top + screen.Height / 2);
+                WindowAttention.BringToFront(form);
+                if (!PumpUntil(() => Form.ActiveForm == form, 3000))
+                {
+                    output.WriteLine("Windows non ha dato il primo piano alla finestra di prova: parte con il mouse vero non eseguita.");
+                    return;
+                }
+                form.HideFullScreenBarOverlayForTests();
+                Pump(300);
+                Assert.False(form.FullScreenBarControl.Visible, "Con il mouse al centro la barra a comparsa deve essere chiusa");
                 Cursor.Position = new Point(screen.Left + screen.Width / 2, screen.Top);
                 Pump(900);
                 Assert.False(form.FullScreenBarControl.Visible, "Il bordo in alto non deve aprire niente");

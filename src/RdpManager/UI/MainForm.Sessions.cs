@@ -44,6 +44,7 @@ public sealed partial class MainForm
     private void BuildLayout()
     {
         _sidebar.Controls.Add(_tree);
+        _sidebar.Controls.Add(BuildTouchBar());
         _sidebar.Controls.Add(BuildTreeToolbar());
         _sidebar.Controls.Add(_search);
         _sidebar.Controls.Add(BuildSidebarHeader());
@@ -891,6 +892,9 @@ public sealed partial class MainForm
                 break;
             case SessionBarAction.NextMonitor:
                 MoveToNextMonitor();
+                break;
+            case SessionBarAction.ScreenKeyboard:
+                OpenScreenKeyboard();
                 break;
         }
     }

@@ -1,0 +1,14 @@
+Qui sta la DLL di WireGuard per Windows (x64):
+
+  wireguard.dll  (driver wireguard-nt 1.1, firmata WireGuard LLC)
+
+RdpManager usa direttamente l'API di wireguard-nt (WireGuardCreateAdapter, WireGuardSetConfiguration, ...) da un
+servizio Windows fornito da RdpManager.exe stesso (--vpn-service): non serve nessun'altra DLL.
+
+Da dove viene: https://download.wireguard.com/wireguard-nt/wireguard-nt-1.1.zip (cartella bin\amd64).
+Per aggiornarla: scaricare lo zip ufficiale in una cartella a parte e verificare la firma digitale prima di copiarla:
+  Get-AuthenticodeSignature .\wireguard.dll | Format-List Status, SignerCertificate
+Status deve essere Valid e il firmatario WireGuard LLC (lo controlla anche un test).
+
+La compilazione e la pubblicazione la copiano accanto a RdpManager.exe e l'installer la include (il [Files]
+dell'installer prende tutta la cartella di pubblicazione). Solo x64: su ARM64 la VPN integrata non e' disponibile.

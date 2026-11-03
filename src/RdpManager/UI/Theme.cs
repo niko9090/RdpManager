@@ -188,6 +188,7 @@ internal static class ThemeManager
         tabs.DrawMode = p.IsDark ? TabDrawMode.OwnerDrawFixed : TabDrawMode.Normal;
         // Disegnate a mano le linguette hanno un margine in più: con quello predefinito il testo si tronca.
         tabs.Padding = p.IsDark ? new Point(14, 4) : new Point(6, 3);
+        TouchUi.TouchifyTabs(tabs, TouchUi.MinTarget(tabs)); // linguette da dito
         tabs.Invalidate();
     }
 

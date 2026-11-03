@@ -3,7 +3,7 @@ using RdpManager.Core;
 namespace RdpManager.UI;
 
 /// <summary>Richiesta di un testo (nome cartella).</summary>
-public sealed class TextPromptDialog : Form
+public sealed class TextPromptDialog : TouchForm
 {
     private readonly TextBox _text = new() { Width = 320 };
 
@@ -42,7 +42,7 @@ public sealed class TextPromptDialog : Form
 }
 
 /// <summary>Finestra separata che ospita una sessione staccata dalle schede.</summary>
-public sealed class DetachedSessionForm : Form
+public sealed class DetachedSessionForm : TouchForm
 {
     public DetachedSessionForm(RdpSessionView view, Icon? icon)
     {

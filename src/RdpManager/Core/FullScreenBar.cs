@@ -48,6 +48,8 @@ public enum SessionBarAction
     SendCtrlAltDel,
     Snapshot,
     NextMonitor,
+    /// <summary>Tastiera su schermo di Windows (dalla 1.6.2), per mandare tasti alla sessione col solo tocco.</summary>
+    ScreenKeyboard,
 }
 
 /// <summary>Aspetto delle sessioni nella sezione «Sessioni connesse».</summary>
@@ -212,6 +214,7 @@ public sealed class FullScreenBarSettings
         SessionBarAction.SendCtrlAltDel => "Invia Ctrl+Alt+Canc",
         SessionBarAction.Snapshot => "Foto della sessione",
         SessionBarAction.NextMonitor => "Monitor successivo",
+        SessionBarAction.ScreenKeyboard => "Tastiera su schermo",
         _ => action.ToString(),
     };
 
@@ -366,9 +369,10 @@ public static class FullScreenBarLayout
     /// <param name="nameWidth">Larghezza del nome per intero.</param>
     /// <param name="shortcutWidth">Larghezza della scorciatoia (0 = nessuna).</param>
     /// <param name="lineHeight">Altezza di una riga di testo.</param>
-    public static ActionButtonLayout LayoutActionButton(int width, int nameWidth, int shortcutWidth, int lineHeight)
+    public static ActionButtonLayout LayoutActionButton(int width, int nameWidth, int shortcutWidth, int lineHeight, int minHeight = 28)
     {
-        const int pad = 6, gap = 10, oneLineHeight = 28;
+        const int pad = 6, gap = 10;
+        int oneLineHeight = Math.Max(28, minHeight);
         int inner = Math.Max(0, width - 2 * pad);
         if (shortcutWidth <= 0)
             return new(new Rectangle(pad, 0, inner, oneLineHeight), Rectangle.Empty, oneLineHeight, false);
@@ -377,7 +381,7 @@ public static class FullScreenBarLayout
             var sc = new Rectangle(width - pad - shortcutWidth, 0, shortcutWidth, oneLineHeight);
             return new(new Rectangle(pad, 0, inner - shortcutWidth - gap, oneLineHeight), sc, oneLineHeight, false);
         }
-        int h = 2 * lineHeight + 8;
+        int h = Math.Max(2 * lineHeight + 8, minHeight);
         int scw = Math.Min(shortcutWidth, inner);
         return new(new Rectangle(pad, 3, inner, lineHeight), new Rectangle(width - pad - scw, 4 + lineHeight, scw, lineHeight), h, true);
     }

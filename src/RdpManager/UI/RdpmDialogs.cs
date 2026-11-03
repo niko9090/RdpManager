@@ -6,7 +6,7 @@ namespace RdpManager.UI;
 /// Esportazione in .rdpm: password cifrate con una password del file (proposta quando ci sono password salvate,
 /// dalla 1.5.1) oppure escluse, con un avviso se se ne perderebbero.
 /// </summary>
-public sealed class RdpmExportDialog : Form
+public sealed class RdpmExportDialog : TouchForm
 {
     private readonly RadioButton _without = new() { Text = "Senza password", AutoSize = true };
     private readonly RadioButton _with = new() { Text = "Con le password, cifrate con una password del file", AutoSize = true };
@@ -54,6 +54,12 @@ public sealed class RdpmExportDialog : Form
             Text = $"{count} connessioni{profiles} e le loro cartelle; {saved}.", AutoSize = true, MaximumSize = new Size(380, 0),
             Margin = new Padding(3, 3, 3, 8),
         });
+        if (RdpmFile.UnreadablePasswordsWarning(doc) is { } unreadable)
+            layout.Controls.Add(new Label
+            {
+                Text = unreadable, AutoSize = true, ForeColor = Color.Firebrick, MaximumSize = new Size(380, 0),
+                Margin = new Padding(3, 0, 3, 8),
+            });
         layout.Controls.Add(_without);
         layout.Controls.Add(_with);
         layout.Controls.Add(grid);
@@ -133,7 +139,7 @@ public sealed class RdpmExportDialog : Form
 }
 
 /// <summary>Importazione da .rdpm: unione senza doppioni o sostituzione dell'elenco.</summary>
-public sealed class RdpmImportDialog : Form
+public sealed class RdpmImportDialog : TouchForm
 {
     private readonly RadioButton _merge = new() { Text = "Unisci: aggiungi solo le connessioni che mancano", AutoSize = true, Checked = true };
     private readonly RadioButton _replace = new() { Text = "Sostituisci: le connessioni attuali vengono cancellate (profili e testi rapidi restano)", AutoSize = true };
@@ -194,7 +200,7 @@ public sealed class RdpmImportDialog : Form
 }
 
 /// <summary>Richiesta della password del file .rdpm.</summary>
-public sealed class FilePasswordDialog : Form
+public sealed class FilePasswordDialog : TouchForm
 {
     private readonly TextBox _password = new() { Width = 260, UseSystemPasswordChar = true };
 

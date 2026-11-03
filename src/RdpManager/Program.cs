@@ -1,5 +1,6 @@
 using RdpManager.Core;
 using RdpManager.UI;
+using RdpManager.Vpn;
 
 namespace RdpManager;
 
@@ -8,6 +9,20 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
+        var programData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "RdpManager");
+        // «--vpn-service <nome>»: questo processo è il servizio del tunnel WireGuard (wireguard-nt); nessuna interfaccia.
+        if (VpnServiceArgs.TryParse(args, out var tunnelName))
+        {
+            Environment.Exit(VpnServiceHost.Run(tunnelName, programData));
+            return;
+        }
+        // «--vpn-helper su|giu|rimuovi …»: assistente elevato (UAC) che registra, ferma o rimuove il servizio del tunnel.
+        if (VpnHelper.IsHelperMode(args))
+        {
+            var helper = new VpnHelper(new ScServiceManager(), programData, Environment.ProcessPath ?? Application.ExecutablePath);
+            Environment.Exit(helper.Run(args));
+            return;
+        }
         ApplicationConfiguration.Initialize();
         // «--aggiorna …»: questa è la copia di riserva avviata come programma di aggiornamento (vedi UpdateRunner).
         if (UpdateJob.IsUpdateMode(args))
