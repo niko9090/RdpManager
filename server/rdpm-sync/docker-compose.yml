@@ -1,0 +1,27 @@
+# Server di sincronizzazione RdpManager, per Container Manager del Synology.
+# Prima di avviare: copia .env.example in .env e metti una RDPM_SYNC_ADMIN_KEY lunga e casuale.
+services:
+  rdpm-sync:
+    build: .
+    image: rdpm-sync:1.0.0
+    container_name: rdpm-sync
+    restart: unless-stopped
+    environment:
+      RDPM_SYNC_ADMIN_KEY: ${RDPM_SYNC_ADMIN_KEY:-}
+      RDPM_SYNC_TOKEN_DAYS: ${RDPM_SYNC_TOKEN_DAYS:-30}
+      RDPM_SYNC_MAX_DOC_MB: ${RDPM_SYNC_MAX_DOC_MB:-8}
+    ports:
+      # Solo sull'indirizzo LAN del Synology (raggiungibile anche dalla VPN WireGuard): mai 0.0.0.0, mai sul router.
+      - "${RDPM_SYNC_BIND_IP:-192.168.1.199}:${RDPM_SYNC_PORT:-8787}:8787"
+    volumes:
+      - ./data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
