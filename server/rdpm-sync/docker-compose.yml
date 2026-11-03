@@ -1,18 +1,24 @@
-# Server di sincronizzazione RdpManager, per Container Manager del Synology.
+# Server di sincronizzazione RdpManager, per il Synology (DSM 7.1, docker-compose 1.28).
 # Prima di avviare: copia .env.example in .env e metti una RDPM_SYNC_ADMIN_KEY lunga e casuale.
+#
+# Rete: il server condivide la rete del contenitore "wireguard" (network_mode), quindi ascolta
+# anche su 10.66.0.1 (interfaccia wg0): i client VPN lo raggiungono su http://10.66.0.1:8787.
+# Non pubblica porte da solo: la porta 8787 e' pubblicata dal contenitore wireguard e SOLO su
+# 127.0.0.1 dell'host (vedi ../wireguard-synology/docker-compose.yml). Mai su LAN o Internet.
+# Il contenitore wireguard deve essere attivo prima di questo; se wireguard viene ricreato
+# (docker-compose up) va ricreato anche questo: "docker-compose up -d --force-recreate".
 services:
   rdpm-sync:
     build: .
     image: rdpm-sync:1.0.0
     container_name: rdpm-sync
     restart: unless-stopped
+    network_mode: "container:wireguard"
     environment:
       RDPM_SYNC_ADMIN_KEY: ${RDPM_SYNC_ADMIN_KEY:-}
+      RDPM_SYNC_PORT: ${RDPM_SYNC_PORT:-8787}
       RDPM_SYNC_TOKEN_DAYS: ${RDPM_SYNC_TOKEN_DAYS:-30}
       RDPM_SYNC_MAX_DOC_MB: ${RDPM_SYNC_MAX_DOC_MB:-8}
-    ports:
-      # Solo sull'indirizzo LAN del Synology (raggiungibile anche dalla VPN WireGuard): mai 0.0.0.0, mai sul router.
-      - "${RDPM_SYNC_BIND_IP:-192.168.1.199}:${RDPM_SYNC_PORT:-8787}:8787"
     volumes:
       - ./data:/data
     read_only: true

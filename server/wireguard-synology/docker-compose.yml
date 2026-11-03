@@ -1,13 +1,17 @@
 # Server WireGuard per RdpManager (rete 10.66.0.0/24, porta 51820/UDP).
-# Immagine linuxserver/wireguard: usa il modulo del kernel se c'e'
-# e ripiega su wireguard-go (userspace) quando su DSM il modulo manca.
+# Su DSM 7.1 il kernel (4.4) non ha il modulo WireGuard: l'immagine costruita dal
+# Dockerfile accanto a questo file aggiunge wireguard-go (userspace) e iptables-legacy.
+# Compatibile con docker-compose 1.28 (pacchetto Docker di DSM 7.1).
 services:
   wireguard:
-    image: lscr.io/linuxserver/wireguard:latest
+    build: .
+    image: rdpmanager/wireguard-go:latest
     container_name: wireguard
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
+    devices:
+      - /dev/net/tun:/dev/net/tun
     sysctls:
       - net.ipv4.ip_forward=1
     environment:
@@ -20,4 +24,6 @@ services:
       - ./scripts:/scripts:ro
     ports:
       - 51820:51820/udp
+      # Server di sincronizzazione (rdpm-sync usa la rete di questo contenitore): solo localhost dell'host
+      - 127.0.0.1:8787:8787
     restart: unless-stopped

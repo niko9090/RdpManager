@@ -11,20 +11,33 @@ recuperano (il server non può aiutare). Il contratto per chi scrive il cliente 
 
 ## Avvio sul Synology (Container Manager)
 
-1. Copia la cartella `server/rdpm-sync` sul Synology (per esempio in `/volume1/docker/rdpm-sync`).
-2. Nella cartella: copia `.env.example` in `.env` e compila `RDPM_SYNC_ADMIN_KEY` con una frase casuale lunga
-   (almeno 16 caratteri). `RDPM_SYNC_BIND_IP` è l'indirizzo LAN del Synology (`192.168.1.199`).
-3. Avvia: in Container Manager → *Progetto* → *Crea* → cartella `rdpm-sync` (usa `docker-compose.yml`), oppure
-   via SSH: `sudo docker compose up -d --build`.
-4. Controlla: `http://192.168.1.199:8787/health` deve rispondere `{"status":"ok",...}`.
+Su DSM 7.1 (pacchetto Docker, `docker-compose` 1.28, NAS x86_64) il server **non** ha una porta propria: gira
+nella rete del contenitore `wireguard` (`network_mode: "container:wireguard"`), quindi ascolta anche su
+`10.66.0.1` (wg0) e i client VPN lo raggiungono su **http://10.66.0.1:8787**. La porta 8787 è pubblicata dal
+contenitore wireguard **solo su 127.0.0.1 del Synology** (non su LAN, non su Internet).
+
+1. Il contenitore `wireguard` deve essere già attivo (vedi `../wireguard-synology/LEGGIMI.md`); il suo
+   `docker-compose.yml` contiene la riga `127.0.0.1:8787:8787`.
+2. Copia la cartella `server/rdpm-sync` (senza `bin/` e `obj/`) in `/volume1/docker/rdpm-sync`.
+3. Nella cartella: copia `.env.example` in `.env` (permessi `600`) e compila `RDPM_SYNC_ADMIN_KEY` con una
+   frase casuale lunga (almeno 16 caratteri). Crea la cartella dati: `mkdir data && chown 1654:1654 data`
+   (1654 è l'utente `app` del contenitore).
+4. Costruisci e avvia (il primo build scarica l'SDK .NET: ci vogliono diversi minuti, lancialo in background):
+   `sudo env PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin COMPOSE_HTTP_TIMEOUT=600 /usr/local/bin/docker-compose up -d --build`
+5. Controlla dal Synology: `curl -fsS http://127.0.0.1:8787/health` e
+   `sudo /usr/local/bin/docker exec wireguard wget -qO- http://10.66.0.1:8787/health`: entrambi devono
+   rispondere `{"status":"ok",...}`. Dal PC con la VPN accesa: `http://10.66.0.1:8787/health`.
+
+Se il contenitore `wireguard` viene ricreato (`docker-compose up` nella sua cartella), `rdpm-sync` perde la
+rete: in `/volume1/docker/rdpm-sync` lancia `docker-compose up -d --force-recreate`. Dopo il riavvio del NAS,
+se `rdpm-sync` è partito prima di `wireguard`, basta `docker restart rdpm-sync`.
 
 Il database sta in `./data/rdpm-sync.db` (cartella accanto al `docker-compose.yml`): **è l'unica cosa da
 salvare** nelle copie di riserva (Hyper Backup).
 
 ### Rete e sicurezza
-- La porta è pubblicata **solo** sull'indirizzo LAN (`RDPM_SYNC_BIND_IP`). Non aprire la porta sul router e non
-  metterla su DSM «Portale di accesso» pubblico: il server si raggiunge dalla LAN o dalla VPN WireGuard
-  (10.66.0.0/24, con la LAN del Synology instradata).
+- La porta è pubblicata **solo** su 127.0.0.1 del Synology (dal contenitore wireguard) e raggiungibile dalla VPN
+  (10.66.0.1). Non aprire la porta sul router e non metterla su DSM «Portale di accesso» pubblico.
 - Il traffico è HTTP semplice perché passa dalla VPN (già cifrata); il documento è comunque cifrato dal cliente.
   Il token di accesso viaggia nell'intestazione: non usare il server su una rete non fidata senza HTTPS.
 - Dopo 5 accessi sbagliati (stesso indirizzo e stesso utente) il login si blocca per 15 minuti.
@@ -36,7 +49,7 @@ salvare** nelle copie di riserva (Hyper Backup).
 Con il comando (la password si digita nel terminale, non resta in nessun file):
 
 ```
-sudo docker exec -it rdpm-sync dotnet rdpm-sync.dll crea-account nicholas
+sudo /usr/local/bin/docker exec -it rdpm-sync dotnet rdpm-sync.dll crea-account nicholas
 ```
 
 Altri comandi: `lista-account`, `elimina-account <utente>` (toglie anche documento e token).
@@ -44,7 +57,7 @@ Altri comandi: `lista-account`, `elimina-account <utente>` (toglie anche documen
 In alternativa, con la chiave di amministrazione via HTTP (serve il segreto derivato dalla password, cioè lo
 fa il cliente: vedi il contratto, `POST /v1/admin/accounts`).
 
-Poi, in RdpManager, si indica l'indirizzo `http://192.168.1.199:8787`, il nome utente e la password.
+Poi, in RdpManager, si indica l'indirizzo `http://10.66.0.1:8787` (VPN accesa), il nome utente e la password.
 Più PC con lo stesso utente e la stessa password vedono gli stessi dati.
 
 ## Impostazioni (variabili d'ambiente)
