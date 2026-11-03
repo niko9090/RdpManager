@@ -1,5 +1,17 @@
 # Novità di RdpManager
 
+## Prossima versione (non ancora rilasciata)
+
+**Server di sincronizzazione con account (`server/rdpm-sync`)** — «stesso login = stesse cose»
+- Nuovo piccolo server (ASP.NET Core, .NET 8, SQLite) da ospitare sul Synology con Docker/Container Manager,
+  raggiungibile da LAN o VPN WireGuard: account con login (password derivata dal cliente, hash PBKDF2 con sale
+  sul server), token a scadenza e revocabili, limite ai tentativi di login, un documento per account con
+  `ETag`/`If-Match` (409 se un altro PC ha salvato prima).
+- Il documento è un `.rdpm` cifrato **dal cliente** (PBKDF2-SHA256 600000 + HKDF + AES-256-GCM): il server non
+  vede mai connessioni né password, nemmeno quella dell'account.
+- Contratto per il cliente in `docs/sync-server-api.md`; avvio e primo account in `server/rdpm-sync/LEGGIMI.md`.
+  Il cliente in RdpManager arriverà in un lavoro successivo.
+
 ## Non ancora rilasciato
 
 **Si usa anche col dito e senza tastiera, su schermi piccoli (per esempio 1366x912 al 150%)**
