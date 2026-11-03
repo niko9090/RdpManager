@@ -4,7 +4,7 @@ using RdpManager.Vpn;
 namespace RdpManager.UI;
 
 /// <summary>Pannello «VPN»: chiavi, frammento per il server, endpoint e accensione del tunnel WireGuard.</summary>
-public sealed class VpnForm : Form
+public sealed class VpnForm : TouchForm
 {
     private readonly VpnProfile _profile;
     private readonly string _profilePath;

@@ -3,7 +3,7 @@ using RdpManager.Core;
 namespace RdpManager.UI;
 
 /// <summary>Impostazioni comuni di una cartella: profilo di credenziali e risoluzione, ereditati dalle connessioni contenute.</summary>
-internal sealed class FolderSettingsDialog : Form
+internal sealed class FolderSettingsDialog : TouchForm
 {
     private readonly ComboBox _profile = new() { Width = 280, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly CheckBox _useResolution = new() { Text = "Imposta una risoluzione", AutoSize = true };

@@ -103,6 +103,7 @@ public sealed partial class MainForm : Form
         InitV12();
         InitAutoUpdate(checkUpdatesOnStartup);
         InitV14();
+        InitTouch();
         MstscLauncher.CleanupOldFiles();
 
         Load += (_, _) => PlaceOnPreferredMonitor();
@@ -170,6 +171,7 @@ public sealed partial class MainForm : Form
         session.DropDownItems.Add(new ToolStripSeparator());
         session.DropDownItems.Add(Item("&Incolla appunti come digitazione", Keys.None, async (_, _) => { if (CurrentView is { } v) await v.PasteClipboardAsTypingAsync(); }));
         session.DropDownItems.Add(Item("Invia Ctrl+Alt+&Canc", Keys.None, (_, _) => CurrentView?.SendCtrlAltDel()));
+        session.DropDownItems.Add(Item("Tastiera su schermo", Keys.None, (_, _) => OpenScreenKeyboard()));
         session.DropDownItems.Add(Item("&Foto della sessione", Keys.None, async (_, _) => { if (CurrentView is { } v) await SaveSnapshotAsync(v); }));
         var quickTexts = new ToolStripMenuItem("&Testi rapidi");
         quickTexts.DropDownItems.Add("(caricamento)");
@@ -248,7 +250,8 @@ public sealed partial class MainForm : Form
 
     private ToolStrip BuildTreeToolbar()
     {
-        var bar = new ToolStrip { GripStyle = ToolStripGripStyle.Hidden, Dock = DockStyle.Top };
+        // A capo invece del menu «»» dei comandi nascosti: col dito tutti i pulsanti devono vedersi.
+        var bar = new ToolStrip { GripStyle = ToolStripGripStyle.Hidden, Dock = DockStyle.Top, LayoutStyle = ToolStripLayoutStyle.Flow, CanOverflow = false };
         bar.Items.Add(new ToolStripButton("Nuova", null, (_, _) => NewConnection()) { ToolTipText = "Nuova connessione (Ctrl+N)" });
         bar.Items.Add(new ToolStripButton("Cartella", null, (_, _) => NewFolder()) { ToolTipText = "Nuova cartella (Ctrl+Shift+N)" });
         bar.Items.Add(new ToolStripButton("Modifica", null, (_, _) => EditSelected()) { ToolTipText = "Modifica (Ctrl+E)" });
@@ -1046,6 +1049,7 @@ public sealed partial class MainForm : Form
 
     private void UpdateStatus()
     {
+        UpdateTouchBar();
         int sessions = _tabs.TabCount + _detached.Count;
         int connected = AllViews.Count(v => v.State == SessionState.Connected);
         _status.Text = $"{_doc.Connections.Count} connessioni salvate · {sessions} sessioni aperte ({connected} connesse)";

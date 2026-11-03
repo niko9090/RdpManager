@@ -6,7 +6,7 @@ namespace RdpManager.UI;
 /// Avviso non modale di un aggiornamento già scaricato e verificato: novità della release e tre scelte
 /// («Aggiorna ora», «Alla chiusura», «Più tardi»). Chiuderlo con la X vale «Più tardi».
 /// </summary>
-internal sealed class UpdateOfferForm : Form
+internal sealed class UpdateOfferForm : TouchForm
 {
     private readonly TextBox _notes = new()
     {

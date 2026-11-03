@@ -222,6 +222,7 @@ internal sealed class FullScreenSideBar : Panel
                     {
                         SessionBarAction.SendCtrlAltDel => "Invia Ctrl+Alt+Canc alla sessione visibile",
                         SessionBarAction.Snapshot => "Foto della sessione visibile (Immagini\\RdpManager e appunti)",
+                        SessionBarAction.ScreenKeyboard => "Apre la tastiera su schermo di Windows: i tasti vanno alla sessione visibile",
                         _ => content.MultipleMonitors ? "Schermo intero sul monitor successivo" : "C'è un solo monitor",
                     });
                     b.Click += (_, _) => SessionActionClicked?.Invoke(this, action);
@@ -425,6 +426,14 @@ internal sealed class FullScreenSideBar : Panel
                 }
             }
         }
+        // Pulsanti, caselle ed elenco alti almeno quanto un bersaglio da dito.
+        int touch = TouchUi.MinTarget(this);
+        foreach (var action in Descendants(_flow).OfType<ActionButton>())
+        {
+            action.MinTouchHeight = touch;
+            action.Height = Math.Max(action.Height, action.CurrentLayout().Height);
+        }
+        TouchUi.Apply(_flow);
     }
 
     private static FlowLayoutPanel Body() => new()
@@ -453,7 +462,12 @@ internal sealed class FullScreenSideBar : Panel
         new() { Text = text, AutoSize = true, ForeColor = Color.Silver, Margin = new Padding(2, 4, 0, 4) };
 
     private static bool SessionActionEnabled(SessionBarAction action, Content content) =>
-        action == SessionBarAction.NextMonitor ? content.MultipleMonitors : content.CanTypeText;
+        action switch
+        {
+            SessionBarAction.NextMonitor => content.MultipleMonitors,
+            SessionBarAction.ScreenKeyboard => true, // la tastiera si apre anche senza sessione: serve per cercare e scrivere
+            _ => content.CanTypeText,
+        };
 
     /// <summary>
     /// Pulsante con il nome a sinistra e la scorciatoia a destra, disegnati senza sovrapporsi
@@ -482,6 +496,9 @@ internal sealed class FullScreenSideBar : Panel
 
         public string ShortcutText { get; }
 
+        /// <summary>Altezza minima da dito (la imposta la barra: 40 px logici per il monitor in uso).</summary>
+        public int MinTouchHeight { get; set; } = 28;
+
         private bool _hover;
 
         /// <summary>Disposizione per la larghezza attuale (per le prove automatiche).</summary>
@@ -490,7 +507,7 @@ internal sealed class FullScreenSideBar : Panel
             const TextFormatFlags measure = TextFormatFlags.SingleLine | TextFormatFlags.NoPadding;
             int nameWidth = TextRenderer.MeasureText(Text, Font, Size.Empty, measure).Width;
             int scWidth = ShortcutText.Length > 0 ? TextRenderer.MeasureText(ShortcutText, Font, Size.Empty, measure).Width : 0;
-            return FullScreenBarLayout.LayoutActionButton(Width, nameWidth, scWidth, Font.Height);
+            return FullScreenBarLayout.LayoutActionButton(Width, nameWidth, scWidth, Font.Height, MinTouchHeight);
         }
 
         protected override void OnSizeChanged(EventArgs e)

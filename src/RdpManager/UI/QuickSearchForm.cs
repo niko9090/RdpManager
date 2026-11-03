@@ -6,7 +6,7 @@ namespace RdpManager.UI;
 /// Ricerca rapida (Ctrl+Alt+Spazio): si scrive parte del nome, dell'host o dell'etichetta (anche con un errore
 /// di battitura) e Invio porta alla sessione aperta o ne apre una nuova. Frecce per scegliere, Esc per chiudere.
 /// </summary>
-internal sealed class QuickSearchForm : Form
+internal sealed class QuickSearchForm : TouchForm
 {
     private readonly TextBox _query = new() { Dock = DockStyle.Top, BorderStyle = BorderStyle.FixedSingle };
     private readonly ListBox _results = new()
