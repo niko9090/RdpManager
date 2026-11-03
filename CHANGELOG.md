@@ -1,6 +1,8 @@
 # Novità di RdpManager
 
-## Prossima versione (non ancora rilasciata)
+## 1.8.0
+
+Versione che riunisce VPN WireGuard integrata, account con sincronizzazione, gruppi e uso col tocco. (La 1.7.0 è stata saltata di proposito: il lavoro del ramo «1.7.0 Core» non è ancora in questa versione.)
 
 **Server di sincronizzazione con account (`server/rdpm-sync`)** — «stesso login = stesse cose»
 - Nuovo piccolo server (ASP.NET Core, .NET 8, SQLite) da ospitare sul Synology con Docker/Container Manager,
@@ -25,8 +27,6 @@
   (VPN spenta) compare un solo avviso discreto nella barra di stato e si lavora in locale; le modifiche partono al ritorno.
 - Se un altro PC ha salvato nel frattempo (409) il programma rilegge, unisce e rimanda da solo.
 
-## Non ancora rilasciato
-
 **Si usa anche col dito e senza tastiera, su schermi piccoli (per esempio 1366x912 al 150%)**
 - Bersagli di almeno 40 px logici: pulsanti, caselle, righe degli elenchi, linguette, voci dei menu, barra della
   sessione e pulsanti della barra a schermo intero.
@@ -40,7 +40,7 @@
   OK e Annulla sempre visibili, le impostazioni hanno le pagine che scorrono, la finestra principale rientra
   nello schermo. Scalano con i dpi del monitor.
 
-**VPN WireGuard integrata (in preparazione, al posto di Tailscale)**
+**VPN WireGuard integrata (al posto di Tailscale)**
 - «Strumenti → VPN (WireGuard)…»: crea le chiavi (la privata resta cifrata con DPAPI), mostra la chiave pubblica e il
   frammento `[Peer]` da aggiungere al server (syncnetpro.com:51820, rete 10.66.0.0/24), accende e spegne il tunnel.
 - Il tunnel usa direttamente il driver **wireguard-nt**: `wireguard.dll` ufficiale (versione 1.1, firmata WireGuard LLC) è
@@ -48,6 +48,20 @@
   Un servizio Windows fornito da RdpManager.exe stesso tiene su il tunnel, con indirizzo e rotte; si installa con
   una conferma UAC la prima volta, poi accendere e spegnere non la chiedono più. Lo stato mostra l'ultimo contatto col server.
   Non ancora provato con il driver vero su un PC (solo prove automatiche sulle strutture e sui comandi).
+
+**Gruppi (cartelle) con impostazioni ereditate**
+- Le impostazioni di cartella (profilo di credenziali, risoluzione) passano alle connessioni e alle cartelle contenute;
+  le cartelle si spostano anche trascinandole; tutto resta nel salvataggio e nel file `.rdpm`.
+
+**Correzioni**
+- Con la password salvata, la finestra «Sicurezza di Windows» che chiedeva di nuovo le credenziali non compare più:
+  la richiesta di credenziali di Windows viene vietata a ogni connessione.
+- Esportazione `.rdpm`: se alcune password salvate non sono leggibili da questo PC (e quindi non entrano nel file) lo
+  dice con un avviso, nel dialogo e nel riepilogo.
+
+**Server WireGuard su Synology**
+- Pacchetto in `server/` (Docker, wireguard-go, script per creare, elencare e togliere i profili dei client) e guida
+  passo per passo per DSM 7.1; il server di sincronizzazione sta sulla rete 10.66.0.0/24 della VPN.
 
 ## 1.6.1
 

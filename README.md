@@ -379,7 +379,7 @@ Da fare su un PC dove RdpManager 1.6.0 è installato, con almeno due sessioni co
 | # | Passo | Risultato atteso |
 |---|---|---|
 | 1 | Con due sessioni connesse, lascia che la 1.6.0 proponga l'aggiornamento e scegli «Aggiorna ora» | L'app si chiude; l'installer aspetta che sia chiusa, aggiorna in silenzio e la riapre alla 1.6.1 con le due sessioni; connessioni e impostazioni uguali a prima. |
-| 2 | Alla versione successiva (1.7.0), di nuovo con due sessioni connesse, «Aggiorna ora» | Compare «Aggiornamento di RdpManager in corso…»; poi l'app si riapre aggiornata con le sessioni. In `%LOCALAPPDATA%\RdpManager\logs` ci sono `aggiornamento.log` (attesa, verifica, codice 0, versione verificata, riaperto) e il log dell'installer. |
+| 2 | Alla versione successiva (1.8.0), di nuovo con due sessioni connesse, «Aggiorna ora» | Compare «Aggiornamento di RdpManager in corso…»; poi l'app si riapre aggiornata con le sessioni. In `%LOCALAPPDATA%\RdpManager\logs` ci sono `aggiornamento.log` (attesa, verifica, codice 0, versione verificata, riaperto) e il log dell'installer. |
 | 3 | Prova di errore: chiudi RdpManager, avvialo da un prompt con `set RDPMANAGER_PROVA_AGGIORNAMENTO_FALLITO=1`, poi «Aggiorna ora» | Il programma di aggiornamento installa, finge che la verifica della versione fallisca, rimette la versione di prima e la riapre con il messaggio «L'aggiornamento … non è riuscito … È stata riaperta la versione precedente». |
 
 **Esiti del 27/10/2026** (dettagli in `verifica/aggiornamento-1.6.1.md`, script `verifica/aggiornamento.ps1`), con due
