@@ -104,6 +104,7 @@ public sealed partial class MainForm : Form
         InitAutoUpdate(checkUpdatesOnStartup);
         InitV14();
         InitTouch();
+        InitSync();
         MstscLauncher.CleanupOldFiles();
 
         Load += (_, _) => PlaceOnPreferredMonitor();
@@ -241,6 +242,7 @@ public sealed partial class MainForm : Form
         var tools = new ToolStripMenuItem("S&trumenti");
         tools.DropDownItems.Add(Item("Cerca &PC in rete…", Keys.None, (_, _) => ShowNetworkScan()));
         tools.DropDownItems.Add(Item("&VPN (WireGuard)…", Keys.None, (_, _) => ShowVpn()));
+        tools.DropDownItems.Add(Item("Account e &sincronizzazione…", Keys.None, (_, _) => ShowSyncAccount()));
 
         var workspaces = new ToolStripMenuItem("Spazi di la&voro");
         workspaces.DropDownItems.Add("(caricamento)");
@@ -477,6 +479,7 @@ public sealed partial class MainForm : Form
         // si scrive nella sua ricerca).
         if (!_fsBar.IsSearching)
             RebuildFullScreenBar();
+        ScheduleSync();
     }
 
     // ---------- elenco ----------

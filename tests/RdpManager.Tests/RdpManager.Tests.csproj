@@ -25,6 +25,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\RdpManager\RdpManager.csproj" />
+    <!-- Il server di sincronizzazione vero, avviato in-process dalle prove client/server (SyncClientServerTests). -->
+    <ProjectReference Include="..\..\server\rdpm-sync\RdpmSync.csproj" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
 </Project>

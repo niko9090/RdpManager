@@ -10,7 +10,20 @@
 - Il documento è un `.rdpm` cifrato **dal cliente** (PBKDF2-SHA256 600000 + HKDF + AES-256-GCM): il server non
   vede mai connessioni né password, nemmeno quella dell'account.
 - Contratto per il cliente in `docs/sync-server-api.md`; avvio e primo account in `server/rdpm-sync/LEGGIMI.md`.
-  Il cliente in RdpManager arriverà in un lavoro successivo.
+  Il cliente è descritto qui sotto.
+
+**Account di sincronizzazione in RdpManager** — stesso login = stesse connessioni, cartelle e profili su ogni PC
+- Nuova voce **Strumenti › Account e sincronizzazione…**: indirizzo del server (predefinito `http://10.66.0.1:8787`,
+  il server sul Synology visto dalla VPN), nome utente e password; **Accedi**, **Crea account…** (serve la chiave di
+  amministrazione del server), **Sincronizza ora**, **Esci dall'account**. Lo stato mostra l'ultima sincronizzazione.
+- Sincronizzano connessioni (con le password), cartelle, profili di credenziali, testi rapidi e impostazioni delle
+  cartelle; non le impostazioni dell'app né gli spazi di lavoro. Le cancellazioni passano da un PC all'altro; se la
+  stessa voce cambia su due PC vince quella di questo PC. Al primo collegamento si uniscono gli elenchi senza cancellare.
+- Il documento è cifrato sul PC con la password dell'account (stessa derivazione dei vettori di prova del server):
+  se si perde la password i dati sul server non si recuperano. Password e token sono salvati solo con DPAPI.
+- Automatica: all'avvio, 4 secondi dopo una modifica e ogni 5 minuti, in background. Se il server non è raggiungibile
+  (VPN spenta) compare un solo avviso discreto nella barra di stato e si lavora in locale; le modifiche partono al ritorno.
+- Se un altro PC ha salvato nel frattempo (409) il programma rilegge, unisce e rimanda da solo.
 
 ## Non ancora rilasciato
 

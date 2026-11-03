@@ -7,7 +7,7 @@ public sealed class TextPromptDialog : TouchForm
 {
     private readonly TextBox _text = new() { Width = 320 };
 
-    private TextPromptDialog(string title, string label, string initial)
+    private TextPromptDialog(string title, string label, string initial, bool secret = false)
     {
         Text = title;
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -31,12 +31,13 @@ public sealed class TextPromptDialog : TouchForm
         AcceptButton = ok;
         CancelButton = cancel;
         _text.Text = initial;
+        _text.UseSystemPasswordChar = secret;
         ThemeManager.Apply(this);
     }
 
-    public static string? Ask(IWin32Window owner, string title, string label, string initial = "")
+    public static string? Ask(IWin32Window owner, string title, string label, string initial = "", bool secret = false)
     {
-        using var dlg = new TextPromptDialog(title, label, initial);
+        using var dlg = new TextPromptDialog(title, label, initial, secret);
         return dlg.ShowDialog(owner) == DialogResult.OK ? dlg._text.Text.Trim() : null;
     }
 }
