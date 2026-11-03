@@ -44,7 +44,7 @@ public class WireGuardNtStructsTests
         Assert.Equal(80, WireGuardNtStructs.InterfaceSize);
         Assert.Equal(136, WireGuardNtStructs.PeerSize);
         Assert.Equal(24, WireGuardNtStructs.AllowedIpSize);
-        Assert.All([WireGuardNtStructs.InterfaceSize, WireGuardNtStructs.PeerSize, WireGuardNtStructs.AllowedIpSize], n => Assert.Equal(0, n % 8));
+        Assert.All(new[] { WireGuardNtStructs.InterfaceSize, WireGuardNtStructs.PeerSize, WireGuardNtStructs.AllowedIpSize }, n => Assert.Equal(0, n % 8));
     }
 
     [Fact]

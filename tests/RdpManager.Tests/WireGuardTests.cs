@@ -204,7 +204,10 @@ public class WireGuardTunnelTests : IDisposable
         public void Stop(string name)
         {
             if (StopDenied)
+            {
+                StopDenied = false; // negato all'utente una volta; l'assistente elevato poi riesce
                 throw new InvalidOperationException("accesso negato");
+            }
             Calls.Add("stop");
             State = TunnelState.Spento;
         }
