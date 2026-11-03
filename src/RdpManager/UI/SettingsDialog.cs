@@ -29,7 +29,7 @@ public sealed class SettingsDialog : TouchForm
     private readonly NumericUpDown _barWidth = new() { Minimum = FullScreenBarSettings.MinWidth, Maximum = FullScreenBarSettings.MaxWidth, Increment = 10, Width = 70 };
     private readonly NumericUpDown _barDelay = new() { Minimum = 0, Maximum = FullScreenBarSettings.MaxRevealDelayMs, Increment = 50, Width = 70 };
     private readonly ComboBox _barStyle = new() { Width = 200, DropDownStyle = ComboBoxStyle.DropDownList };
-    private readonly CheckedListBox _barSections = new() { Width = 300, Height = 130, CheckOnClick = true, IntegralHeight = false };
+    private readonly TouchCheckedListBox _barSections = new() { Width = 300, Height = 130, CheckOnClick = true, IntegralHeight = false };
     private readonly List<BarSectionSetting> _sections;
     private readonly IReadOnlyList<ScreenInfo> _screens = Screens.All();
 

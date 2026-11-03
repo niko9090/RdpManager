@@ -465,7 +465,7 @@ internal sealed class HistoryDialog : TouchForm
 /// <summary>Scelta dei PC da importare dalla cronologia di mstsc (letta solo dopo la richiesta dell'utente).</summary>
 internal sealed class MstscImportDialog : TouchForm
 {
-    private readonly CheckedListBox _list = new() { Width = 480, Height = 260, CheckOnClick = true, IntegralHeight = false };
+    private readonly TouchCheckedListBox _list = new() { Width = 480, Height = 260, CheckOnClick = true, IntegralHeight = false };
     private readonly IReadOnlyList<MstscHistoryItem> _items;
 
     public MstscImportDialog(IReadOnlyList<MstscHistoryItem> items, ConnectionsDocument doc)

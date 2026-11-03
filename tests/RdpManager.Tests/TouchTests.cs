@@ -365,7 +365,8 @@ public sealed class TouchUiTests : IDisposable
                 int min = TouchMetrics.Scale(TouchMetrics.MinTarget, d.DeviceDpi);
                 foreach (var c in All(d).Where(c => c is Button or CheckBox or RadioButton))
                     Assert.True(c.Height >= min, $"{d.GetType().Name}: «{c.Text}» è alto {c.Height} px (minimo {min})");
-                foreach (var c in All(d).OfType<TextBox>().Where(t => !t.Multiline))
+                // La casella interna di un numero o di una tendina è una parte del controllo (che si misura a parte), non un bersaglio.
+                foreach (var c in All(d).OfType<TextBox>().Where(t => !t.Multiline && t.Parent is not (NumericUpDown or ComboBox)))
                     Assert.True(c.Height >= min, $"{d.GetType().Name}: casella di testo alta {c.Height} px (minimo {min})");
                 foreach (var c in All(d).OfType<NumericUpDown>())
                     Assert.True(c.Height >= min, $"{d.GetType().Name}: numero alto {c.Height} px (minimo {min})");
