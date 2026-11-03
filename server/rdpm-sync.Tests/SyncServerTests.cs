@@ -494,6 +494,7 @@ public class ClientKeysTests
         Assert.Equal(VectorEnc, Convert.ToHexString(ClientKeys.EncryptionKey("mario", "correct horse battery staple")).ToLowerInvariant());
     }
 
-    private const string VectorAuth = "VECTOR_AUTH";
-    private const string VectorEnc = "VECTOR_ENC";
+    // Calcolati con un'implementazione indipendente (Python hashlib/hmac).
+    private const string VectorAuth = "LYH1gkWICwAF8nBgnDp+hpjco7z+BEnEW50myOk2GcA=";
+    private const string VectorEnc = "8b1035aaa59eca1969dcc4ff5176b960a45eddcddb2fe37b42b4cb66269aee13";
 }

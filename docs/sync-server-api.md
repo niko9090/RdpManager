@@ -44,8 +44,8 @@ memoria la `chiaveCifratura` per la sessione, senza mai scriverla su disco; sul 
 ### Vettori di prova (devono coincidere)
 `utente = "mario"`, `password = "correct horse battery staple"`:
 
-- `segretoAccesso` = `VECTOR_AUTH`
-- `chiaveCifratura` (hex) = `VECTOR_ENC`
+- `segretoAccesso` = `LYH1gkWICwAF8nBgnDp+hpjco7z+BEnEW50myOk2GcA=`
+- `chiaveCifratura` (hex) = `8b1035aaa59eca1969dcc4ff5176b960a45eddcddb2fe37b42b4cb66269aee13`
 
 ### Formato del blob (il documento sul server)
 
