@@ -34,6 +34,32 @@ public class TouchForm : Form
     }
 }
 
+/// <summary>
+/// Elenco con caselle di spunta a righe alte quanto serve. Il <see cref="CheckedListBox"/> di serie ignora ItemHeight
+/// (l'altezza è sempre quella del carattere): qui si tiene il valore e lo si restituisce anche a Windows.
+/// </summary>
+internal sealed class TouchCheckedListBox : CheckedListBox
+{
+    private int _rowHeight;
+
+    public override int ItemHeight
+    {
+        get => _rowHeight > 0 ? _rowHeight : base.ItemHeight;
+        set
+        {
+            _rowHeight = value;
+            base.ItemHeight = value;
+        }
+    }
+
+    protected override void OnMeasureItem(MeasureItemEventArgs e)
+    {
+        base.OnMeasureItem(e);
+        if (_rowHeight > 0)
+            e.ItemHeight = _rowHeight;
+    }
+}
+
 /// <summary>Adatta i controlli all'uso col dito: bersagli grandi, elenchi con righe alte, menu comodi, dialoghi che stanno nello schermo.</summary>
 internal static class TouchUi
 {
@@ -97,14 +123,14 @@ internal static class TouchUi
                 box.Height = Math.Max(box.Height, min);
                 break;
             case NumericUpDown up:
-                up.AutoSize = false;
-                up.Height = Math.Max(up.Height, min);
+                TouchifyNumeric(up, min);
                 break;
             case ComboBox combo:
                 TouchifyCombo(combo, min);
                 break;
             case CheckedListBox checkedList:
                 checkedList.CheckOnClick = true;
+                // Il valore va tenuto (e dato a Windows) dalla nostra classe: quello di serie lo scarta.
                 checkedList.ItemHeight = Math.Max(checkedList.ItemHeight, min);
                 break;
             case ListBox list when list.DrawMode == DrawMode.Normal:
@@ -117,6 +143,23 @@ internal static class TouchUi
                 tree.ItemHeight = Math.Max(tree.ItemHeight, min);
                 break;
         }
+    }
+
+    private static readonly System.Reflection.PropertyInfo? FontHeightProperty =
+        typeof(Control).GetProperty("FontHeight", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+    /// <summary>
+    /// Il controllo numerico ignora ogni altezza che gli si dà: la ricava dall'altezza del carattere. Per averlo da dito
+    /// si alza quel valore (senza cambiare il carattere) e poi si ridimensiona.
+    /// </summary>
+    private static void TouchifyNumeric(NumericUpDown up, int min)
+    {
+        if (up.PreferredHeight < min && FontHeightProperty is not null)
+        {
+            int border = up.PreferredHeight - up.Font.Height;
+            FontHeightProperty.SetValue(up, min - border);
+        }
+        up.Height = Math.Max(up.Height, min);
     }
 
     private static void GrowTo(Control c, int min, bool widthToo)
