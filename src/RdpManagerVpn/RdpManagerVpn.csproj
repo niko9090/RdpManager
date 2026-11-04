@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>RdpManagerVpn</RootNamespace>
+    <AssemblyName>RdpManagerVpn</AssemblyName>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationVisualStyles>true</ApplicationVisualStyles>
+    <Product>RdpManager VPN</Product>
+    <Version>1.8.0</Version>
+    <AssemblyVersion>$(Version).0</AssemblyVersion>
+    <FileVersion>$(Version).0</FileVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <Company>niko9090</Company>
+    <Copyright>Copyright © 2026 niko9090 - https://github.com/niko9090/RdpManager</Copyright>
+    <AssemblyTitle>RdpManager VPN - client VPN WireGuard con icona nell'area di notifica</AssemblyTitle>
+    <Description>Client VPN WireGuard per i PC dei clienti: servizio Windows più icona nell'area di notifica</Description>
+    <NeutralLanguage>it-IT</NeutralLanguage>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <!--
+    Il codice del tunnel (WireGuardConfig, VpnTunnelRunner, wireguard-nt) è quello di RdpManager, non una copia:
+    RdpManager.dll viaggia accanto all'exe, e con lei wireguard.dll (file «None» con copia in uscita).
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\RdpManager\RdpManager.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="RdpManager.Tests" />
+  </ItemGroup>
+
+</Project>

@@ -48,6 +48,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="RdpManager.Tests" />
+    <!-- Il client VPN per i PC dei clienti (src\RdpManagerVpn) riusa il tunnel di RdpManager. -->
+    <InternalsVisibleTo Include="RdpManagerVpn" />
   </ItemGroup>
 
 </Project>
