@@ -25,10 +25,14 @@ services:
       RDPM_VPN_CONF: /vpn/wg0.conf
       RDPM_VPN_ENDPOINT: ${RDPM_VPN_ENDPOINT:-syncnetpro.com:51820}
       RDPM_VPN_DNS: ${RDPM_VPN_DNS:-}
-    # root ma senza capability: serve per leggere/scrivere wg0.conf e il socket di wireguard-go (file di root).
+    # root con la sola capability DAC_OVERRIDE: wg0.conf (0600) e i profili appartengono a un altro uid (1000,
+    # creati dal contenitore wireguard) e senza DAC_OVERRIDE root non li legge. Tutte le altre capability sono tolte.
+    # Il socket di wireguard-go e' di root: per "wg set" basta l'uid 0.
     user: "0:0"
     cap_drop:
       - ALL
+    cap_add:
+      - DAC_OVERRIDE
     volumes:
       - ./data:/data
       # Config del server WireGuard (wg0.conf, server.pub): la stessa cartella del contenitore wireguard

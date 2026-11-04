@@ -14,7 +14,8 @@ public sealed class FakeWireGuard : IWireGuardPeers
     public bool Fail { get; set; }
     public string[] Reserved { get; set; } = [];
 
-    public IReadOnlyCollection<string> ReservedAddresses() => Reserved;
+    public IReadOnlyCollection<string> ReservedAddresses() =>
+        Denied ? throw new UnauthorizedAccessException("permesso negato") : Reserved;
 
     public Task ApplyAsync(IReadOnlyCollection<WgPeer> desired, CancellationToken ct = default)
     {
