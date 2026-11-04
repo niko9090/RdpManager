@@ -14,13 +14,16 @@ internal sealed class SyncAccountDialog : TouchForm
     private readonly Label _passwordLabel = new() { Text = "Password dell'account", AutoSize = true, Margin = new Padding(3, 8, 3, 0) };
     private readonly Label _status = new() { AutoSize = true, MaximumSize = new Size(380, 0), Margin = new Padding(3, 12, 3, 3) };
     private readonly Button _signIn = new() { Text = "Accedi", AutoSize = true };
-    private readonly Button _create = new() { Text = "Crea account…", AutoSize = true };
+    private readonly Button _create = new() { Text = "Registrati", AutoSize = true };
     private readonly Button _syncButton = new() { Text = "Sincronizza ora", AutoSize = true };
     private readonly Button _signOut = new() { Text = "Esci dall'account", AutoSize = true };
+    private readonly Func<Task<string>>? _afterSignIn;
     private bool _busy;
 
-    public SyncAccountDialog(SyncService sync, Func<Task<SyncOutcome>> syncNow, Func<SyncOutcome?> lastOutcome)
+    public SyncAccountDialog(SyncService sync, Func<Task<SyncOutcome>> syncNow, Func<SyncOutcome?> lastOutcome,
+        Func<Task<string>>? afterSignIn = null)
     {
+        _afterSignIn = afterSignIn;
         _sync = sync;
         _syncNow = syncNow;
         _lastOutcome = lastOutcome;
@@ -113,6 +116,7 @@ internal sealed class SyncAccountDialog : TouchForm
         SyncServerException { Code: "invalid_credentials" } => "Utente o password sbagliati.",
         SyncServerException { Code: "too_many_attempts", RetryAfterSeconds: { } s } =>
             $"Troppi tentativi sbagliati: riprova fra {Math.Max(1, (s + 59) / 60)} minuti.",
+        SyncServerException { Code: "invalid_registration_code" } => "Codice di registrazione sbagliato.",
         SyncServerException { Code: "account_exists" } => "Esiste già un account con questo nome: usa «Accedi».",
         SyncServerException { Code: "unauthorized" } => "Chiave di amministrazione sbagliata.",
         SyncServerException { Code: "admin_disabled" } => "Sul server la creazione di account via rete è spenta: crealo sul server (vedi LEGGIMI di rdpm-sync).",
@@ -149,6 +153,38 @@ internal sealed class SyncAccountDialog : TouchForm
         {
             SetBusy(false);
             _status.Text = Explain(ex);
+        }
+    }
+
+    /// <summary>
+    /// Registrazione dall'app. Se il server vuole un codice lo chiede; se la registrazione aperta è spenta
+    /// ripiega sulla vecchia via con la chiave di amministrazione.
+    /// </summary>
+    private async Task RegisterAsync()
+    {
+        string? code = null;
+        while (true)
+        {
+            try
+            {
+                await _sync.RegisterAsync(_server.Text, _user.Text, _password.Text, code);
+                return;
+            }
+            catch (SyncServerException ex) when (ex.Code == "invalid_registration_code")
+            {
+                code = TextPromptDialog.Ask(this, "Registrazione", "Codice di registrazione del server:", secret: true);
+                if (string.IsNullOrEmpty(code))
+                    throw new ArgumentException("Registrazione annullata.");
+            }
+            catch (SyncServerException ex) when (ex.Code == "registration_disabled")
+            {
+                var adminKey = TextPromptDialog.Ask(this, "Crea account",
+                    "La registrazione libera è spenta. Chiave di amministrazione del server (RDPM_SYNC_ADMIN_KEY):", secret: true);
+                if (string.IsNullOrEmpty(adminKey))
+                    throw new ArgumentException("Registrazione annullata.");
+                await _sync.CreateAccountAsync(_server.Text, adminKey, _user.Text, _password.Text);
+                return;
+            }
         }
     }
 

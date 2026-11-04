@@ -5,15 +5,16 @@ namespace RdpmSync;
 
 public sealed record ErrorBody(string Error, string Message, string? CurrentEtag = null, int? RetryAfterSeconds = null);
 
-public sealed record CredentialsRequest(string? Username, string? Password, string? DeviceName);
+public sealed record CredentialsRequest(string? Username, string? Password, string? DeviceName, string? RegistrationCode = null);
 
 /// <summary>Costruisce l'applicazione web (minimal API). Contratto: docs/sync-server-api.md.</summary>
 public static class SyncApp
 {
-    public const string Version = "1.0.0";
+    public const string Version = "1.1.0";
     private const int MinSecretLength = 16, MaxSecretLength = 256;
 
-    public static WebApplication Build(SyncOptions options, TimeProvider? time = null, string? url = null)
+    public static WebApplication Build(SyncOptions options, TimeProvider? time = null, string? url = null,
+        IWireGuardPeers? wireGuard = null)
     {
         time ??= TimeProvider.System;
         var builder = WebApplication.CreateBuilder();
@@ -31,11 +32,30 @@ public static class SyncApp
         var byIp = new FailureLimiter(time, options.MaxFailuresPerIp, options.FailureWindow);
         var byUser = new FailureLimiter(time, options.MaxFailuresPerUser, options.FailureWindow);
         var byIpAdmin = new FailureLimiter(time, 10, options.FailureWindow);
+        var byIpRegister = new FailureLimiter(time, 10, options.FailureWindow);
         // Hash finto: un utente inesistente costa lo stesso tempo di uno esistente.
         var (dummyHash, dummySalt) = PasswordHasher.Hash("dummy", options.ServerHashIterations);
 
         var app = builder.Build();
         var log = app.Logger;
+
+        // VPN automatica: attiva solo se c'è wg0.conf (o un'implementazione fornita, nelle prove) e la chiave pubblica del server.
+        if (wireGuard is null && options.VpnConfigPath.Length > 0)
+            wireGuard = new WgCliPeers(options.VpnConfigPath, options.VpnInterface, options.WgPath);
+        var serverKey = options.VpnServerPublicKey;
+        if (serverKey.Length == 0 && options.VpnConfigPath.Length > 0)
+        {
+            var pubFile = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(options.VpnConfigPath))!, "server.pub");
+            if (File.Exists(pubFile))
+                serverKey = File.ReadAllText(pubFile).Trim();
+        }
+        var vpn = new VpnEndpoints(options, store, wireGuard, serverKey, log);
+        if (vpn.Enabled)
+            app.Lifetime.ApplicationStarted.Register(() => _ = Task.Run(async () =>
+            {
+                try { await vpn.ReconcileAsync(); }
+                catch (Exception ex) { log.LogError(ex, "VPN: allineamento iniziale di wg0.conf non riuscito"); }
+            }));
 
         app.MapGet("/health", () => Results.Json(new { status = "ok", version = Version }));
 
@@ -78,14 +98,36 @@ public static class SyncApp
                 username = a.Username, createdUtc = a.Created, disabled = a.Disabled, hasDocument = a.HasDocument,
             })));
 
-        app.MapDelete("/v1/admin/accounts/{username}", (HttpContext ctx, string username) =>
+        app.MapDelete("/v1/admin/accounts/{username}", async (HttpContext ctx, string username) =>
         {
             if (AdminCheck(ctx) is { } denied)
                 return denied;
+            await vpn.ForgetAccountAsync(username);
             if (!store.DeleteAccount(username))
                 return Err(404, "not_found", "Account inesistente.");
             log.LogInformation("Account eliminato: {User}", username);
             return Results.NoContent();
+        });
+
+        // ---------- registrazione dall'app ----------
+        app.MapPost("/v1/register", (HttpContext ctx, CredentialsRequest? body) =>
+        {
+            if (!options.OpenRegistration && options.RegistrationCode.Length == 0)
+                return Err(403, "registration_disabled", "La registrazione dall'app non è attiva su questo server.");
+            var ip = Ip(ctx);
+            if (byIpRegister.Blocked(ip) is { } wait)
+                return TooMany(wait);
+            byIpRegister.Fail(ip); // ogni tentativo conta: limita la creazione in massa di account
+            if (options.RegistrationCode.Length > 0 && !SecretEquals(body?.RegistrationCode ?? "", options.RegistrationCode))
+                return Err(403, "invalid_registration_code", "Codice di registrazione mancante o sbagliato.");
+            if (!Store.ValidUsername(body?.Username))
+                return Err(400, "invalid_username", "Nome utente: da 3 a 64 caratteri tra lettere, cifre e . _ - @");
+            if (!ValidSecret(body?.Password))
+                return Err(400, "invalid_password", "Il segreto di accesso deve essere derivato dal cliente (vedi contratto).");
+            if (!store.CreateAccount(body!.Username!, body.Password!, options.ServerHashIterations))
+                return Err(409, "account_exists", "Esiste già un account con questo nome.");
+            log.LogInformation("Account registrato dall'app: {User} da {Ip}", body.Username, ip);
+            return Results.Json(new { username = body.Username }, statusCode: 201);
         });
 
         // ---------- accesso ----------
@@ -161,6 +203,8 @@ public static class SyncApp
             log.LogInformation("Token revocati: {Count} per {User}", n, t.Username);
             return Results.Json(new { revoked = n });
         });
+
+        vpn.Map(app, Authenticate, Unauthorized);
 
         // ---------- documento ----------
         app.MapGet("/v1/document", (HttpContext ctx) =>
@@ -245,7 +289,7 @@ public static class SyncApp
     private static bool SecretEquals(string a, string b) =>
         CryptographicOperations.FixedTimeEquals(SHA256.HashData(Encoding.UTF8.GetBytes(a)), SHA256.HashData(Encoding.UTF8.GetBytes(b)));
 
-    private static IResult Err(int status, string code, string message) =>
+    internal static IResult Err(int status, string code, string message) =>
         Results.Json(new ErrorBody(code, message), statusCode: status);
 
     private static IResult TooMany(TimeSpan wait)

@@ -1,5 +1,17 @@
 # Novità di RdpManager
 
+## Non rilasciato
+
+**VPN automatica e registrazione dall'app** (`rdpm-sync` 1.1.0)
+- Il server `rdpm-sync` diventa anche il registro della VPN: `POST /v1/vpn/devices` (nome del PC + chiave pubblica
+  generata dal PC) assegna il primo IP libero in 10.66.0.0/24, salva il peer, lo scrive in `wg0.conf` (blocco gestito) e lo
+  applica al tunnel in esecuzione con `wg set`, senza riavvio; risponde con i dati del profilo. Idempotente; ogni utente vede
+  e toglie solo i propri PC (`GET`/`DELETE /v1/vpn/devices`). Niente più `aggiungi-pc.sh` sul Synology.
+- Nuovo `POST /v1/register`: registrazione dall'app senza chiave di amministrazione (aperta o con codice di registrazione).
+- RdpManager: **Registrati** nella finestra dell'account; dopo accesso o registrazione, se la VPN non ha profilo, crea le
+  chiavi, chiede il profilo al server e accende il tunnel da solo. Indirizzo predefinito del server: `https://syncnetpro.com:8443`
+  (proxy inverso HTTPS di DSM); la messa in opera è in `server/rdpm-sync/LEGGIMI.md`.
+
 ## 1.8.0
 
 Versione che riunisce VPN WireGuard integrata, account con sincronizzazione, gruppi e uso col tocco. (La 1.7.0 è stata saltata di proposito: il lavoro del ramo «1.7.0 Core» non è ancora in questa versione.)

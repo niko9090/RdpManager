@@ -26,7 +26,7 @@ public sealed class TestServer : IAsyncDisposable
     public HttpClient Http { get; }
     public SyncOptions Options { get; }
 
-    public TestServer(Action<SyncOptions>? configure = null, string adminKey = AdminKey)
+    public TestServer(Action<SyncOptions>? configure = null, string adminKey = AdminKey, IWireGuardPeers? wireGuard = null)
     {
         Options = new SyncOptions
         {
@@ -36,7 +36,7 @@ public sealed class TestServer : IAsyncDisposable
             MaxDocumentBytes = 64 * 1024,
         };
         configure?.Invoke(Options);
-        _app = SyncApp.Build(Options, Time, "http://127.0.0.1:0");
+        _app = SyncApp.Build(Options, Time, "http://127.0.0.1:0", wireGuard);
         _app.Start();
         Http = new HttpClient { BaseAddress = new Uri(_app.Urls.First()) };
     }

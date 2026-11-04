@@ -521,6 +521,10 @@ riconnessione automatica. **Disinstallazione** da *App installate*: ferma e rimu
 profilo e `%ProgramData%\RdpManagerVPN`. L'installer contiene la chiave privata del PC: va consegnato solo a quel cliente.
 Non provato su un PC vero (installazione, servizio, disinstallazione): solo la compilazione.
 
+*Da fare:* far accettare a `RdpManagerVpn` le credenziali dell'account al primo avvio (stesso giro di «VPN automatica»
+di RdpManager) invece del profilo incorporato: oggi l'installer resta con il profilo del PC già dentro, quindi il profilo
+va ancora creato (a mano con `crea-profilo-client.sh`, oppure da un PC con RdpManager) e il suo peer registrato sul server.
+
 ## Pubblicare a mano (cartella o eseguibile unico)
 
 ```powershell
@@ -693,10 +697,16 @@ non cerca niente finché non premi un pulsante.
 ### Account di sincronizzazione (stesso login = stesse cose)
 
 **Strumenti › Account e sincronizzazione…** collega questo PC a un account del server `rdpm-sync` (vedi
-`server/rdpm-sync/LEGGIMI.md` per avviarlo sul Synology e creare l'account). Si indicano l'indirizzo (predefinito
-`http://10.66.0.1:8787`, raggiungibile con la VPN accesa), il nome utente e la password, poi **Accedi**. Sugli altri PC
+`server/rdpm-sync/LEGGIMI.md` per avviarlo sul Synology). Si indicano l'indirizzo (predefinito
+`https://syncnetpro.com:8443`; con la VPN accesa vale anche `http://10.66.0.1:8787`), il nome utente e la password, poi **Accedi**,
+oppure **Registrati** se l'account non c'è ancora (il server può chiedere un codice di registrazione). Sugli altri PC
 basta lo stesso login: connessioni, cartelle, profili di credenziali e testi rapidi sono gli stessi.
 
+- **VPN automatica**: dopo l'accesso o la registrazione, se questo PC non ha ancora un profilo VPN, RdpManager crea le
+  chiavi WireGuard (la privata resta sul PC, cifrata con DPAPI), manda al server solo la pubblica, riceve indirizzo,
+  chiave del server ed endpoint, salva il profilo e **accende la VPN da solo**. Nessun file da copiare e niente da
+  fare sul Synology: il server aggiunge il PC al tunnel da sé. La prima accensione chiede la conferma UAC di Windows.
+  Un profilo VPN già presente (fatto a mano) non viene toccato.
 - La sincronizzazione parte da sola all'avvio, poco dopo ogni modifica e ogni 5 minuti; **Sincronizza ora** la forza.
 - Il documento è cifrato sul PC con la password dell'account: il server non vede nulla in chiaro. **Se si perde la
   password i dati sul server non si recuperano.** Sul PC la password dell'account è salvata con DPAPI, come le altre.

@@ -12,6 +12,8 @@ public sealed record DocumentInfo(long Version, byte[] Blob, DateTimeOffset Upda
 
 public enum PutResult { Ok, Conflict }
 
+public sealed record VpnDevice(long Id, long AccountId, string Name, string PublicKey, string Address, DateTimeOffset CreatedUtc);
+
 /// <summary>Database SQLite: account, token (se ne salva solo l'hash) e un documento cifrato per account.</summary>
 public sealed class Store
 {
@@ -50,6 +52,14 @@ public sealed class Store
             CREATE TABLE IF NOT EXISTS documents(
               account_id INTEGER PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
               version INTEGER NOT NULL, blob BLOB NOT NULL, updated_utc INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS vpn_devices(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+              name TEXT NOT NULL COLLATE NOCASE,
+              public_key TEXT NOT NULL UNIQUE,
+              address TEXT NOT NULL UNIQUE,
+              created_utc INTEGER NOT NULL,
+              UNIQUE(account_id, name));
             """);
     }
 
@@ -213,4 +223,70 @@ public sealed class Store
         cmd.Parameters.AddWithValue("$t", Now);
         return cmd.ExecuteNonQuery() == 1 ? PutResult.Ok : PutResult.Conflict;
     }
+
+    // ---------- VPN: dispositivi (peer WireGuard) ----------
+
+    private static VpnDevice ReadDevice(SqliteDataReader r) =>
+        new(r.GetInt64(0), r.GetInt64(1), r.GetString(2), r.GetString(3), r.GetString(4), DateTimeOffset.FromUnixTimeSeconds(r.GetInt64(5)));
+
+    private const string DeviceColumns = "id, account_id, name, public_key, address, created_utc";
+
+    public List<VpnDevice> ListDevices(long? accountId = null)
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = $"SELECT {DeviceColumns} FROM vpn_devices WHERE $a IS NULL OR account_id = $a ORDER BY id";
+        cmd.Parameters.AddWithValue("$a", (object?)accountId ?? DBNull.Value);
+        using var r = cmd.ExecuteReader();
+        var list = new List<VpnDevice>();
+        while (r.Read())
+            list.Add(ReadDevice(r));
+        return list;
+    }
+
+    public VpnDevice? FindDevice(long accountId, string name)
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = $"SELECT {DeviceColumns} FROM vpn_devices WHERE account_id = $a AND name = $n";
+        cmd.Parameters.AddWithValue("$a", accountId);
+        cmd.Parameters.AddWithValue("$n", name);
+        using var r = cmd.ExecuteReader();
+        return r.Read() ? ReadDevice(r) : null;
+    }
+
+    public VpnDevice? FindDeviceByKey(string publicKey)
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = $"SELECT {DeviceColumns} FROM vpn_devices WHERE public_key = $k";
+        cmd.Parameters.AddWithValue("$k", publicKey);
+        using var r = cmd.ExecuteReader();
+        return r.Read() ? ReadDevice(r) : null;
+    }
+
+    public void InsertDevice(long accountId, string name, string publicKey, string address)
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "INSERT INTO vpn_devices(account_id, name, public_key, address, created_utc) VALUES($a,$n,$k,$ad,$t)";
+        cmd.Parameters.AddWithValue("$a", accountId);
+        cmd.Parameters.AddWithValue("$n", name);
+        cmd.Parameters.AddWithValue("$k", publicKey);
+        cmd.Parameters.AddWithValue("$ad", address);
+        cmd.Parameters.AddWithValue("$t", Now);
+        cmd.ExecuteNonQuery();
+    }
+
+    public void ReplaceDeviceKey(long deviceId, string publicKey)
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "UPDATE vpn_devices SET public_key = $k WHERE id = $i";
+        cmd.Parameters.AddWithValue("$k", publicKey);
+        cmd.Parameters.AddWithValue("$i", deviceId);
+        cmd.ExecuteNonQuery();
+    }
+
+    public bool DeleteDevice(long deviceId) => Run("DELETE FROM vpn_devices WHERE id = $x", deviceId) == 1;
 }
