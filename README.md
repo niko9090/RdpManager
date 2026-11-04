@@ -502,6 +502,25 @@ acceso; per la scheda Tailscale serve Tailscale installato e connesso (e, per il
   Remote Desktop Gateway vero, testi rapidi digitati in un PC remoto, aggiornamento con un clic da una
   release vera (la verifica SHA256 è provata con un server finto).
 
+## Installer del client VPN per un PC cliente
+
+`build-vpn-client.ps1` costruisce un installer di **RdpManager VPN** (servizio Windows con il tunnel WireGuard più icona
+nell'area di notifica) con il profilo del PC già dentro: sul PC cliente basta avviarlo, senza dati da inserire.
+
+```powershell
+# profilo WireGuard del PC (.conf, come lo crea crea-profilo-client.sh sul server) e nome del PC
+powershell -NoProfile -File build-vpn-client.ps1 -Profilo C:\profili\ufficio1.conf -Nome ufficio1
+# risultato: dist\RdpManagerVPN-Setup-ufficio1.exe
+```
+
+Serve Inno Setup 6. Per provare lo script senza un profilo vero c'è `tests\fixtures\vpn-esempio.conf` (chiavi finte).
+L'installer chiede l'amministratore, installa in `Program Files\RdpManager VPN`, copia il profilo come `vpn.conf`
+leggibile solo da SYSTEM e amministratori, registra e avvia il servizio, mette l'icona nell'avvio automatico di Windows
+(voce `RdpManagerVPN` in HKCU\...\Run) e la avvia. Dal menu dell'icona si disattivano l'avvio con Windows e la
+riconnessione automatica. **Disinstallazione** da *App installate*: ferma e rimuove servizio, avvio automatico, file,
+profilo e `%ProgramData%\RdpManagerVPN`. L'installer contiene la chiave privata del PC: va consegnato solo a quel cliente.
+Non provato su un PC vero (installazione, servizio, disinstallazione): solo la compilazione.
+
 ## Pubblicare a mano (cartella o eseguibile unico)
 
 ```powershell

@@ -419,3 +419,19 @@ public class VpnClientSupervisorTests
         Assert.Equal(2, attempts);
     }
 }
+
+/// <summary>Il profilo finto usato per provare build-vpn-client.ps1 deve essere accettato dal client.</summary>
+public class VpnClientFixtureTests
+{
+    [Fact]
+    public void VpnClient_ProfiloDiEsempioDelleFixture_EValido()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "tests", "fixtures", "vpn-esempio.conf")))
+            dir = dir.Parent;
+        Assert.NotNull(dir);
+        var r = ClientProfile.Load([Path.Combine(dir!.FullName, "tests", "fixtures", "vpn-esempio.conf")]);
+        Assert.True(r.Ok, r.ErrorText);
+        Assert.Equal("10.66.0.50", r.IpAddress);
+    }
+}
