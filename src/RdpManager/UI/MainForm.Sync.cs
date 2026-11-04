@@ -43,7 +43,11 @@ public sealed partial class MainForm
         Shown += async (_, _) =>
         {
             if (_autoSync && _sync.SignedIn)
+            {
                 await RunSyncAsync(manual: false);
+                if (await EnsureVpnAsync() is { Length: > 0 } vpnLine && !IsDisposed)
+                    ShowNotice(vpnLine);
+            }
         };
         FormClosed += (_, _) =>
         {
@@ -126,7 +130,7 @@ public sealed partial class MainForm
 
     internal void ShowSyncAccount()
     {
-        using var dlg = new SyncAccountDialog(_sync, () => RunSyncAsync(manual: true), () => _lastSync);
+        using var dlg = new SyncAccountDialog(_sync, () => RunSyncAsync(manual: true), () => _lastSync, EnsureVpnAsync);
         ThemeManager.Apply(dlg);
         dlg.ShowDialog(this);
     }

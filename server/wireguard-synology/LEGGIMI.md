@@ -60,6 +60,12 @@ e i profili: e' escluso dal repository (`.gitignore`).
 
 ## 5. Aggiungere un PC
 
+**Dalla 1.1 non serve fare niente sul Synology**: l'utente si registra (o accede) in RdpManager, il PC crea le sue
+chiavi, il server `rdpm-sync` gli assegna il primo indirizzo libero, lo scrive in `wg0.conf` (in un blocco proprio)
+e lo applica al tunnel con `wg set`, e l'app accende la VPN da sola. Come mettere in opera `rdpm-sync` (e perche'
+questo `docker-compose.yml` monta la cartella `./run`): `../rdpm-sync/LEGGIMI.md`. Gli script qui sotto restano
+per i casi a mano (un PC non gestito dall'app, o il server `rdpm-sync` non installato).
+
 1. Sul PC apri RdpManager: **Strumenti -> VPN (WireGuard)...**.
 2. Il client crea le sue chiavi e mostra un frammento `[Peer]` con la sua chiave
    pubblica e un indirizzo `10.66.0.N/32`. Copia la **chiave pubblica**.

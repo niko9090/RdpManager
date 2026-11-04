@@ -10,7 +10,7 @@
 services:
   rdpm-sync:
     build: .
-    image: rdpm-sync:1.0.0
+    image: rdpm-sync:1.1.0
     container_name: rdpm-sync
     restart: unless-stopped
     network_mode: "container:wireguard"
@@ -19,8 +19,22 @@ services:
       RDPM_SYNC_PORT: ${RDPM_SYNC_PORT:-8787}
       RDPM_SYNC_TOKEN_DAYS: ${RDPM_SYNC_TOKEN_DAYS:-30}
       RDPM_SYNC_MAX_DOC_MB: ${RDPM_SYNC_MAX_DOC_MB:-8}
+      # Registrazione dall'app e VPN automatica (vedi LEGGIMI.md)
+      RDPM_SYNC_OPEN_REGISTRATION: ${RDPM_SYNC_OPEN_REGISTRATION:-}
+      RDPM_SYNC_REGISTRATION_CODE: ${RDPM_SYNC_REGISTRATION_CODE:-}
+      RDPM_VPN_CONF: /vpn/wg0.conf
+      RDPM_VPN_ENDPOINT: ${RDPM_VPN_ENDPOINT:-syncnetpro.com:51820}
+      RDPM_VPN_DNS: ${RDPM_VPN_DNS:-}
+    # root ma senza capability: serve per leggere/scrivere wg0.conf e il socket di wireguard-go (file di root).
+    user: "0:0"
+    cap_drop:
+      - ALL
     volumes:
       - ./data:/data
+      # Config del server WireGuard (wg0.conf, server.pub): la stessa cartella del contenitore wireguard
+      - ../wireguard/config:/vpn
+      # Socket di wireguard-go (creato dal contenitore wireguard in ./run): serve al comando "wg set"
+      - ../wireguard/run:/var/run/wireguard
     read_only: true
     tmpfs:
       - /tmp

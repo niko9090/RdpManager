@@ -1,3 +1,4 @@
+using RdpManager.Core;
 using RdpManager.Vpn;
 
 namespace RdpManager.UI;
@@ -14,12 +15,49 @@ public sealed partial class MainForm
             open.Activate();
             return;
         }
+        _vpn = new VpnForm(CreateTunnel());
+        _vpn.FormClosed += (_, _) => _vpn = null;
+        _vpn.Show(this);
+    }
+
+    private static WireGuardNtTunnel CreateTunnel()
+    {
         var staging = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RdpManager", "vpn");
         var exe = Environment.ProcessPath ?? Application.ExecutablePath;
         var programData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "RdpManager");
-        _vpn = new VpnForm(new WireGuardNtTunnel(new ProcessElevator(exe), new ScControl(), staging,
-            VpnPaths.InstalledHash(programData), VpnPaths.Status(programData)));
-        _vpn.FormClosed += (_, _) => _vpn = null;
-        _vpn.Show(this);
+        return new WireGuardNtTunnel(new ProcessElevator(exe), new ScControl(), staging,
+            VpnPaths.InstalledHash(programData), VpnPaths.Status(programData));
+    }
+
+    /// <summary>
+    /// VPN automatica: se questo PC non ha ancora un profilo e si è nell'account, lo ottiene dal server (chiavi create qui,
+    /// al server va solo la pubblica) e accende il tunnel. Restituisce una riga di stato per chi l'ha chiamata ("" = niente da fare).
+    /// </summary>
+    internal async Task<string> EnsureVpnAsync()
+    {
+        try
+        {
+            if (!_sync.SignedIn || !VpnProvisioning.NeedsProvisioning(VpnProfile.Load()))
+                return "";
+            var profile = await VpnProvisioning.EnsureAsync(_sync);
+            if (profile is null)
+                return "";
+            AppLog.Default?.Info("VPN: profilo ottenuto dal server, indirizzo " + profile.Address);
+            if (!Vpn.WireGuardNative.DllPresent)
+                return "VPN configurata. Manca wireguard.dll accanto al programma: la VPN non si può accendere.";
+            var config = profile.ToConfig();
+            await Task.Run(() => CreateTunnel().Accendi(config));
+            return "VPN configurata e accesa (indirizzo " + profile.Address + ").";
+        }
+        catch (SyncServerException ex) when (ex.Code == "vpn_disabled")
+        {
+            return ""; // il server non offre la VPN automatica: niente avviso a ogni avvio
+        }
+        catch (Exception ex) when (ex is SyncServerException or SyncUnreachableException or Vpn.VpnException
+                                       or ArgumentException or InvalidOperationException or FormatException)
+        {
+            AppLog.Default?.Info("VPN automatica non riuscita: " + ex.Message);
+            return "VPN non configurata: " + ex.Message;
+        }
     }
 }

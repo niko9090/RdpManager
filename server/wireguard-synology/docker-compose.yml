@@ -22,6 +22,8 @@ services:
       # wg0.conf, chiavi e script stanno qui (la cartella accanto a questo file)
       - ./config:/config/wg_confs
       - ./scripts:/scripts:ro
+      # Socket di wireguard-go, condiviso con rdpm-sync (che aggiunge i PC da solo con "wg set")
+      - ./run:/var/run/wireguard
     ports:
       - 51820:51820/udp
       # Server di sincronizzazione (rdpm-sync usa la rete di questo contenitore): solo localhost dell'host

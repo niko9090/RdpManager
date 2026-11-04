@@ -30,6 +30,12 @@ public sealed class SyncHttp : IDisposable
     /// <summary>Indirizzo predefinito: il server sul Synology, visto dalla VPN WireGuard (porta 8787 di rdpm-sync).</summary>
     public const string DefaultServerUrl = "http://10.66.0.1:8787";
 
+    /// <summary>
+    /// Indirizzo pubblico del server (HTTPS, dietro il proxy inverso del Synology): serve a chi non ha ancora la VPN,
+    /// cioè alla registrazione e alla richiesta del primo profilo VPN.
+    /// </summary>
+    public const string PublicServerUrl = "https://syncnetpro.com:8443";
+
     private readonly HttpClient _http;
 
     public SyncHttp(string baseUrl, TimeSpan? timeout = null)
@@ -110,6 +116,37 @@ public sealed class SyncHttp : IDisposable
         req.Headers.Add("X-Admin-Key", adminKey);
         using var r = await SendAsync(req, ct);
         if (!r.IsSuccessStatusCode)
+            throw await ErrorAsync(r, ct);
+    }
+
+    /// <summary>Registra un account dall'app (senza chiave di amministrazione); il codice solo se il server lo chiede.</summary>
+    public async Task RegisterAsync(string username, string authSecret, string? registrationCode, CancellationToken ct = default)
+    {
+        using var req = new HttpRequestMessage(HttpMethod.Post, "v1/register")
+        {
+            Content = JsonContent.Create(new { username, password = authSecret, registrationCode }),
+        };
+        using var r = await SendAsync(req, ct);
+        if (!r.IsSuccessStatusCode)
+            throw await ErrorAsync(r, ct);
+    }
+
+    /// <summary>Chiede la VPN per questo PC: manda nome e chiave PUBBLICA; stesso PC = stessa risposta.</summary>
+    public async Task<VpnGrant> RequestVpnDeviceAsync(string token, string pcName, string publicKey, CancellationToken ct = default)
+    {
+        using var req = Authorized(HttpMethod.Post, "v1/vpn/devices", token);
+        req.Content = JsonContent.Create(new { name = pcName, publicKey });
+        using var r = await SendAsync(req, ct);
+        if (!r.IsSuccessStatusCode)
+            throw await ErrorAsync(r, ct);
+        return VpnGrant.Parse(await r.Content.ReadFromJsonAsync<JsonElement>(ct));
+    }
+
+    /// <summary>Toglie un PC dall'account (e dal tunnel del server). 404 = già tolto.</summary>
+    public async Task RemoveVpnDeviceAsync(string token, string pcName, CancellationToken ct = default)
+    {
+        using var r = await SendAsync(Authorized(HttpMethod.Delete, "v1/vpn/devices/" + Uri.EscapeDataString(pcName), token), ct);
+        if (!r.IsSuccessStatusCode && r.StatusCode != HttpStatusCode.NotFound)
             throw await ErrorAsync(r, ct);
     }
 

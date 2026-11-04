@@ -142,7 +142,25 @@ indirizzo `429`). Non servono al cliente di tutti i giorni.
 Il modo più semplice per creare un account resta il comando sul server (deriva il segreto da sé):
 `docker exec -it rdpm-sync dotnet rdpm-sync.dll crea-account mario`.
 
+## 4b. Registrazione dall'app e VPN (dalla 1.1)
+
+### `POST /v1/register`
+Come `POST /v1/admin/accounts`, ma senza chiave di amministrazione: `{"username","password":"<segretoAccesso>","registrationCode":"..."}`.
+Attiva solo se il server ha `RDPM_SYNC_OPEN_REGISTRATION=1` o `RDPM_SYNC_REGISTRATION_CODE`; altrimenti `403 registration_disabled`.
+Con il codice impostato, codice mancante o sbagliato = `403 invalid_registration_code`. Altri errori come per l'amministrazione
+(`400 invalid_username`, `400 invalid_password`, `409 account_exists`); 10 tentativi per indirizzo ogni 15 minuti, poi `429`.
+
+### VPN: `/v1/vpn/devices` (Bearer)
+Il PC genera la coppia di chiavi WireGuard e manda **solo la chiave pubblica**. `503 vpn_disabled` se il server non gestisce WireGuard.
+- `POST /v1/vpn/devices` `{"name":"Ufficio","publicKey":"<base64, 44 car.>"}` → `201` (nuovo) o `200` (già presente):
+  `{"name","address":"10.66.0.N/32","serverPublicKey","endpoint":"syncnetpro.com:51820","allowedIPs":"10.66.0.0/24","dns":"","persistentKeepalive":25}`.
+  `name`: 1–64 caratteri tra lettere, cifre, spazio, `.` `_` `-`. Idempotente: stessa chiave = stesso peer; stesso nome con chiave
+  nuova = stesso indirizzo e chiave sostituita. Errori: `400 invalid_name`, `400 invalid_public_key`, `409 key_in_use` (chiave di
+  un altro account), `409 too_many_devices`, `409 network_full`, `503 vpn_unavailable` (WireGuard non risponde: nulla è salvato).
+- `GET /v1/vpn/devices` → `200 [{"name","address","publicKey","createdUtc"}]`, solo i PC dell'account.
+- `DELETE /v1/vpn/devices/{name}` → `204`, o `404 not_found` (anche se il PC è di un altro account).
+
 ## 5. Cose volutamente non nella v1
 - Cambio password (richiederebbe di ricifrare il documento e cambiare il segreto di accesso in un solo passo).
 - Documenti multipli per account, cronologia delle versioni.
-- HTTPS: il server è pensato per la LAN/VPN WireGuard; con un reverse proxy davanti il contratto non cambia.
+- HTTPS: il server parla HTTP semplice; l'HTTPS per i PC senza VPN lo dà il proxy inverso del Synology (il contratto non cambia).

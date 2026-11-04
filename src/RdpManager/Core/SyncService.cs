@@ -14,7 +14,7 @@ public sealed class SyncState
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
-    public string ServerUrl { get; set; } = SyncHttp.DefaultServerUrl;
+    public string ServerUrl { get; set; } = SyncHttp.PublicServerUrl;
     public string Username { get; set; } = "";
     public string? ProtectedPassword { get; set; }
     public string? ProtectedToken { get; set; }
@@ -139,6 +139,42 @@ public sealed class SyncService : IDisposable
             _keyFor = id;
         }
         return (_auth, _key);
+    }
+
+    /// <summary>Registra l'account dall'app (la password non lascia il PC: parte solo il segreto derivato).</summary>
+    public async Task RegisterAsync(string url, string username, string password, string? registrationCode, CancellationToken ct = default)
+    {
+        ValidateCredentials(username, password);
+        var (auth, _) = await Task.Run(() => SyncCrypto.Derive(username, password, _iterations), ct);
+        await Http(url).RegisterAsync(username.Trim(), auth, string.IsNullOrWhiteSpace(registrationCode) ? null : registrationCode.Trim(), ct);
+    }
+
+    /// <summary>Chiede al server la VPN per questo PC con l'account attuale (rifà il login se il token è scaduto).</summary>
+    public async Task<VpnGrant> RequestVpnAsync(string pcName, string publicKey, CancellationToken ct = default)
+    {
+        if (!SignedIn || !PasswordProtector.TryUnprotect(State.ProtectedPassword, out var password) || password is null)
+            throw new InvalidOperationException("Per la VPN serve prima l'accesso all'account.");
+        await _gate.WaitAsync(ct);
+        try
+        {
+            var http = Http(State.ServerUrl);
+            var token = PasswordProtector.TryUnprotect(State.ProtectedToken, out var saved) && saved is not null
+                ? saved
+                : await LoginAsync(State.ServerUrl, State.Username, password, ct);
+            try
+            {
+                return await http.RequestVpnDeviceAsync(token, pcName, publicKey, ct);
+            }
+            catch (SyncServerException ex) when (ex.Code == "unauthorized")
+            {
+                token = await LoginAsync(State.ServerUrl, State.Username, password, ct);
+                return await http.RequestVpnDeviceAsync(token, pcName, publicKey, ct);
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
 
     private static string Device => Environment.MachineName;
