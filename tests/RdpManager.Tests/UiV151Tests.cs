@@ -139,6 +139,11 @@ public sealed class UiV151Tests : IDisposable
                 .Single(b => b.Tag is SessionBarAction.NextMonitor);
             Assert.Equal("Monitor successivo", monitor.Text);
             Assert.True(monitor.Visible);
+            // La barra verticale scorre (AutoScroll): su schermi bassi il pulsante si raggiunge scorrendo, come farebbe l'utente.
+            for (Control? p = monitor.Parent; p is not null && p != bar.Parent; p = p.Parent)
+                if (p is ScrollableControl { AutoScroll: true } scroller)
+                    scroller.ScrollControlIntoView(monitor);
+            Pump(100);
             var where = bar.RectangleToClient(monitor.RectangleToScreen(monitor.ClientRectangle));
             Assert.True(bar.ClientRectangle.IntersectsWith(where), $"il pulsante {where} è fuori dalla barra {bar.ClientRectangle}");
 
