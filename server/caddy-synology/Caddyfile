@@ -1,0 +1,9 @@
+{
+	auto_https off
+	admin 127.0.0.1:20190
+}
+
+https://{$CERT_HOST}:8443 {
+	tls /certs/fullchain.pem /certs/privkey.pem
+	reverse_proxy 127.0.0.1:8787
+}

@@ -26,42 +26,43 @@ chiave pubblica. Il contratto per chi scrive il cliente è in `docs/sync-server-
   i peer aggiunti a mano con `aggiungi-pc.sh` restano dove sono e i loro indirizzi non vengono riassegnati.
   All'avvio il server riallinea `wg0.conf` e il tunnel al suo database (i peer di account eliminati spariscono).
 - **I PC senza VPN** (la prima registrazione) non raggiungono `10.66.0.1`: arrivano da Internet su **HTTPS**,
-  attraverso il proxy inverso di DSM che inoltra a `http://localhost:8787`. Il default del cliente è
+  attraverso il proxy Caddy (`caddy-rdpm`, porta 8443) che inoltra a `http://localhost:8787`. Il default del cliente è
   `https://syncnetpro.com:8443`.
 
-## Messa in opera sul Synology
+## Messa in opera sul Synology (automatica)
 
-Prerequisiti: pacchetto Docker di DSM 7.1 attivo, contenitore `wireguard` già avviato con `prima-generazione.sh`
-eseguito (esistono `wg0.conf` e `server.pub` in `/volume1/docker/wireguard/config`), SSH attivo, DNS
-`syncnetpro.com` verso l'IP di casa.
+Dal PC, con l'alias SSH `synology` (utente con `sudo` senza password) e DNS `syncnetpro.com` verso l'IP di casa:
 
-1. Copia `server/wireguard-synology` in `/volume1/docker/wireguard` (il suo `docker-compose.yml` ora monta anche
-   `./run`) e ricrea il contenitore, così monta la cartella del socket:
-   `cd /volume1/docker/wireguard && mkdir -p run && sudo env PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin /usr/local/bin/docker-compose up -d --build`
-2. Copia `server/rdpm-sync` (senza `bin/` e `obj/`) in `/volume1/docker/rdpm-sync`, **accanto** a `wireguard` (il
-   compose usa `../wireguard/config` e `../wireguard/run`).
-3. In `/volume1/docker/rdpm-sync`: `cp .env.example .env && chmod 600 .env` e compila `.env`:
-   - `RDPM_SYNC_ADMIN_KEY`: frase casuale di almeno 16 caratteri (vuota = amministrazione HTTP spenta);
-   - `RDPM_SYNC_REGISTRATION_CODE`: un codice che l'app chiede una volta alla registrazione (consigliato), **oppure**
-     `RDPM_SYNC_OPEN_REGISTRATION=1` per la registrazione libera. Senza nessuno dei due la registrazione dall'app è
-     spenta (resta il comando `crea-account` sul server);
-   - facoltativi: `RDPM_VPN_ENDPOINT` (default `syncnetpro.com:51820`), `RDPM_VPN_DNS` (vuoto = nessun DNS).
-4. `mkdir -p data` (il contenitore gira come root, non serve `chown`). Costruisci e avvia (il primo build scarica
-   l'SDK .NET e `wireguard-tools`: diversi minuti, meglio in background):
-   `sudo env PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin COMPOSE_HTTP_TIMEOUT=600 /usr/local/bin/docker-compose up -d --build`
-5. Controlla:
-   - `curl -fsS http://127.0.0.1:8787/health` risponde `{"status":"ok","version":"1.1.0"}`;
-   - `sudo /usr/local/bin/docker exec rdpm-sync wg show wg0` mostra l'interfaccia (se non trova il socket, la
-     cartella `run` non è condivisa: ricrea **prima** `wireguard`, poi `rdpm-sync`);
-   - `sudo /usr/local/bin/docker logs rdpm-sync` non contiene errori «VPN: allineamento iniziale».
-6. **HTTPS per i PC senza VPN**: DSM, *Pannello di controllo -> Portale di accesso -> Avanzate -> Proxy inverso ->
-   Crea*: origine HTTPS, nome host `syncnetpro.com`, porta **8443**; destinazione HTTP `localhost`, porta **8787**.
-   Certificato (Let's Encrypt) per `syncnetpro.com` in *Sicurezza -> Certificato*, assegnato a quella regola. Sul
-   router inoltra **TCP 8443** verso il Synology (192.168.1.199) e apri la porta nel firewall DSM. Prova da fuori
-   LAN: `curl https://syncnetpro.com:8443/health`. (Con un'altra porta cambia anche `SyncHttp.PublicServerUrl` nel
-   client; nella finestra dell'account l'indirizzo si può comunque scrivere a mano.)
-7. Prova completa: dall'app, *Strumenti -> Account e sincronizzazione -> Registrati*; a fine registrazione la VPN è
-   accesa e `sudo /usr/local/bin/docker exec rdpm-sync wg show wg0` mostra il nuovo peer con un «latest handshake».
+```powershell
+pwsh server/deploy-synology.ps1
+```
+
+Lo script (ripetibile, si può rilanciare per aggiornare) fa tutto da solo:
+- installa il pacchetto Docker di DSM se manca;
+- copia `server/wireguard-synology` in `/volume1/docker/wireguard`, `server/rdpm-sync` (senza `bin/obj`) in
+  `/volume1/docker/rdpm-sync` e `server/caddy-synology` in `/volume1/docker/caddy`; `config/`, `data/` e `.env`
+  già presenti sul NAS non vengono toccati;
+- se mancano, genera le chiavi del server WireGuard (`prima-generazione.sh`) e crea `.env` con una chiave admin
+  casuale di 40 caratteri e un `RDPM_SYNC_REGISTRATION_CODE` casuale di 32 (un `.env` esistente non è mai
+  sovrascritto: si aggiungono solo le chiavi vuote o mancanti);
+- avvia `wireguard`, `rdpm-sync` e `caddy-rdpm` con `restart: unless-stopped` (ripartono al riavvio del NAS);
+- **HTTPS pubblico**: `caddy-rdpm` ascolta su **8443** (host) e inoltra a `127.0.0.1:8787`, con il certificato
+  Let's Encrypt di `syncnetpro.com` che DSM già gestisce e rinnova (cartella in `/usr/syno/etc/certificate/_archive`,
+  montata in sola lettura; Caddy lo rilegge ogni 12 ore). Le porte 80/443 restano a DSM, nessuna regola nel proxy
+  inverso di DSM;
+- apre sul router, via **UPnP**, TCP 8443 e UDP 51820 verso il Synology (se il router non supporta UPnP lo script
+  avvisa: va inoltrata a mano);
+- verifica `/health` (locale e via HTTPS) e `wg show wg0` dentro `rdpm-sync`, poi stampa l'ultima riga
+  `REGISTRATION_CODE=...`: è il codice che l'app chiede una volta alla registrazione (si rilegge anche in
+  `/volume1/docker/rdpm-sync/.env`). Non va nel repository.
+
+Prova da fuori LAN: `curl https://syncnetpro.com:8443/health`. Con un'altra porta cambia anche
+`SyncHttp.PublicServerUrl` nel client (nella finestra dell'account l'indirizzo si può scrivere a mano).
+Prova completa: dall'app, *Strumenti -> Account e sincronizzazione -> Registrati*; a fine registrazione la VPN è
+accesa e `sudo /usr/local/bin/docker exec rdpm-sync wg show wg0` mostra il nuovo peer con un «latest handshake».
+
+Impostazioni facoltative in `.env`: `RDPM_VPN_ENDPOINT` (default `syncnetpro.com:51820`), `RDPM_VPN_DNS`,
+`RDPM_SYNC_OPEN_REGISTRATION=1` (registrazione libera, sconsigliata: chi si registra entra nella VPN).
 
 Se il contenitore `wireguard` viene ricreato, `rdpm-sync` perde rete e socket: in `/volume1/docker/rdpm-sync` lancia
 `docker-compose up -d --force-recreate` (all'avvio i peer si riapplicano da `wg0.conf` e dal database). Dopo il

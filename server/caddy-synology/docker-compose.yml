@@ -1,0 +1,25 @@
+# Proxy HTTPS pubblico per rdpm-sync: https://syncnetpro.com:8443 -> http://127.0.0.1:8787.
+# Usa il certificato Let's Encrypt che DSM gestisce e rinnova da solo (cartella montata in sola lettura,
+# CERT_DIR e' scritta in .env da deploy-synology.ps1). Le porte 80/443 sono di DSM: qui solo la 8443.
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy-rdpm
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      CERT_HOST: ${CERT_HOST:-syncnetpro.com}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${CERT_DIR}:/certs:ro
+    # Ricarica la configurazione ogni 12 ore: Caddy rilegge cosi' il certificato rinnovato da DSM.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        caddy run --config /etc/caddy/Caddyfile --adapter caddyfile &
+        while sleep 43200; do caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile; done
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
