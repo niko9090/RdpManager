@@ -12,12 +12,17 @@ public sealed class FakeWireGuard : IWireGuardPeers
     public List<WgPeer> Peers { get; private set; } = [];
     public int Applications { get; private set; }
     public bool Fail { get; set; }
+    /// <summary>Simula wg0.conf / socket illeggibili per permessi (UnauthorizedAccessException).</summary>
+    public bool Denied { get; set; }
     public string[] Reserved { get; set; } = [];
 
-    public IReadOnlyCollection<string> ReservedAddresses() => Reserved;
+    public IReadOnlyCollection<string> ReservedAddresses() =>
+        Denied ? throw new UnauthorizedAccessException("permesso negato") : Reserved;
 
     public Task ApplyAsync(IReadOnlyCollection<WgPeer> desired, CancellationToken ct = default)
     {
+        if (Denied)
+            throw new UnauthorizedAccessException("permesso negato");
         if (Fail)
             throw new IOException("wg non risponde");
         Peers = desired.ToList();
@@ -226,6 +231,34 @@ public class VpnTests
         var ok = await Request(s, token, "A", NewKey());
         Assert.Equal(HttpStatusCode.Created, ok.StatusCode);
         Assert.Equal("10.66.0.2/32", (await Json(ok)).GetProperty("address").GetString());
+    }
+
+    [Fact]
+    public async Task Se_wg0_conf_non_e_leggibile_per_permessi_503_e_nessun_peer_resta()
+    {
+        var wg = new FakeWireGuard { Denied = true };
+        await using var s = Server(wg);
+        var token = await UserAsync(s, "mario");
+        var r = await Request(s, token, "A", NewKey());
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, r.StatusCode);
+
+        wg.Denied = false;
+        var ok = await Request(s, token, "A", NewKey());
+        Assert.Equal(HttpStatusCode.Created, ok.StatusCode);
+    }
+
+    [Fact]
+    public async Task Account_cancellabile_anche_se_la_vpn_nega_i_permessi()
+    {
+        var wg = new FakeWireGuard();
+        await using var s = Server(wg);
+        var token = await UserAsync(s, "mario");
+        await Request(s, token, "A", NewKey());
+
+        wg.Denied = true;
+        var req = new HttpRequestMessage(HttpMethod.Delete, "/v1/admin/accounts/mario");
+        req.Headers.Add("X-Admin-Key", TestServer.AdminKey);
+        Assert.Equal(HttpStatusCode.NoContent, (await s.Http.SendAsync(req)).StatusCode);
     }
 
     [Fact]

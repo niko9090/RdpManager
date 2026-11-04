@@ -107,7 +107,7 @@ public sealed partial class VpnEndpoints(SyncOptions options, Store store, IWire
                     var old = existing;
                     store.ReplaceDeviceKey(existing.Id, key!);
                     try { await wg!.ApplyAsync(Desired()); }
-                    catch (Exception ex) when (ex is IOException or InvalidOperationException)
+                    catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
                     {
                         store.ReplaceDeviceKey(existing.Id, old.PublicKey);
                         log.LogError(ex, "VPN: chiave non sostituita per {User}/{Name}", t.Username, name);
@@ -120,14 +120,20 @@ public sealed partial class VpnEndpoints(SyncOptions options, Store store, IWire
                 if (store.ListDevices(t.AccountId).Count >= options.MaxDevicesPerAccount)
                     return SyncApp.Err(409, "too_many_devices", $"Hai già {options.MaxDevicesPerAccount} PC nella VPN: togline uno.");
 
-                var used = store.ListDevices().Select(d => d.Address).Concat(wg!.ReservedAddresses());
+                IEnumerable<string> used;
+                try { used = store.ListDevices().Select(d => d.Address).Concat(wg!.ReservedAddresses()).ToList(); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    log.LogError(ex, "VPN: wg0.conf non leggibile per {User}/{Name}", t.Username, name);
+                    return SyncApp.Err(503, "vpn_unavailable", "Il server WireGuard non risponde: riprova fra poco.");
+                }
                 if (NextFree(used) is not { } ip)
                     return SyncApp.Err(409, "network_full", "La rete VPN è piena.");
 
                 store.InsertDevice(t.AccountId, name!, key!, ip);
                 var created = store.FindDevice(t.AccountId, name!)!;
                 try { await wg.ApplyAsync(Desired()); }
-                catch (Exception ex) when (ex is IOException or InvalidOperationException)
+                catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
                 {
                     store.DeleteDevice(created.Id);
                     log.LogError(ex, "VPN: peer non applicato per {User}/{Name}", t.Username, name);
@@ -155,7 +161,7 @@ public sealed partial class VpnEndpoints(SyncOptions options, Store store, IWire
                     return SyncApp.Err(404, "not_found", "Nessun PC con questo nome nel tuo account.");
                 store.DeleteDevice(d.Id);
                 try { await wg!.ApplyAsync(Desired()); }
-                catch (Exception ex) when (ex is IOException or InvalidOperationException)
+                catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
                 {
                     log.LogError(ex, "VPN: peer {User}/{Name} tolto dal database ma non dal tunnel", t.Username, name);
                 }
@@ -180,7 +186,7 @@ public sealed partial class VpnEndpoints(SyncOptions options, Store store, IWire
             foreach (var d in store.ListDevices(a.Id))
                 store.DeleteDevice(d.Id);
             try { await wg!.ApplyAsync(Desired()); }
-            catch (Exception ex) when (ex is IOException or InvalidOperationException)
+            catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
             {
                 log.LogError(ex, "VPN: peer di {User} non tolti dal tunnel", username);
             }
