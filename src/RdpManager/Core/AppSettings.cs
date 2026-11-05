@@ -141,6 +141,14 @@ public sealed class AppSettings
     /// </summary>
     public int SidebarWidth { get; set; } = WindowSidebar.DefaultWidth;
 
+    // --- Dalla 1.9.1 ---
+
+    /// <summary>
+    /// Modalità tocco della finestra principale (righe, schede, menu e pulsanti più grandi, scorrimento col dito):
+    /// automatica se c'è uno schermo touch. Vale per questo PC, non si esporta.
+    /// </summary>
+    public TouchMode TouchMode { get; set; } = TouchMode.Auto;
+
     /// <summary>La barra a schermo intero, creata dalle impostazioni di prima se manca.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public FullScreenBarSettings Bar => FullScreenBar ??= FullScreenBarSettings.FromLegacy(SidebarMode);
@@ -161,6 +169,7 @@ public sealed class AppSettings
         copy.OpenSessions = [];
         copy.ReopenOnceAfterUpdate = false;
         copy.LockPin = null; // il PIN non esce mai dal PC
+        copy.TouchMode = TouchMode.Auto; // dipende dallo schermo di questo PC
         copy.FullScreenBar = Bar.Clone();
         return copy;
     }
@@ -241,6 +250,7 @@ public sealed class AppSettings
             LockPin = null;
         LockAfterMinutes = Math.Clamp(LockAfterMinutes, 0, 24 * 60);
         SidebarWidth = Math.Clamp(SidebarWidth, WindowSidebar.MinWidth, WindowSidebar.MaxWidth);
+        TouchMode = TouchPolicy.Normalize(TouchMode);
         Bar.Normalize();
     }
 }

@@ -80,6 +80,15 @@ internal static class TouchUi
         return Screen.FromControl(owner).WorkingArea;
     }
 
+    /// <summary>Per le prove automatiche: se impostati, sostituiscono la rilevazione dello schermo touch e l'origine dell'ultimo input.</summary>
+    internal static Func<bool>? TouchScreenForTests { get; set; }
+    internal static Func<bool>? TouchInputForTests { get; set; }
+
+    public static bool HasTouchScreen() => TouchScreenForTests is { } test ? test() : NativeMethods.HasTouchScreen();
+
+    /// <summary>L'evento del mouse in corso viene da un dito (o dalla penna).</summary>
+    public static bool IsTouchInput() => TouchInputForTests is { } test ? test() : NativeMethods.LastInputWasTouch();
+
     /// <summary>Per le prove automatiche: se impostata, sostituisce l'apertura vera della tastiera (restituisce se è riuscita).</summary>
     internal static Func<bool>? ScreenKeyboardForTests { get; set; }
 
@@ -95,9 +104,11 @@ internal static class TouchUi
     // ---------- bersagli ----------
 
     /// <summary>Porta il controllo e tutti i suoi figli a bersagli da dito (idempotente).</summary>
-    public static void Apply(Control root)
+    public static void Apply(Control root) => Apply(root, MinTarget(root));
+
+    /// <summary>Come <see cref="Apply(Control)"/> con un lato minimo scelto (la modalità tocco usa 48 px logici).</summary>
+    public static void Apply(Control root, int min)
     {
-        int min = MinTarget(root);
         Touchify(root, min);
         foreach (var c in Descendants(root))
             Touchify(c, min);
@@ -236,36 +247,103 @@ internal static class TouchUi
             tabs.Padding = new Point(tabs.Padding.X, pad);
     }
 
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<TabControl, object> WideTabs = new();
+
+    /// <summary>Le linguette sono larghe, con la X di chiusura disegnata (modalità tocco)?</summary>
+    internal static bool HasWideTabs(TabControl tabs) => WideTabs.TryGetValue(tabs, out _);
+
+    /// <summary>
+    /// Modalità tocco per le schede: linguette larghe e alte (<paramref name="min"/>), su più righe invece delle freccine
+    /// minuscole, disegnate a mano con una grande X di chiusura (vedi <see cref="TabCloseLayout"/>). Spenta, torna tutto com'era.
+    /// </summary>
+    internal static void SetWideTabs(TabControl tabs, bool on, int min)
+    {
+        if (on)
+        {
+            WideTabs.AddOrUpdate(tabs, new object());
+            tabs.SizeMode = TabSizeMode.Fixed;
+            tabs.ItemSize = new Size(Px(tabs, TabCloseLayout.TabWidth), min);
+            tabs.Multiline = true;
+            ThemeManager.RefreshTabs(tabs); // disegno a mano con la X (e il gestore del tema, se manca)
+        }
+        else if (HasWideTabs(tabs))
+        {
+            WideTabs.Remove(tabs);
+            tabs.SizeMode = TabSizeMode.Normal;
+            tabs.ItemSize = Size.Empty;
+            tabs.Multiline = false;
+            // Il tema scuro continua a disegnare le linguette a mano: ci pensa ThemeManager alla prossima applicazione.
+            tabs.DrawMode = TabDrawMode.Normal;
+            ThemeManager.RefreshTabs(tabs);
+        }
+        TouchifyTabs(tabs, min);
+        tabs.Invalidate();
+    }
+
+    /// <summary>Come <see cref="OpenScreenKeyboard"/> ma senza avvisi se non c'è: serve a chi tocca la casella di ricerca.</summary>
+    internal static void OpenScreenKeyboardQuietly()
+    {
+        if (ScreenKeyboardForTests is { } test)
+            test();
+        else
+            ScreenKeyboard.TryOpen();
+    }
+
     // ---------- menu e barre di pulsanti ----------
 
     /// <summary>Voci alte almeno quanto un bersaglio, anche quelle che i menu aggiungono dopo, all'apertura.</summary>
     public static void TouchifyStrip(ToolStrip strip, int min)
     {
+        // Il minimo si può cambiare dopo (modalità tocco accesa o spenta): le voci aggiunte più tardi usano quello in corso.
+        var state = Watched.GetValue(strip, _ => new StripState());
+        state.Min = min;
         foreach (ToolStripItem item in strip.Items)
             TouchifyItem(item, min);
-        if (Watched.TryGetValue(strip, out _))
+        if (state.Hooked)
             return;
-        Watched.Add(strip, new object());
-        strip.ItemAdded += (_, e) => { if (e.Item is { } item) TouchifyItem(item, min); };
+        state.Hooked = true;
+        strip.ItemAdded += (_, e) => { if (e.Item is { } item) TouchifyItem(item, state.Min); };
     }
 
-    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ToolStrip, object> Watched = new();
+    private sealed class StripState
+    {
+        public int Min;
+        public bool Hooked;
+        public bool DropDownPadded;
+    }
+
+    private sealed class ItemPad { public int Extra; }
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ToolStrip, StripState> Watched = new();
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ToolStripItem, ItemPad> ItemPads = new();
 
     private static void TouchifyItem(ToolStripItem item, int min)
     {
         if (item is ToolStripSeparator)
             return;
+        // Si toglie il riempimento messo prima, così il minimo può anche scendere (modalità tocco spenta).
+        var pad = ItemPads.GetValue(item, _ => new ItemPad());
+        if (pad.Extra > 0)
+        {
+            item.Padding = new Padding(item.Padding.Left, item.Padding.Top - pad.Extra, item.Padding.Right, item.Padding.Bottom - pad.Extra);
+            pad.Extra = 0;
+        }
         int height = item.GetPreferredSize(Size.Empty).Height;
         if (height < min)
         {
             int extra = TouchMetrics.PaddingToReach(height, min);
             item.Padding = new Padding(item.Padding.Left, item.Padding.Top + extra, item.Padding.Right, item.Padding.Bottom + extra);
+            pad.Extra = extra;
         }
         if (item is ToolStripDropDownItem { HasDropDown: true } dropDown)
         {
             TouchifyStrip(dropDown.DropDown, min);
-            dropDown.DropDown.Padding = new Padding(dropDown.DropDown.Padding.Left, dropDown.DropDown.Padding.Top + 2,
-                dropDown.DropDown.Padding.Right, dropDown.DropDown.Padding.Bottom + 2);
+            if (Watched.TryGetValue(dropDown.DropDown, out var sub) && !sub.DropDownPadded)
+            {
+                sub.DropDownPadded = true;
+                dropDown.DropDown.Padding = new Padding(dropDown.DropDown.Padding.Left, dropDown.DropDown.Padding.Top + 2,
+                    dropDown.DropDown.Padding.Right, dropDown.DropDown.Padding.Bottom + 2);
+            }
         }
     }
 

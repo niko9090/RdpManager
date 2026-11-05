@@ -102,6 +102,7 @@ public sealed partial class MainForm
         _splitItem.ShortcutKeyDisplayString = _shortcuts[ShortcutAction.ToggleSplitView].ToString();
         UpdateEmptyHint();
         ApplySidebarLayout();
+        RefreshTouchMode();
         if (_fullScreen)
             UpdateFullScreenBounds();
     }

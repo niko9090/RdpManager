@@ -18,8 +18,21 @@ internal sealed class OverviewForm : Form
         public DateTime? CapturedUtc { get; set; }
     }
 
-    private const int HeaderHeight = 44;
-    private static readonly Color Back = Color.FromArgb(24, 25, 29);
+    private const int BaseHeaderHeight = 44;
+    /// <summary>Altezza dell'intestazione: abbastanza per un pulsante «Chiudi» da dito (48 px logici più il respiro).</summary>
+    private int HeaderHeight => Math.Max(BaseHeaderHeight, TouchUi.Px(this, TouchPolicy.ComfortTarget + 8));
+
+    /// <summary>Pulsante «Chiudi» in alto a destra: col dito non c'è il tasto Esc.</summary>
+    internal Rectangle CloseButtonRect
+    {
+        get
+        {
+            int h = TouchUi.Px(this, TouchPolicy.ComfortTarget), w = TouchUi.Px(this, 130), margin = TouchUi.Px(this, 8);
+            return new Rectangle(ClientSize.Width - w - margin, (HeaderHeight - h) / 2, w, h);
+        }
+    }
+
+    private static readonly Color Back =Color.FromArgb(24, 25, 29);
     private static readonly Color TileBack = Color.FromArgb(40, 42, 48);
     private static readonly Color Accent = Color.FromArgb(70, 140, 230);
 
@@ -27,6 +40,7 @@ internal sealed class OverviewForm : Form
     private IReadOnlyList<Rectangle> _cells = [];
     private int _selected;
     private int _hover = -1;
+    private bool _hoverClose;
     private int _columns = 1;
 
     public OverviewForm()
@@ -136,8 +150,13 @@ internal sealed class OverviewForm : Form
         g.DrawString("Panoramica", title, text, 16, 10);
         g.DrawString(_tiles.Count == 0
                 ? "Nessuna sessione connessa. Esc per chiudere."
-                : "Clic o Invio per passare alla sessione · frecce per scegliere · Esc per chiudere",
+                : "Tocca una sessione per aprirla · Invio e frecce da tastiera · Esc per chiudere",
             Font, gray, 150, 15);
+        var close = CloseButtonRect;
+        using (var closeBack = new SolidBrush(_hoverClose ? Color.FromArgb(70, 74, 84) : TileBack))
+            g.FillRectangle(closeBack, close);
+        using (var closeFormat = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+            g.DrawString("Chiudi  ✕", Font, text, close, closeFormat);
 
         using var tileBack = new SolidBrush(TileBack);
         for (int i = 0; i < _tiles.Count && i < _cells.Count; i++)
@@ -177,6 +196,12 @@ internal sealed class OverviewForm : Form
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
+        bool overClose = CloseButtonRect.Contains(e.Location);
+        if (overClose != _hoverClose)
+        {
+            _hoverClose = overClose;
+            Invalidate();
+        }
         int hit = OverviewLayout.HitTest(_cells, e.Location);
         if (hit != _hover)
         {
@@ -189,6 +214,11 @@ internal sealed class OverviewForm : Form
     protected override void OnMouseClick(MouseEventArgs e)
     {
         base.OnMouseClick(e);
+        if (e.Button == MouseButtons.Left && CloseButtonRect.Contains(e.Location))
+        {
+            Close();
+            return;
+        }
         int hit = OverviewLayout.HitTest(_cells, e.Location);
         if (e.Button == MouseButtons.Left && hit >= 0)
             Choose(hit);

@@ -354,7 +354,12 @@ public sealed partial class MainForm : Form
         _tree.AfterExpand += (_, e) => { if (CollapseKey(e.Node) is { } k && _search.TextLength == 0) _collapsed.Remove(k); };
 
         // Trascinamento delle connessioni nelle cartelle.
-        _tree.ItemDrag += (_, e) => { if (e.Item is TreeNode { Tag: RdpConnection or FolderTag }) DoDragDrop(e.Item, DragDropEffects.Move); };
+        // Col dito trascinare fa scorrere l'elenco (modalità tocco): lo spostamento resta al mouse.
+        _tree.ItemDrag += (_, e) =>
+        {
+            if (TouchPolicy.AllowItemDrag(_touchActive, _touchPressed) && e.Item is TreeNode { Tag: RdpConnection or FolderTag })
+                DoDragDrop(e.Item, DragDropEffects.Move);
+        };
         _tree.DragOver += (_, e) =>
             e.Effect = e.Data?.GetDataPresent(typeof(TreeNode)) == true ? DragDropEffects.Move : DragDropEffects.None;
         _tree.DragDrop += (_, e) =>

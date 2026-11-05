@@ -12,6 +12,7 @@ public sealed class SettingsDialog : TouchForm
     private readonly RadioButton _autoHide = new() { Text = "A comparsa (bordo sinistro)", AutoSize = true };
     private readonly CheckBox _reopen = new() { Text = "Riapri all'avvio le sessioni lasciate aperte", AutoSize = true };
     private readonly ComboBox _theme = new() { Width = 200, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly ComboBox _touchMode = new() { Width = 320, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly CheckBox _tray = new() { Text = "Icona nell'area di notifica con il menu delle connessioni", AutoSize = true };
     private readonly CheckBox _closeToTray = new() { Text = "Chiudendo la finestra resta nell'area di notifica", AutoSize = true };
     private readonly ShortcutBox _globalHotkey = new() { Width = 200 };
@@ -57,6 +58,11 @@ public sealed class SettingsDialog : TouchForm
         _theme.Items.AddRange(ThemeChoices.Select(t => (object)t.Text).ToArray());
         _theme.SelectedIndex = Math.Max(0, Array.FindIndex(ThemeChoices, t => t.Theme == settings.Theme));
         general.Controls.Add(Group("Aspetto", Flow(new Label { Text = "Tema", AutoSize = true, Margin = new Padding(3, 7, 8, 3) }, _theme)));
+
+        _touchMode.Items.AddRange(["Automatica (se c'è uno schermo touch)", "Sempre attiva", "Spenta"]);
+        _touchMode.SelectedIndex = (int)TouchPolicy.Normalize(settings.TouchMode);
+        general.Controls.Add(Group("Modalità tocco", _touchMode,
+            Note("Righe, schede, menu e pulsanti più grandi; trascinando l'elenco col dito scorre; la X chiude le schede.")));
 
         _tray.Checked = settings.ShowTrayIcon;
         _closeToTray.Checked = settings.CloseToTray;
@@ -312,6 +318,7 @@ public sealed class SettingsDialog : TouchForm
         _settings.SidebarMode = _pinned.Checked ? SidebarMode.Pinned : SidebarMode.AutoHide;
         _settings.ReopenSessionsOnStartup = _reopen.Checked;
         _settings.Theme = ThemeChoices[Math.Max(0, _theme.SelectedIndex)].Theme;
+        _settings.TouchMode = (TouchMode)Math.Max(0, _touchMode.SelectedIndex);
         _settings.ShowTrayIcon = _tray.Checked;
         _settings.CloseToTray = _tray.Checked && _closeToTray.Checked;
         _settings.GlobalHotkey = _globalHotkey.Combo.IsEmpty ? "" : _globalHotkey.Combo.ToString();

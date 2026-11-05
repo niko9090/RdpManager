@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using RdpManager.Core;
 
 namespace RdpManager.UI;
 
@@ -49,6 +50,38 @@ internal static class NativeMethods
 
     [DllImport("user32.dll")]
     public static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int index);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetMessageExtraInfo();
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
+    private const int SM_DIGITIZER = 94, SM_MAXIMUMTOUCHES = 95, WM_VSCROLL = 0x0115, SB_LINEUP = 0, SB_LINEDOWN = 1;
+
+    /// <summary>Questo PC ha uno schermo (o digitalizzatore) a tocco pronto all'uso.</summary>
+    public static bool HasTouchScreen()
+    {
+        try { return TouchPolicy.IsTouchCapable(GetSystemMetrics(SM_DIGITIZER), GetSystemMetrics(SM_MAXIMUMTOUCHES)); }
+        catch (EntryPointNotFoundException) { return false; }
+    }
+
+    /// <summary>L'evento del mouse che si sta gestendo nasce da un dito (o dalla penna), non dal mouse.</summary>
+    public static bool LastInputWasTouch() => TouchPolicy.IsTouchOrigin(GetMessageExtraInfo().ToInt64());
+
+    /// <summary>Scorre un controllo con barra verticale di <paramref name="rows"/> righe (positivo = verso il fondo).</summary>
+    public static void ScrollRows(Control control, int rows)
+    {
+        if (!control.IsHandleCreated)
+            return;
+        for (int i = 0; i < Math.Abs(rows); i++)
+            SendMessage(control.Handle, WM_VSCROLL, rows > 0 ? SB_LINEDOWN : SB_LINEUP, IntPtr.Zero);
+    }
+
+    private static IntPtr SendMessage(IntPtr hWnd, int msg, int wParam, IntPtr lParam) => SendMessage(hWnd, msg, (IntPtr)wParam, lParam);
 
     /// <summary>Tema visivo di una finestra: "DarkMode_Explorer" dà barre di scorrimento scure (Windows 10 1809+).</summary>
     [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]

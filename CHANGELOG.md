@@ -1,5 +1,17 @@
 # Novità di RdpManager
 
+## Non rilasciato
+
+**Finestra principale più comoda col dito (modalità tocco)**
+- Nuova **modalità tocco**: automatica se il PC ha uno schermo touch, oppure da *Impostazioni › Generale › Modalità tocco*
+  (Automatica / Sempre attiva / Spenta). Col mouse non cambia nulla: le misure di prima (bersagli da 40 px) restano.
+- Elenco connessioni: righe alte (52 px logici); **trascinando col dito l'elenco scorre** senza dover prendere la barra sottile
+  (il trascinamento che sposta le connessioni nelle cartelle resta al mouse); un tocco su una cartella la apre o la chiude.
+- Schede delle sessioni: larghe e alte, su più righe invece delle freccine, con una **X grande e lontana dal bordo** per chiuderle;
+  scorrendo il dito sulla riga delle schede si passa alla successiva o alla precedente. Il tocco prolungato apre i menu come il tasto destro.
+- Menu, barre degli strumenti e pulsanti della barra laterale da 48 px logici; toccando la casella di ricerca col dito si apre la tastiera su schermo.
+- Vista d'insieme (Panoramica): pulsante **Chiudi** grande in alto a destra (col dito non c'è Esc).
+
 ## 1.9.0
 
 **VPN automatica e registrazione dall'app** (`rdpm-sync` 1.1.0)
