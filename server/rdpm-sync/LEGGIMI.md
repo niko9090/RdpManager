@@ -45,7 +45,11 @@ Lo script (ripetibile, si può rilanciare per aggiornare) fa tutto da solo:
 - se mancano, genera le chiavi del server WireGuard (`prima-generazione.sh`) e crea `.env` con una chiave admin
   casuale di 40 caratteri e un `RDPM_SYNC_REGISTRATION_CODE` casuale di 32 (un `.env` esistente non è mai
   sovrascritto: si aggiungono solo le chiavi vuote o mancanti);
-- avvia `wireguard`, `rdpm-sync` e `caddy-rdpm` con `restart: unless-stopped` (ripartono al riavvio del NAS);
+- avvia `wireguard`, `rdpm-sync` e `caddy-rdpm` con `restart: unless-stopped`, e installa
+  `/usr/local/etc/rc.d/S99rdpm-avvio.sh` (da `wireguard-synology/scripts/avvio-nas.sh`): al riavvio del NAS Docker
+  riparte i contenitori prima che esista `/dev/net/tun`, `wireguard` esce subito e `rdpm-sync` con lui (il proxy
+  risponde 502 e nessuno può accedere). Lo script aspetta Docker e `/dev/net/tun`, li riaccende e controlla
+  `/health`; scrive in `/var/log/rdpm-avvio.log`. A mano: `sudo sh /usr/local/etc/rc.d/S99rdpm-avvio.sh adesso`;
 - **HTTPS pubblico**: `caddy-rdpm` ascolta su **8443** (host) e inoltra a `127.0.0.1:8787`, con il certificato
   Let's Encrypt di `syncnetpro.com` che DSM già gestisce e rinnova (cartella in `/usr/syno/etc/certificate/_archive`,
   montata in sola lettura; Caddy lo rilegge ogni 12 ore). Le porte 80/443 restano a DSM, nessuna regola nel proxy
@@ -66,7 +70,7 @@ Impostazioni facoltative in `.env`: `RDPM_VPN_ENDPOINT` (default `syncnetpro.com
 
 Se il contenitore `wireguard` viene ricreato, `rdpm-sync` perde rete e socket: in `/volume1/docker/rdpm-sync` lancia
 `docker-compose up -d --force-recreate` (all'avvio i peer si riapplicano da `wg0.conf` e dal database). Dopo il
-riavvio del NAS, se `rdpm-sync` è partito prima di `wireguard`, basta `docker restart rdpm-sync`.
+riavvio del NAS ci pensa `S99rdpm-avvio.sh` (vedi sopra); se `/health` non risponde, guarda `/var/log/rdpm-avvio.log`.
 
 Da salvare nelle copie di riserva (Hyper Backup): `./data/rdpm-sync.db` e `/volume1/docker/wireguard/config`
 (chiavi del server e `wg0.conf`).

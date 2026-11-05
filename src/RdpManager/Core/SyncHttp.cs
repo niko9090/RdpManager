@@ -14,8 +14,14 @@ public sealed class SyncServerException(HttpStatusCode status, string code, stri
     public int? RetryAfterSeconds { get; } = retryAfterSeconds;
 }
 
-/// <summary>Il server non risponde (VPN spenta, indirizzo sbagliato, tempo scaduto).</summary>
-public sealed class SyncUnreachableException(string message, Exception? inner = null) : Exception(message, inner);
+/// <summary>Il server non risponde (VPN spenta, indirizzo sbagliato, tempo scaduto), oppure il proxy davanti
+/// al server risponde ma il servizio dietro è spento (502/504: <see cref="ServerDown"/>).</summary>
+public sealed class SyncUnreachableException(string message, Exception? inner = null, bool serverDown = false)
+    : Exception(message, inner)
+{
+    /// <summary>Vero se l'indirizzo è giusto e raggiungibile, ma il servizio di sincronizzazione è spento.</summary>
+    public bool ServerDown { get; } = serverDown;
+}
 
 public enum RemoteDocumentKind { Missing, NotModified, Found }
 
@@ -60,7 +66,18 @@ public sealed class SyncHttp : IDisposable
     {
         try
         {
-            return await _http.SendAsync(request, ct);
+            var response = await _http.SendAsync(request, ct);
+            // 502/504 vengono dal proxy HTTPS (Caddy sul Synology), non da rdpm-sync: il servizio dietro è spento
+            // o si sta riavviando (succede dopo un riavvio del NAS). Non è un errore dell'account: si lavora in locale
+            // e si riprova, come con la VPN spenta. (503 invece lo usa anche rdpm-sync, con un codice nel corpo.)
+            if (response.StatusCode is HttpStatusCode.BadGateway or HttpStatusCode.GatewayTimeout)
+            {
+                var status = (int)response.StatusCode;
+                response.Dispose();
+                throw new SyncUnreachableException(
+                    $"Il server di sincronizzazione è spento o si sta riavviando (errore {status}).", serverDown: true);
+            }
+            return response;
         }
         catch (HttpRequestException ex)
         {
