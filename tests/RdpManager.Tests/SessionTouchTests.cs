@@ -6,6 +6,7 @@ using RdpManager.UI;
 namespace RdpManager.Tests;
 
 /// <summary>Dito dentro la sessione remota (1.9.1): gesti da mouse, adattamento allo schermo, modalità, pulsanti grandi.</summary>
+[Collection("UI")]
 public sealed class SessionTouchGestureTests
 {
     private static readonly DateTime T0 = new(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc);
@@ -208,6 +209,7 @@ public sealed class SessionTouchGestureTests
     }
 }
 
+[Collection("UI")]
 public sealed class SessionTouchUiTests
 {
     private static void OnStaThread(Action body)

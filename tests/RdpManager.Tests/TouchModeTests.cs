@@ -8,6 +8,7 @@ using RdpManager.UI;
 namespace RdpManager.Tests;
 
 /// <summary>Logica della modalità tocco della finestra principale (senza finestre): attivazione, X delle schede, scorrimento, gesti.</summary>
+[Collection("UI")]
 public sealed class TouchModeCoreTests
 {
     [Theory]
@@ -166,6 +167,7 @@ public sealed class TouchModeCoreTests
 }
 
 /// <summary>La modalità tocco nella finestra principale: misure dei bersagli, X delle schede, tastiera sulla ricerca.</summary>
+[Collection("UI")]
 public sealed class TouchModeUiTests : IDisposable
 {
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "RdpManagerTouchMode-" + Guid.NewGuid().ToString("N"));
