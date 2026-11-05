@@ -2,12 +2,34 @@
 
 ## Non rilasciato
 
+**Finestra principale più comoda col dito (modalità tocco)**
+- Nuova **modalità tocco**: automatica se il PC ha uno schermo touch, oppure da *Impostazioni › Generale › Modalità tocco*
+  (Automatica / Sempre attiva / Spenta). Col mouse non cambia nulla: le misure di prima (bersagli da 40 px) restano.
+- Elenco connessioni: righe alte (52 px logici); **trascinando col dito l'elenco scorre** senza dover prendere la barra sottile
+  (il trascinamento che sposta le connessioni nelle cartelle resta al mouse); un tocco su una cartella la apre o la chiude.
+- Schede delle sessioni: larghe e alte, su più righe invece delle freccine, con una **X grande e lontana dal bordo** per chiuderle;
+  scorrendo il dito sulla riga delle schede si passa alla successiva o alla precedente. Il tocco prolungato apre i menu come il tasto destro.
+- Menu, barre degli strumenti e pulsanti della barra laterale da 48 px logici; toccando la casella di ricerca col dito si apre la tastiera su schermo.
+- Vista d'insieme (Panoramica): pulsante **Chiudi** grande in alto a destra (col dito non c'è Esc).
+
 **Login e sincronizzazione dopo un riavvio del Synology**
 - Server: dopo un riavvio del NAS `wireguard` e `rdpm-sync` restavano spenti (Docker partiva prima di `/dev/net/tun`)
   e il proxy rispondeva 502 a tutti: nessun login, sincronizzazione o VPN. Ora lo script di avvio
   `S99rdpm-avvio.sh`, installato dal deploy, li riaccende da solo e controlla `/health`.
 - RdpManager: con 502/504 dal proxy l'app non dice più «Errore del server (502)», ma «il server è spento o si sta
   riavviando»; la sincronizzazione automatica lo tratta come la VPN spenta (lavora in locale e riprova).
+
+**Dito dentro la sessione remota**
+- Nuova opzione (Impostazioni › Generale › «Dito dentro la sessione remota», o pulsante «Tocco: …» nella barra della
+  sessione): il tocco passato al PC remoto (si prova ad accendere l'ingresso touch del controllo RDP, dalla prossima
+  connessione) oppure il dito che fa da mouse: tocco = clic, doppio tocco = doppio clic, pressione lunga = clic destro,
+  trascinare = trascinare, due dita su e giù = rotella.
+- Risoluzione fissa su uno schermo più piccolo (tablet piccolo o ruotato): la sessione si adatta allo schermo (zoom) invece di
+  uscire dai bordi.
+- Barra della sessione e barra a schermo intero con pulsanti alti almeno 48 px (scalati): Ctrl+Alt+Canc, Esc, Win, «Clic
+  destro» (il prossimo tocco), Tastiera su schermo. Le azioni nuove sono anche nella sezione «Azioni sulla sessione» della barra a
+  schermo intero, insieme a «Nascondi la barra».
+- A schermo intero, su uno schermo a tocco, con la barra nascosta compare una linguetta sul bordo per richiamarla col dito.
 
 ## 1.9.0
 

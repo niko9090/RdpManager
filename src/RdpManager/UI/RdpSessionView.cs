@@ -18,6 +18,8 @@ public sealed class RdpSessionView : UserControl
     private readonly ToolStripButton _reconnectButton = new("Riconnetti");
     private readonly ToolStripButton _detachButton = new("Stacca");
     private readonly ToolStripButton _monitorButton = new("Monitor ›") { ToolTipText = "Sposta la finestra sul monitor successivo", Visible = false };
+    private readonly ToolStripButton _touchModeButton = new() { ToolTipText = "Come agisce il dito sulla sessione: passato al PC remoto, oppure fa da mouse (pressione lunga = clic destro, due dita = scorrimento)" };
+    private readonly ToolStripButton _rightClickButton = new("Clic destro") { CheckOnClick = true, ToolTipText = "Il prossimo tocco sulla sessione vale come clic destro" };
     private readonly ToolStripDropDownButton _sendButton = new("Invia") { ToolTipText = "Comandi verso il PC remoto" };
     private readonly Panel _host = new() { Dock = DockStyle.Fill, BackColor = Color.FromArgb(32, 32, 32) };
     private readonly Label _message = new()
@@ -35,6 +37,8 @@ public sealed class RdpSessionView : UserControl
     private int _lastSentScale;
     private int _reconnectAttempts;
     private bool _closing;
+    private readonly SessionTouchInput _touch;
+    private SessionTouchMode _touchMode = SessionTouchMode.Remote;
 
     public RdpSessionView(RdpConnection connection)
     {
@@ -43,6 +47,8 @@ public sealed class RdpSessionView : UserControl
 
         _sendButton.DropDownItems.Add("Incolla appunti come digitazione", null, async (_, _) => await PasteClipboardAsTypingAsync());
         _sendButton.DropDownItems.Add("Ctrl+Alt+Canc", null, (_, _) => SendCtrlAltDel());
+        _sendButton.DropDownItems.Add("Esc", null, (_, _) => SendEscape());
+        _sendButton.DropDownItems.Add("Tasto Windows", null, (_, _) => SendWindowsKey());
         _sendButton.DropDownItems.Add(new ToolStripSeparator());
         _sendButton.DropDownItems.Add("Foto della sessione", null, (_, _) => SnapshotRequested?.Invoke(this, EventArgs.Empty));
         _sendButton.DropDownItems.Add(new ToolStripSeparator());
@@ -58,12 +64,25 @@ public sealed class RdpSessionView : UserControl
         _bar.Items.Add(new ToolStripSeparator());
         _bar.Items.Add(_reconnectButton);
         _bar.Items.Add(new ToolStripButton("Schermo intero", null, (_, _) => FullScreenRequested?.Invoke(this, EventArgs.Empty)) { ToolTipText = "Schermo intero (Ctrl+Alt+Invio)" });
+        _bar.Items.Add(new ToolStripButton("Ctrl+Alt+Canc", null, (_, _) => SendCtrlAltDel()) { ToolTipText = "Invia Ctrl+Alt+Canc alla sessione" });
+        _bar.Items.Add(new ToolStripButton("Esc", null, (_, _) => SendEscape()) { ToolTipText = "Invia il tasto Esc alla sessione" });
+        _bar.Items.Add(new ToolStripButton("Win", null, (_, _) => SendWindowsKey()) { ToolTipText = "Invia il tasto Windows alla sessione" });
+        _bar.Items.Add(_rightClickButton);
+        _bar.Items.Add(new ToolStripButton("Tastiera", null, (_, _) => OpenScreenKeyboard()) { ToolTipText = "Apre la tastiera su schermo di Windows: i tasti vanno a questa sessione" });
+        _bar.Items.Add(_touchModeButton);
+        // Meno usati: nel menu di overflow, così sulla barra restano i pulsanti grandi e comodi da toccare.
+        _detachButton.Overflow = ToolStripItemOverflow.AsNeeded;
         _bar.Items.Add(_detachButton);
         _bar.Items.Add(_monitorButton);
         _bar.Items.Add(_sendButton);
-        _bar.Items.Add(new ToolStripButton("Tastiera", null, (_, _) => OpenScreenKeyboard()) { ToolTipText = "Apre la tastiera su schermo di Windows: i tasti vanno a questa sessione" });
-        _bar.Items.Add(new ToolStripButton("Apri con mstsc", null, (_, _) => OpenWithMstsc()) { ToolTipText = "Apre la connessione con il client Desktop remoto di Windows" });
+        _bar.Items.Add(new ToolStripButton("Apri con mstsc", null, (_, _) => OpenWithMstsc()) { ToolTipText = "Apre la connessione con il client Desktop remoto di Windows", Overflow = ToolStripItemOverflow.Always });
         _bar.Items.Add(new ToolStripButton("Chiudi", null, (_, _) => CloseRequested?.Invoke(this, EventArgs.Empty)) { Alignment = ToolStripItemAlignment.Right });
+        _bar.OverflowButton.ToolTipText = "Altri comandi";
+        _touch = new SessionTouchInput(_host);
+        _touch.RightClickUsed += (_, _) => { _rightClickButton.Checked = false; UpdateTouchFilter(); };
+        _touchModeButton.Click += (_, _) => TouchModeToggleRequested?.Invoke(this, EventArgs.Empty);
+        _rightClickButton.CheckedChanged += (_, _) => { _touch.RightClickArmed = _rightClickButton.Checked; UpdateTouchFilter(); FocusSession(); };
+        TouchMode = SessionTouchMode.Remote;
         _reconnectButton.Click += (_, _) => Connect();
         _detachButton.Click += (_, _) => DetachToggleRequested?.Invoke(this, EventArgs.Empty);
         _monitorButton.Click += (_, _) => { if (FindForm() is { } f) Screens.MoveFormToNext(f); };
@@ -72,8 +91,8 @@ public sealed class RdpSessionView : UserControl
         Controls.Add(_host);
         Controls.Add(_bar);
         // Barra e menu da dito (40 px logici): i dpi veri si sanno solo con la finestra creata.
-        HandleCreated += (_, _) => TouchUi.Apply(_bar);
-        DpiChangedAfterParent += (_, _) => TouchUi.Apply(_bar);
+        HandleCreated += (_, _) => ApplyBarTouch();
+        DpiChangedAfterParent += (_, _) => ApplyBarTouch();
 
         _host.Resize += (_, _) => { if (State == SessionState.Connected) { _resizeTimer.Stop(); _resizeTimer.Start(); } };
         _resizeTimer.Tick += (_, _) => { _resizeTimer.Stop(); ApplyFitToWindow(); };
@@ -85,6 +104,37 @@ public sealed class RdpSessionView : UserControl
     }
 
     public RdpConnection Connection { get; }
+
+    /// <summary>Si chiede di passare dal tocco «remoto» al dito che fa da mouse (e viceversa): la finestra salva la scelta per tutte le sessioni.</summary>
+    public event EventHandler? TouchModeToggleRequested;
+
+    /// <summary>Come il dito agisce sulla sessione (la modalità mouse vale subito; il tocco remoto dalla prossima connessione).</summary>
+    public SessionTouchMode TouchMode
+    {
+        get => _touchMode;
+        set
+        {
+            _touchMode = value;
+            _touchModeButton.Text = SessionTouchModes.Short(value);
+            UpdateTouchFilter();
+        }
+    }
+
+    internal SessionTouchInput TouchInput => _touch;
+
+    internal ToolStrip Bar => _bar;
+
+    private void UpdateTouchFilter() => _touch.Enabled = _touchMode == SessionTouchMode.Mouse || _rightClickButton.Checked;
+
+    /// <summary>Pulsanti della barra grandi come quelli a schermo intero (48 px logici) e menu di overflow comodo.</summary>
+    private void ApplyBarTouch()
+    {
+        TouchUi.Apply(_bar);
+        TouchUi.TouchifyStrip(_bar, TouchUi.Px(this, TouchMetrics.SessionTarget));
+        int pad = TouchUi.Px(this, 10);
+        _bar.OverflowButton.Padding = new Padding(pad, 0, pad, 0);
+        _bar.OverflowButton.AutoSize = true;
+    }
 
     private readonly ToolStripMenuItem _quickTextsItem = new("Testi rapidi");
 
@@ -334,6 +384,42 @@ public sealed class RdpSessionView : UserControl
         }
     }
 
+    /// <summary>Invia Esc alla sessione.</summary>
+    public bool SendEscape() => SendScanCodes(0x01);
+
+    /// <summary>Invia il tasto Windows (apre il menu Start del PC remoto).</summary>
+    public bool SendWindowsKey() => SendScanCodes(0x15B); // Windows di sinistra: scan code 0x5B con il bit dei tasti estesi
+
+    /// <summary>Preme i tasti nell'ordine dato e li rilascia in ordine inverso (scan code).</summary>
+    private bool SendScanCodes(params int[] scanCodes)
+    {
+        if (_rdp?.NonScriptable is not { } ns || State != SessionState.Connected)
+            return false;
+        int n = scanCodes.Length;
+        short[] up = new short[n * 2];
+        int[] keys = new int[n * 2];
+        for (int i = 0; i < n; i++)
+        {
+            keys[i] = scanCodes[i];
+            keys[n + i] = scanCodes[n - 1 - i];
+            up[n + i] = -1;
+        }
+        try
+        {
+            FocusSession();
+            ns.SendKeys(keys.Length, ref up[0], ref keys[0]);
+            return true;
+        }
+        catch (Exception ex) when (ex is COMException or InvalidCastException or NotImplementedException)
+        {
+            MessageBox.Show(this, "Invio del tasto non riuscito: " + ex.Message, "RdpManager", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return false;
+        }
+    }
+
+    /// <summary>Il prossimo tocco sulla sessione vale come clic destro (lo stesso pulsante della barra).</summary>
+    public void ArmRightClick() => _rightClickButton.Checked = true;
+
     public async Task PasteClipboardAsTypingAsync()
     {
         string text;
@@ -538,7 +624,8 @@ public sealed class RdpSessionView : UserControl
         // La riconnessione del controllo stesso (stessa sessione, pochi secondi) resta sempre attiva;
         // quella dell'app (nuova Connect dopo una disconnessione) dipende da AutoReconnect.
         Try(() => adv.EnableAutoReconnect = true);
-        Try(() => adv.SmartSizing = false);
+        Try(() => adv.SmartSizing = SessionFit.ShouldSmartSize(c.ResolutionMode, size, _host.ClientSize));
+        ConfigureTouch(ocx);
         if (!string.IsNullOrEmpty(c.Password))
             adv.ClearTextPassword = c.Password;
 
@@ -605,6 +692,23 @@ public sealed class RdpSessionView : UserControl
         }
     }
 
+    /// <summary>
+    /// Tocco passato al PC remoto (modalità «remoto»): si prova ad accendere l'ingresso touch del controllo; nelle
+    /// versioni che non lo conoscono la proprietà manca e si prosegue (Windows trasforma il tocco in mouse).
+    /// Con la modalità «mouse» il tocco remoto resta spento: il dito lo gestisce l'app.
+    /// </summary>
+    private void ConfigureTouch(dynamic ocx)
+    {
+        bool remote = _touchMode == SessionTouchMode.Remote;
+        foreach (var name in TouchProperties)
+        {
+            string n = name;
+            Try(() => ocx.SetExtendedProperty(n, remote));
+        }
+    }
+
+    private static readonly string[] TouchProperties = ["EnableTouchInput", "RedirectTouchInput"];
+
     /// <summary>Il controllo accetta come fattore del dispositivo solo 100, 140 o 180.</summary>
     private static int DeviceScaleFactor(int desktopScale) => desktopScale switch
     {
@@ -619,6 +723,13 @@ public sealed class RdpSessionView : UserControl
     /// </summary>
     private void ApplyFitToWindow()
     {
+        if (_rdp is not null && State == SessionState.Connected && Connection.ResolutionMode == ResolutionMode.Fixed)
+        {
+            // Risoluzione fissa: se il tablet è piccolo o ruota, l'immagine si scala per stare nello schermo.
+            bool smart = SessionFit.ShouldSmartSize(ResolutionMode.Fixed, _lastSentSize, _host.ClientSize);
+            Try(() => _rdp.Ocx.AdvancedSettings2.SmartSizing = smart);
+            return;
+        }
         if (_rdp is null || State != SessionState.Connected || Connection.ResolutionMode != ResolutionMode.FitToWindow || _resizeUnsupported)
             return;
         var size = ClampSize(_host.ClientSize);
@@ -769,6 +880,7 @@ public sealed class RdpSessionView : UserControl
             _closing = true;
             _resizeTimer.Dispose();
             _reconnectTimer.Dispose();
+            _touch.Dispose();
             DisposeClient();
         }
         base.Dispose(disposing);

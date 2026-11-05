@@ -57,6 +57,8 @@ public sealed class UiV12Tests : IDisposable
 
     private static void WithMainForm(ConnectionStore store, Action<MainForm> body, bool systemIntegration = false) => OnStaThread(() =>
     {
+        // Lo schermo touch vero della macchina non deve cambiare le misure attese: modalità tocco spenta.
+        TouchUi.TouchScreenForTests = () => false;
         using var form = new MainForm(store, systemIntegration: systemIntegration)
         {
             StartPosition = FormStartPosition.Manual, Location = new Point(0, 0),

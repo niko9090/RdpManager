@@ -185,9 +185,11 @@ internal static class ThemeManager
             TabPainters.Add(tabs, painter);
             tabs.DrawItem += DrawTabItem;
         }
-        tabs.DrawMode = p.IsDark ? TabDrawMode.OwnerDrawFixed : TabDrawMode.Normal;
+        bool wide = TouchUi.HasWideTabs(tabs); // modalità tocco: sempre disegnate a mano, con la X
+        tabs.DrawMode = p.IsDark || wide ? TabDrawMode.OwnerDrawFixed : TabDrawMode.Normal;
         // Disegnate a mano le linguette hanno un margine in più: con quello predefinito il testo si tronca.
-        tabs.Padding = p.IsDark ? new Point(14, 4) : new Point(6, 3);
+        if (!wide)
+            tabs.Padding = p.IsDark ? new Point(14, 4) : new Point(6, 3);
         TouchUi.TouchifyTabs(tabs, TouchUi.MinTarget(tabs)); // linguette da dito
         tabs.Invalidate();
     }
@@ -208,9 +210,27 @@ internal static class ThemeManager
             e.Graphics.DrawImage(img, x, e.Bounds.Y + (e.Bounds.Height - img.Height) / 2);
             x += img.Width + 4;
         }
-        TextRenderer.DrawText(e.Graphics, page.Text, tabs.Font, new Rectangle(x, e.Bounds.Y, e.Bounds.Right - x, e.Bounds.Height),
+        var textArea = new Rectangle(x, e.Bounds.Y, e.Bounds.Right - x, e.Bounds.Height);
+        if (TouchUi.HasWideTabs(tabs))
+        {
+            // Linguetta da dito: X grande e lontana dal bordo; un filo separa una scheda dall'altra.
+            textArea = TabCloseLayout.TextArea(e.Bounds, tabs.DeviceDpi, x - e.Bounds.X);
+            var close = TabCloseLayout.CloseRect(e.Bounds, tabs.DeviceDpi);
+            int arm = Math.Max(4, close.Width / 5);
+            var c = new Point(close.X + close.Width / 2, close.Y + close.Height / 2);
+            using var pen = new Pen(selected ? p.Text : p.GrayText, Math.Max(2f, close.Width / 14f));
+            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            e.Graphics.DrawLine(pen, c.X - arm, c.Y - arm, c.X + arm, c.Y + arm);
+            e.Graphics.DrawLine(pen, c.X - arm, c.Y + arm, c.X + arm, c.Y - arm);
+            using var edge = new Pen(p.Border);
+            e.Graphics.DrawRectangle(edge, e.Bounds.X, e.Bounds.Y, e.Bounds.Width - 1, e.Bounds.Height - 1);
+        }
+        TextRenderer.DrawText(e.Graphics, page.Text, tabs.Font, textArea,
             selected ? p.Text : p.GrayText, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
     }
+
+    /// <summary>Rifà il disegno delle linguette col tema in uso (dopo che la modalità tocco le ha cambiate).</summary>
+    internal static void RefreshTabs(TabControl tabs) => ThemeTabs(tabs, Current);
 
     /// <summary>Dopo il disegno nativo ricolora ciò che resta chiaro: striscia accanto alle schede e bordo delle pagine.</summary>
     private sealed class TabPainter : NativeWindow

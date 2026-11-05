@@ -348,9 +348,9 @@ public sealed class V15CoreTests : IDisposable
     [Fact]
     public void SessionActions_HaveTheThree11FunctionsPlusTheScreenKeyboardAndAreShownByDefault()
     {
-        Assert.Equal([SessionBarAction.SendCtrlAltDel, SessionBarAction.Snapshot, SessionBarAction.NextMonitor, SessionBarAction.ScreenKeyboard], FullScreenBarLayout.SessionActions);
+        Assert.Equal([SessionBarAction.SendCtrlAltDel, SessionBarAction.Snapshot, SessionBarAction.NextMonitor, SessionBarAction.ScreenKeyboard], FullScreenBarLayout.SessionActions.Take(4));
         Assert.Equal(["Invia Ctrl+Alt+Canc", "Foto della sessione", "Monitor successivo", "Tastiera su schermo"],
-            FullScreenBarLayout.SessionActions.Select(FullScreenBarSettings.Describe));
+            FullScreenBarLayout.SessionActions.Take(4).Select(FullScreenBarSettings.Describe));
         Assert.Contains(BarSection.SessionActions, new AppSettings().Bar.VisibleSections);
         Assert.Contains(BarSection.SessionActions, FullScreenBarSettings.FromLegacy(SidebarMode.AutoHide).VisibleSections);
     }

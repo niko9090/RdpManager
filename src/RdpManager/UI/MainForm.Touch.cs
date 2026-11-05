@@ -79,18 +79,126 @@ public sealed partial class MainForm
     /// <summary>Adatta al dito ciò che è già costruito (e ciò che i menu aggiungeranno dopo); si rifà se cambiano i dpi.</summary>
     private void ApplyTouch()
     {
-        int min = TouchUi.MinTarget(this);
-        TouchUi.Apply(_sidebar);
+        // 40 px logici sempre (come dalla 1.6.2); 48 e le altre comodità del dito solo in modalità tocco.
+        int min = TouchUi.Px(this, TouchPolicy.TargetSize(_touchActive));
+        TouchUi.Apply(_sidebar, min);
         TouchUi.TouchifyStrip(_menu, min);
         TouchUi.TouchifyStrip(_treeMenu, min);
         TouchUi.TouchifyStrip(_tabMenu, min);
-        TouchUi.TouchifyTabs(_tabs, min);
+        _tree.ItemHeight = _touchActive ? TouchUi.Px(this, TouchPolicy.RowHeight) : TouchUi.MinTarget(this);
+        TouchUi.SetWideTabs(_tabs, _touchActive, min);
+    }
+
+    private bool _touchActive;
+    private PanScroller? _pan;
+    private bool _touchPressed;
+    private Point _tabsDown;
+    private bool _tabsDownOnStrip;
+
+    /// <summary>Modalità tocco in corso (per le prove automatiche).</summary>
+    internal bool TouchModeActive => _touchActive;
+
+    /// <summary>Si ricalcola se la modalità tocco è attiva (impostazione, schermo touch) e si applicano le misure.</summary>
+    internal void RefreshTouchMode()
+    {
+        bool active = TouchPolicy.IsActive(_doc.Settings.TouchMode, TouchUi.HasTouchScreen());
+        if (active == _touchActive && _touchModeApplied)
+            return;
+        _touchActive = active;
+        _touchModeApplied = true;
+        ApplyTouch();
+    }
+
+    private bool _touchModeApplied;
+
+    /// <summary>Tocco sulla X di una scheda larga: chiude quella sessione. Falso se il punto non è su una X.</summary>
+    internal bool TryCloseTabAt(Point location)
+    {
+        if (!_touchActive || !UiHasTabs())
+            return false;
+        var rects = Enumerable.Range(0, _tabs.TabCount).Select(_tabs.GetTabRect).ToList();
+        int index = TabCloseLayout.HitClose(rects, location, DeviceDpi);
+        if (index < 0 || _tabs.TabPages[index].Tag is not RdpSessionView view)
+            return false;
+        CloseSession(view);
+        return true;
+    }
+
+    private bool UiHasTabs() => _tabs.TabCount > 0;
+
+    /// <summary>Scorrimento laterale sulla riga delle schede: passa alla successiva o alla precedente. Restituisce lo spostamento fatto.</summary>
+    internal int SwipeTabs(Point down, Point up)
+    {
+        int direction = SwipeDetector.Direction(down, up, TouchUi.Px(this, SwipeDetector.MinDistance));
+        if (direction != 0 && _tabs.TabCount > 1)
+            CycleTab(direction);
+        return direction;
+    }
+
+    private void WireTouchGestures()
+    {
+        // Elenco: trascinare col dito scorre (la barra sottile non serve); col mouse resta il trascinamento delle connessioni.
+        _tree.MouseDown += (_, e) =>
+        {
+            _touchPressed = e.Button == MouseButtons.Left && _touchActive && TouchUi.IsTouchInput();
+            if (!_touchPressed)
+                return;
+            _pan = new PanScroller(_tree.ItemHeight, TouchUi.Px(this, 8));
+            _pan.Begin(e.Y);
+        };
+        _tree.MouseMove += (_, e) =>
+        {
+            if (_touchPressed && _pan is { } pan && e.Button == MouseButtons.Left && pan.Move(e.Y) is var rows and not 0)
+                NativeMethods.ScrollRows(_tree, rows);
+        };
+        _tree.MouseUp += (_, _) => _pan?.End();
+        // Le cartelle si aprono con un tocco sulla riga (il segno +/- è troppo piccolo).
+        _tree.NodeMouseClick += (_, e) =>
+        {
+            if (e.Button != MouseButtons.Left || e.Clicks != 1 || !_touchPressed || _pan?.Active == true || e.Node.Nodes.Count == 0)
+                return;
+            if (e.Node.Tag is not (FolderTag or SectionTag))
+                return;
+            if (_tree.HitTest(e.Location).Location == TreeViewHitTestLocations.PlusMinus)
+                return; // il controllo l'ha già aperta o chiusa
+            e.Node.Toggle();
+        };
+
+        // Ricerca: un tocco col dito apre la tastiera su schermo.
+        _search.MouseDown += (_, e) =>
+        {
+            if (e.Button == MouseButtons.Left && TouchPolicy.ShouldOpenKeyboardOnTap(_touchActive, TouchUi.IsTouchInput()))
+                TouchUi.OpenScreenKeyboardQuietly();
+        };
+
+        // Schede: X grande per chiudere, scorrimento laterale per cambiare.
+        _tabs.MouseDown += (_, e) =>
+        {
+            _tabsDown = e.Location;
+            _tabsDownOnStrip = e.Button == MouseButtons.Left && _touchActive && TouchUi.IsTouchInput() && e.Y < _tabs.DisplayRectangle.Top;
+        };
+        _tabs.MouseUp += (_, e) =>
+        {
+            if (e.Button != MouseButtons.Left)
+                return;
+            if (_tabsDownOnStrip)
+            {
+                _tabsDownOnStrip = false;
+                if (SwipeTabs(_tabsDown, e.Location) != 0)
+                    return;
+            }
+            TryCloseTabAt(e.Location);
+        };
     }
 
     private void InitTouch()
     {
-        ApplyTouch();
+        RefreshTouchMode();
+        ApplyTouch(); // di nuovo: i menu e la barra possono aver aggiunto voci dopo la prima volta
         DpiChanged += (_, _) => ApplyTouch();
+        // Un portatile che si trasforma in tablet (o uno schermo che si collega) cambia la modalità automatica.
+        Activated += (_, _) => { if (_doc.Settings.TouchMode == TouchMode.Auto) RefreshTouchMode(); };
+        WireTouchGestures();
 
         // Tenere premuto sull'elenco o su una scheda = clic destro.
         _treeLongPress = LongPress.Attach(_tree, ShowTreeMenuAt);

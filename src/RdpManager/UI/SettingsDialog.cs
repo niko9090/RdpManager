@@ -12,6 +12,8 @@ public sealed class SettingsDialog : TouchForm
     private readonly RadioButton _autoHide = new() { Text = "A comparsa (bordo sinistro)", AutoSize = true };
     private readonly CheckBox _reopen = new() { Text = "Riapri all'avvio le sessioni lasciate aperte", AutoSize = true };
     private readonly ComboBox _theme = new() { Width = 200, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly ComboBox _touchMode = new() { Width = 320, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly ComboBox _sessionTouch = new() { Width = 420, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly CheckBox _tray = new() { Text = "Icona nell'area di notifica con il menu delle connessioni", AutoSize = true };
     private readonly CheckBox _closeToTray = new() { Text = "Chiudendo la finestra resta nell'area di notifica", AutoSize = true };
     private readonly ShortcutBox _globalHotkey = new() { Width = 200 };
@@ -58,6 +60,11 @@ public sealed class SettingsDialog : TouchForm
         _theme.SelectedIndex = Math.Max(0, Array.FindIndex(ThemeChoices, t => t.Theme == settings.Theme));
         general.Controls.Add(Group("Aspetto", Flow(new Label { Text = "Tema", AutoSize = true, Margin = new Padding(3, 7, 8, 3) }, _theme)));
 
+        _touchMode.Items.AddRange(["Automatica (se c'è uno schermo touch)", "Sempre attiva", "Spenta"]);
+        _touchMode.SelectedIndex = (int)TouchPolicy.Normalize(settings.TouchMode);
+        general.Controls.Add(Group("Modalità tocco", _touchMode,
+            Note("Righe, schede, menu e pulsanti più grandi; trascinando l'elenco col dito scorre; la X chiude le schede.")));
+
         _tray.Checked = settings.ShowTrayIcon;
         _closeToTray.Checked = settings.CloseToTray;
         _closeToTray.Enabled = _tray.Checked;
@@ -83,6 +90,11 @@ public sealed class SettingsDialog : TouchForm
 
         _manualOrder.Checked = settings.ConnectionOrder == ConnectionOrder.Manual;
         general.Controls.Add(Group("Elenco", _manualOrder));
+
+        _sessionTouch.Items.AddRange(Enum.GetValues<SessionTouchMode>().Select(m => (object)SessionTouchModes.Describe(m)).ToArray());
+        _sessionTouch.SelectedIndex = (int)settings.SessionTouch;
+        general.Controls.Add(Group("Dito dentro la sessione remota", _sessionTouch,
+            Note("Si cambia anche dalla barra della sessione («Tocco: …»). La modalità «remoto» vale dalla prossima connessione.")));
 
         // ---------- Schermo intero ----------
         var full = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Dock = DockStyle.Fill };
@@ -312,12 +324,14 @@ public sealed class SettingsDialog : TouchForm
         _settings.SidebarMode = _pinned.Checked ? SidebarMode.Pinned : SidebarMode.AutoHide;
         _settings.ReopenSessionsOnStartup = _reopen.Checked;
         _settings.Theme = ThemeChoices[Math.Max(0, _theme.SelectedIndex)].Theme;
+        _settings.TouchMode = (TouchMode)Math.Max(0, _touchMode.SelectedIndex);
         _settings.ShowTrayIcon = _tray.Checked;
         _settings.CloseToTray = _tray.Checked && _closeToTray.Checked;
         _settings.GlobalHotkey = _globalHotkey.Combo.IsEmpty ? "" : _globalHotkey.Combo.ToString();
         _settings.HistoryEnabled = _history.Checked;
         _settings.VerboseLog = _verboseLog.Checked;
         _settings.UpdateMode = _updOff.Checked ? UpdateMode.Off : _updNotify.Checked ? UpdateMode.NotifyOnly : UpdateMode.AutomaticWithConfirmation;
+        _settings.SessionTouch = (SessionTouchMode)Math.Max(0, _sessionTouch.SelectedIndex);
         _settings.ConnectionOrder = _manualOrder.Checked ? ConnectionOrder.Manual : ConnectionOrder.Alphabetical;
         _settings.LockPin = _pin;
         _settings.LockAfterMinutes = (int)_lockAfter.Value;
