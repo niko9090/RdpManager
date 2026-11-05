@@ -92,6 +92,8 @@ public sealed partial class MainForm
             log.Verbose = _doc.Settings.VerboseLog;
         if (Form.ActiveForm == this || NativeMethods.IsOwnProcessForeground())
             RegisterSessionHotkeys();
+        foreach (var v in AllViews)
+            v.TouchMode = _doc.Settings.SessionTouch;
         _fullScreenItem.ShortcutKeyDisplayString = $"F11, {_shortcuts[ShortcutAction.ToggleFullScreen]}";
         _sidebarItem.ShortcutKeyDisplayString = _shortcuts[ShortcutAction.ToggleSidebar].ToString();
         _nextSessionItem.ShortcutKeyDisplayString = _shortcuts[ShortcutAction.NextSession].ToString();
@@ -189,6 +191,7 @@ public sealed partial class MainForm
         view.QuickTexts = () => _doc.QuickTexts;
         view.ConnectBlocked = () => _locked;
         view.ManageQuickTextsRequested += (_, _) => ManageQuickTexts();
+        WireSessionTouch(view);
         ConfigureNewSession?.Invoke(view);
         AddTab(view);
         view.Connect();
@@ -807,8 +810,10 @@ public sealed partial class MainForm
             _tabs.Dock = DockStyle.None;
             _tabs.Bounds = new Rectangle(-_tabInsets.Left, -_tabInsets.Top,
                 _content.Width + _tabInsets.Horizontal, _content.Height + _tabInsets.Vertical);
+            UpdateFullScreenHandle();
             return;
         }
+        UpdateFullScreenHandle();
         if (_tabs.Dock != DockStyle.Fill)
             _tabs.Dock = DockStyle.Fill;
         if (_doc.Settings.SidebarMode == SidebarMode.AutoHide && _sidebarRevealed)
@@ -896,6 +901,9 @@ public sealed partial class MainForm
                 break;
             case SessionBarAction.ScreenKeyboard:
                 OpenScreenKeyboard();
+                break;
+            default:
+                ExecuteTouchSessionAction(action);
                 break;
         }
     }

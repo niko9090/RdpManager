@@ -50,6 +50,16 @@ public enum SessionBarAction
     NextMonitor,
     /// <summary>Tastiera su schermo di Windows (dalla 1.6.2), per mandare tasti alla sessione col solo tocco.</summary>
     ScreenKeyboard,
+    /// <summary>Tasto Esc alla sessione (dalla 1.9.1).</summary>
+    SendEscape,
+    /// <summary>Tasto Windows alla sessione (dalla 1.9.1).</summary>
+    SendWindows,
+    /// <summary>Il prossimo tocco sulla sessione vale come clic destro (dalla 1.9.1).</summary>
+    RightClick,
+    /// <summary>Passa dal tocco al PC remoto al dito che fa da mouse e viceversa (dalla 1.9.1).</summary>
+    TouchMode,
+    /// <summary>Nasconde la barra (dalla 1.9.1): col dito non c'è il bordo del mouse per richiuderla.</summary>
+    HideBar,
 }
 
 /// <summary>Aspetto delle sessioni nella sezione «Sessioni connesse».</summary>
@@ -215,6 +225,11 @@ public sealed class FullScreenBarSettings
         SessionBarAction.Snapshot => "Foto della sessione",
         SessionBarAction.NextMonitor => "Monitor successivo",
         SessionBarAction.ScreenKeyboard => "Tastiera su schermo",
+        SessionBarAction.SendEscape => "Esc",
+        SessionBarAction.SendWindows => "Tasto Windows",
+        SessionBarAction.RightClick => "Clic destro",
+        SessionBarAction.TouchMode => "Tocco: remoto / mouse",
+        SessionBarAction.HideBar => "Nascondi la barra",
         _ => action.ToString(),
     };
 

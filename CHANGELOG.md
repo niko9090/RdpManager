@@ -19,6 +19,18 @@
 - RdpManager: con 502/504 dal proxy l'app non dice più «Errore del server (502)», ma «il server è spento o si sta
   riavviando»; la sincronizzazione automatica lo tratta come la VPN spenta (lavora in locale e riprova).
 
+**Dito dentro la sessione remota**
+- Nuova opzione (Impostazioni › Generale › «Dito dentro la sessione remota», o pulsante «Tocco: …» nella barra della
+  sessione): il tocco passato al PC remoto (si prova ad accendere l'ingresso touch del controllo RDP, dalla prossima
+  connessione) oppure il dito che fa da mouse: tocco = clic, doppio tocco = doppio clic, pressione lunga = clic destro,
+  trascinare = trascinare, due dita su e giù = rotella.
+- Risoluzione fissa su uno schermo più piccolo (tablet piccolo o ruotato): la sessione si adatta allo schermo (zoom) invece di
+  uscire dai bordi.
+- Barra della sessione e barra a schermo intero con pulsanti alti almeno 48 px (scalati): Ctrl+Alt+Canc, Esc, Win, «Clic
+  destro» (il prossimo tocco), Tastiera su schermo. Le azioni nuove sono anche nella sezione «Azioni sulla sessione» della barra a
+  schermo intero, insieme a «Nascondi la barra».
+- A schermo intero, su uno schermo a tocco, con la barra nascosta compare una linguetta sul bordo per richiamarla col dito.
+
 ## 1.9.0
 
 **VPN automatica e registrazione dall'app** (`rdpm-sync` 1.1.0)

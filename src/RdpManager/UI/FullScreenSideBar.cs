@@ -223,6 +223,11 @@ internal sealed class FullScreenSideBar : Panel
                         SessionBarAction.SendCtrlAltDel => "Invia Ctrl+Alt+Canc alla sessione visibile",
                         SessionBarAction.Snapshot => "Foto della sessione visibile (Immagini\\RdpManager e appunti)",
                         SessionBarAction.ScreenKeyboard => "Apre la tastiera su schermo di Windows: i tasti vanno alla sessione visibile",
+                        SessionBarAction.SendEscape => "Invia il tasto Esc alla sessione visibile",
+                        SessionBarAction.SendWindows => "Invia il tasto Windows alla sessione visibile",
+                        SessionBarAction.RightClick => "Il prossimo tocco sulla sessione vale come clic destro",
+                        SessionBarAction.TouchMode => "Passa dal tocco al PC remoto al dito che fa da mouse (e viceversa)",
+                        SessionBarAction.HideBar => "Nasconde la barra (si richiama dalla linguetta sul bordo)",
                         _ => content.MultipleMonitors ? "Schermo intero sul monitor successivo" : "C'è un solo monitor",
                     });
                     b.Click += (_, _) => SessionActionClicked?.Invoke(this, action);
@@ -427,7 +432,7 @@ internal sealed class FullScreenSideBar : Panel
             }
         }
         // Pulsanti, caselle ed elenco alti almeno quanto un bersaglio da dito.
-        int touch = TouchUi.MinTarget(this);
+        int touch = TouchUi.Px(this, TouchMetrics.SessionTarget);
         foreach (var action in Descendants(_flow).OfType<ActionButton>())
         {
             action.MinTouchHeight = touch;
@@ -465,6 +470,7 @@ internal sealed class FullScreenSideBar : Panel
         action switch
         {
             SessionBarAction.NextMonitor => content.MultipleMonitors,
+            SessionBarAction.TouchMode or SessionBarAction.HideBar => true,
             SessionBarAction.ScreenKeyboard => true, // la tastiera si apre anche senza sessione: serve per cercare e scrivere
             _ => content.CanTypeText,
         };

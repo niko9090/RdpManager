@@ -172,7 +172,7 @@ public sealed class TouchModeUiTests : IDisposable
 
     public void Dispose()
     {
-        TouchUi.TouchScreenForTests = null;
+        TouchUi.TouchScreenForTests = () => false;
         TouchUi.TouchInputForTests = null;
         TouchUi.ScreenKeyboardForTests = null;
         if (Directory.Exists(_dir))

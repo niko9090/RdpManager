@@ -67,6 +67,9 @@ public sealed class AppSettings
 
     public SidebarMode SidebarMode { get; set; } = SidebarMode.Pinned;
 
+    /// <summary>Come il dito agisce dentro la sessione remota: tocco al PC remoto o dito che fa da mouse (dalla 1.9.1).</summary>
+    public SessionTouchMode SessionTouch { get; set; } = SessionTouchMode.Remote;
+
     /// <summary>Alla chiusura si ricordano le sessioni aperte e all'avvio si riaprono.</summary>
     public bool ReopenSessionsOnStartup { get; set; }
 
@@ -236,6 +239,8 @@ public sealed class AppSettings
             SidebarMode = SidebarMode.Pinned;
         if (!Enum.IsDefined(Theme))
             Theme = AppTheme.System;
+        if (!Enum.IsDefined(SessionTouch))
+            SessionTouch = SessionTouchMode.Remote;
         // null = file della 1.0/1.1 senza il campo: si usa il predefinito; "" = disattivata dall'utente.
         if (GlobalHotkey is null)
             GlobalHotkey = Core.GlobalHotkey.DefaultText;
