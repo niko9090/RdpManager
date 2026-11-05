@@ -112,6 +112,7 @@ internal sealed class SyncAccountDialog : TouchForm
 
     private static string Explain(Exception ex) => ex switch
     {
+        SyncUnreachableException { ServerDown: true } => "Il server è spento o si sta riavviando: riprova fra qualche minuto.",
         SyncUnreachableException => "Il server non risponde. Controlla l'indirizzo e che la VPN sia accesa.",
         SyncServerException { Code: "invalid_credentials" } => "Utente o password sbagliati.",
         SyncServerException { Code: "too_many_attempts", RetryAfterSeconds: { } s } =>

@@ -532,3 +532,88 @@ public sealed class SyncClientServerTests : IAsyncLifetime
         Assert.Equal(SyncStatus.Synced, (await a.SyncAsync()).Status);
     }
 }
+
+/// <summary>Il proxy HTTPS davanti a rdpm-sync risponde 502/504 quando il servizio è spento (es. dopo un riavvio del NAS):
+/// l'app deve trattarlo come «server non raggiungibile», non come un errore dell'account.</summary>
+public sealed class SyncServerDownTests
+{
+    private static (System.Net.HttpListener Listener, string Url, Task Loop) Proxy(int status)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            var url = $"http://127.0.0.1:{FreePort()}/";
+            var listener = new System.Net.HttpListener();
+            listener.Prefixes.Add(url);
+            try { listener.Start(); }
+            catch (System.Net.HttpListenerException) when (attempt < 5) { continue; }
+            var loop = Task.Run(async () =>
+            {
+                while (listener.IsListening)
+                {
+                    System.Net.HttpListenerContext ctx;
+                    try { ctx = await listener.GetContextAsync(); } catch { return; }
+                    ctx.Response.StatusCode = status;
+                    ctx.Response.ContentType = "text/html";
+                    var body = Encoding.UTF8.GetBytes("<html>Bad Gateway</html>");
+                    await ctx.Response.OutputStream.WriteAsync(body);
+                    ctx.Response.Close();
+                }
+            });
+            return (listener, url, loop);
+        }
+
+    }
+
+    /// <summary>Una porta libera: aperta e subito chiusa (chi vi si collega viene rifiutato).</summary>
+    private static int FreePort()
+    {
+        var l = System.Net.Sockets.TcpListener.Create(0);
+        l.Start();
+        var port = ((System.Net.IPEndPoint)l.LocalEndpoint).Port;
+        l.Stop();
+        return port;
+    }
+
+    [Theory]
+    [InlineData(502)]
+    [InlineData(504)]
+    public async Task Login_con_proxy_che_risponde_502_o_504_dice_server_spento(int status)
+    {
+        var (listener, url, _) = Proxy(status);
+        try
+        {
+            using var client = new SyncHttp(url);
+            var ex = await Assert.ThrowsAsync<SyncUnreachableException>(() => client.LoginAsync("mario", "segreto", "PC"));
+            Assert.True(ex.ServerDown);
+            Assert.Contains("spento", ex.Message);
+        }
+        finally { listener.Stop(); }
+    }
+
+    [Fact]
+    public async Task Server_irraggiungibile_non_e_server_spento()
+    {
+        using var client = new SyncHttp($"http://127.0.0.1:{FreePort()}/", TimeSpan.FromSeconds(5));
+        var ex = await Assert.ThrowsAsync<SyncUnreachableException>(() => client.LoginAsync("mario", "segreto", "PC"));
+        Assert.False(ex.ServerDown);
+    }
+
+    [Fact]
+    public async Task Sincronizzazione_con_proxy_502_resta_in_locale()
+    {
+        var (listener, url, _) = Proxy(502);
+        var dir = Path.Combine(Path.GetTempPath(), "rdpm-down-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            using var sync = new SyncService(Path.Combine(dir, "sync.json"), 1000);
+            await Assert.ThrowsAsync<SyncUnreachableException>(() => sync.SignInAsync(url, "mario", "una password lunga"));
+            Assert.False(sync.SignedIn);
+        }
+        finally
+        {
+            listener.Stop();
+            Directory.Delete(dir, true);
+        }
+    }
+}

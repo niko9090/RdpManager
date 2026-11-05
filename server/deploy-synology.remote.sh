@@ -30,6 +30,8 @@ for d in wireguard-synology:wireguard rdpm-sync:rdpm-sync caddy-synology:caddy; 
 done
 find "$BASE/wireguard" "$BASE/rdpm-sync" "$BASE/caddy" -maxdepth 2 \( -name '*.sh' -o -name '*.yml' -o -name Caddyfile -o -name '*.modello' -o -name '.env.example' \) -print0 | xargs -0 sed -i 's/\r$//'
 chmod +x "$BASE"/wireguard/scripts/*.sh
+# riaccensione dopo un riavvio del NAS (Docker parte prima di /dev/net/tun: vedi lo script)
+install -m 755 "$BASE/wireguard/scripts/avvio-nas.sh" /usr/local/etc/rc.d/S99rdpm-avvio.sh
 mkdir -p "$BASE/wireguard/run" "$BASE/wireguard/config" "$BASE/rdpm-sync/data"
 rm -rf "$SRC"
 
