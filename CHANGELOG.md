@@ -1,6 +1,6 @@
 # Novità di RdpManager
 
-## Non rilasciato
+## 1.9.0
 
 **VPN automatica e registrazione dall'app** (`rdpm-sync` 1.1.0)
 - Il server `rdpm-sync` diventa anche il registro della VPN: `POST /v1/vpn/devices` (nome del PC + chiave pubblica
