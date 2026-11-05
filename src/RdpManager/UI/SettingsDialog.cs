@@ -11,7 +11,8 @@ public sealed class SettingsDialog : TouchForm
     private readonly RadioButton _pinned = new() { Text = "Fissa", AutoSize = true };
     private readonly RadioButton _autoHide = new() { Text = "A comparsa (bordo sinistro)", AutoSize = true };
     private readonly CheckBox _reopen = new() { Text = "Riapri all'avvio le sessioni lasciate aperte", AutoSize = true };
-    private readonly ComboBox _theme = new() { Width = 200, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly ComboBox _touchMode = new() { Width = 420, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly ComboBox _theme =new() { Width = 200, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly CheckBox _tray = new() { Text = "Icona nell'area di notifica con il menu delle connessioni", AutoSize = true };
     private readonly CheckBox _closeToTray = new() { Text = "Chiudendo la finestra resta nell'area di notifica", AutoSize = true };
     private readonly ShortcutBox _globalHotkey = new() { Width = 200 };
@@ -83,6 +84,11 @@ public sealed class SettingsDialog : TouchForm
 
         _manualOrder.Checked = settings.ConnectionOrder == ConnectionOrder.Manual;
         general.Controls.Add(Group("Elenco", _manualOrder));
+
+        _touchMode.Items.AddRange(Enum.GetValues<SessionTouchMode>().Select(m => (object)SessionTouchModes.Describe(m)).ToArray());
+        _touchMode.SelectedIndex = (int)settings.SessionTouch;
+        general.Controls.Add(Group("Dito dentro la sessione remota", _touchMode,
+            Note("Si cambia anche dalla barra della sessione («Tocco: …»). La modalità «remoto» vale dalla prossima connessione.")));
 
         // ---------- Schermo intero ----------
         var full = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Dock = DockStyle.Fill };
@@ -318,6 +324,7 @@ public sealed class SettingsDialog : TouchForm
         _settings.HistoryEnabled = _history.Checked;
         _settings.VerboseLog = _verboseLog.Checked;
         _settings.UpdateMode = _updOff.Checked ? UpdateMode.Off : _updNotify.Checked ? UpdateMode.NotifyOnly : UpdateMode.AutomaticWithConfirmation;
+        _settings.SessionTouch = (SessionTouchMode)Math.Max(0, _touchMode.SelectedIndex);
         _settings.ConnectionOrder = _manualOrder.Checked ? ConnectionOrder.Manual : ConnectionOrder.Alphabetical;
         _settings.LockPin = _pin;
         _settings.LockAfterMinutes = (int)_lockAfter.Value;

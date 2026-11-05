@@ -13,6 +13,9 @@ public static class TouchMetrics
     /// <summary>Lato minimo di un bersaglio da toccare, in pixel logici (a 96 dpi).</summary>
     public const int MinTarget = 40;
 
+    /// <summary>Lato minimo dei pulsanti della barra della sessione e della barra a schermo intero (usate col dito, spesso su tablet).</summary>
+    public const int SessionTarget = 48;
+
     /// <summary>Distanza minima tra un dialogo e il bordo dell'area di lavoro, in pixel logici.</summary>
     public const int DialogMargin = 12;
 
