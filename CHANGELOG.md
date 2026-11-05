@@ -1,5 +1,14 @@
 # Novità di RdpManager
 
+## Non rilasciato
+
+**Login e sincronizzazione dopo un riavvio del Synology**
+- Server: dopo un riavvio del NAS `wireguard` e `rdpm-sync` restavano spenti (Docker partiva prima di `/dev/net/tun`)
+  e il proxy rispondeva 502 a tutti: nessun login, sincronizzazione o VPN. Ora lo script di avvio
+  `S99rdpm-avvio.sh`, installato dal deploy, li riaccende da solo e controlla `/health`.
+- RdpManager: con 502/504 dal proxy l'app non dice più «Errore del server (502)», ma «il server è spento o si sta
+  riavviando»; la sincronizzazione automatica lo tratta come la VPN spenta (lavora in locale e riprova).
+
 ## 1.9.0
 
 **VPN automatica e registrazione dall'app** (`rdpm-sync` 1.1.0)
