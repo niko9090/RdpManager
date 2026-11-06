@@ -14,6 +14,7 @@ public sealed class SettingsDialog : TouchForm
     private readonly ComboBox _theme = new() { Width = 200, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly ComboBox _touchMode = new() { Width = 320, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly ComboBox _sessionTouch = new() { Width = 420, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly Dictionary<TouchGesture, ComboBox> _gestureBoxes = [];
     private readonly CheckBox _tray = new() { Text = "Icona nell'area di notifica con il menu delle connessioni", AutoSize = true };
     private readonly CheckBox _closeToTray = new() { Text = "Chiudendo la finestra resta nell'area di notifica", AutoSize = true };
     private readonly ShortcutBox _globalHotkey = new() { Width = 200 };
@@ -95,6 +96,22 @@ public sealed class SettingsDialog : TouchForm
         _sessionTouch.SelectedIndex = (int)settings.SessionTouch;
         general.Controls.Add(Group("Dito dentro la sessione remota", _sessionTouch,
             Note("Si cambia anche dalla barra della sessione («Tocco: …»). La modalità «remoto» vale dalla prossima connessione.")));
+
+        var gestures = new TableLayoutPanel { ColumnCount = 2, AutoSize = true, Margin = Padding.Empty };
+        foreach (var gesture in Enum.GetValues<TouchGesture>())
+        {
+            var box = new ComboBox { Width = 300, DropDownStyle = ComboBoxStyle.DropDownList, Margin = new Padding(3, 3, 3, 6) };
+            box.Items.Add(TouchGestureMap.Describe((TouchActionKind?)null));
+            box.Items.AddRange(TouchGestureMap.Choices.Select(k => (object)TouchGestureMap.Describe(k)).ToArray());
+            _gestureBoxes[gesture] = box;
+            gestures.Controls.Add(new Label { Text = TouchGestureMap.Describe(gesture), AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(3, 3, 12, 6) });
+            gestures.Controls.Add(box);
+        }
+        ShowGestures(settings.GestureMap);
+        var resetGestures = new Button { Text = "Ripristina predefiniti", AutoSize = true };
+        resetGestures.Click += (_, _) => ShowGestures(TouchGestureMap.Default);
+        general.Controls.Add(Group("Gesti a più dita", gestures, resetGestures,
+            Note("Valgono dentro la sessione remota (in modalità «mouse» o col clic destro armato) e, per le schede, anche nella finestra principale su uno schermo touch. Le azioni «scheda» e «barra» riguardano RdpManager, le altre il PC remoto.")));
 
         // ---------- Schermo intero ----------
         var full = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Dock = DockStyle.Fill };
@@ -279,6 +296,23 @@ public sealed class SettingsDialog : TouchForm
         return page;
     }
 
+    private void ShowGestures(TouchGestureMap map)
+    {
+        foreach (var (gesture, box) in _gestureBoxes)
+        {
+            int index = map.ActionFor(gesture) is { } kind ? TouchGestureMap.Choices.ToList().IndexOf(kind) + 1 : 0;
+            box.SelectedIndex = Math.Max(0, index);
+        }
+    }
+
+    private TouchGestureMap ReadGestures()
+    {
+        var map = TouchGestureMap.Default;
+        foreach (var (gesture, box) in _gestureBoxes)
+            map = map.With(gesture, box.SelectedIndex <= 0 ? null : TouchGestureMap.Choices[box.SelectedIndex - 1]);
+        return map;
+    }
+
     private static FlowLayoutPanel Flow(params Control[] items)
     {
         var f = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = Padding.Empty };
@@ -332,6 +366,7 @@ public sealed class SettingsDialog : TouchForm
         _settings.VerboseLog = _verboseLog.Checked;
         _settings.UpdateMode = _updOff.Checked ? UpdateMode.Off : _updNotify.Checked ? UpdateMode.NotifyOnly : UpdateMode.AutomaticWithConfirmation;
         _settings.SessionTouch = (SessionTouchMode)Math.Max(0, _sessionTouch.SelectedIndex);
+        _settings.GestureMap = ReadGestures();
         _settings.ConnectionOrder = _manualOrder.Checked ? ConnectionOrder.Manual : ConnectionOrder.Alphabetical;
         _settings.LockPin = _pin;
         _settings.LockAfterMinutes = (int)_lockAfter.Value;

@@ -37,7 +37,16 @@
   mostra/nascondi la barra comandi; **tocco = Alt+Tab** sul PC remoto.
 - Quattro dita: scorrimento giù = Win+D (mostra il desktop), su = Win+Tab, sul PC remoto.
 - Il numero di dita è quello appoggiato entro 250 ms dal primo; un dito che arriva dopo non cambia il gesto già cominciato.
-  Le associazioni gesto → azione sono in un'unica tabella predefinita (`TouchGestureMap`), pronta per renderla modificabile.
+  Le associazioni gesto → azione sono in un'unica tabella (`TouchGestureMap`).
+
+**Gesti a più dita configurabili**
+- Nuova sezione *Impostazioni › Generale › «Gesti a più dita»*: per ognuno degli otto gesti (tocco a due e tre dita, tre dita
+  a sinistra/destra/su/giù, quattro dita su/giù) si sceglie l'azione da un elenco (clic destro, clic sinistro, Alt+Tab, Win+D,
+  Win+Tab, scheda precedente/successiva, mostra/nascondi la barra) oppure «Spento». «Ripristina predefiniti» rimette il
+  comportamento di prima, che resta quello di partenza anche per chi aggiorna (nessuna impostazione da rifare).
+- La scelta vale per questo PC (come la modalità tocco): non si esporta nei file `.rdpm`.
+- Nella finestra principale, fuori dalla sessione, su uno schermo touch (modalità tocco attiva): tre dita a sinistra/destra
+  cambiano scheda, se il gesto è attivo nella mappa (stesso filtro dei messaggi WM_POINTER della sessione, che non consuma il dito).
 - Cambia: due dita ferme e fugaci (sotto i 350 ms) ora fanno clic destro; prima non facevano nulla.
 
 ## 1.9.0

@@ -152,6 +152,20 @@ public sealed class AppSettings
     /// </summary>
     public TouchMode TouchMode { get; set; } = TouchMode.Auto;
 
+    /// <summary>
+    /// Cosa fa ogni gesto a più dita (nome del gesto → nome dell'azione, oppure «Off»). Assente nei file di prima:
+    /// valgono i predefiniti. Vale per questo PC, non si esporta.
+    /// </summary>
+    public Dictionary<string, string>? TouchGestures { get; set; }
+
+    /// <summary>La mappa dei gesti a più dita (predefiniti se non è mai stata cambiata).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public TouchGestureMap GestureMap
+    {
+        get => TouchGestureMap.FromSettings(TouchGestures);
+        set => TouchGestures = value.ToSettings();
+    }
+
     /// <summary>La barra a schermo intero, creata dalle impostazioni di prima se manca.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public FullScreenBarSettings Bar => FullScreenBar ??= FullScreenBarSettings.FromLegacy(SidebarMode);
@@ -173,6 +187,7 @@ public sealed class AppSettings
         copy.ReopenOnceAfterUpdate = false;
         copy.LockPin = null; // il PIN non esce mai dal PC
         copy.TouchMode = TouchMode.Auto; // dipende dallo schermo di questo PC
+        copy.TouchGestures = null;
         copy.FullScreenBar = Bar.Clone();
         return copy;
     }
@@ -222,6 +237,7 @@ public sealed class AppSettings
         copy.OpenSessions = [.. OpenSessions ?? []];
         copy.Shortcuts = new Dictionary<string, string>(Shortcuts ?? []);
         copy.FullScreenBar = FullScreenBar?.Clone();
+        copy.TouchGestures = TouchGestures is null ? null : new Dictionary<string, string>(TouchGestures);
         return copy;
     }
 
@@ -256,6 +272,8 @@ public sealed class AppSettings
         LockAfterMinutes = Math.Clamp(LockAfterMinutes, 0, 24 * 60);
         SidebarWidth = Math.Clamp(SidebarWidth, WindowSidebar.MinWidth, WindowSidebar.MaxWidth);
         TouchMode = TouchPolicy.Normalize(TouchMode);
+        if (TouchGestures is { Count: 0 })
+            TouchGestures = null;
         Bar.Normalize();
     }
 }
