@@ -28,7 +28,9 @@ internal sealed class SessionTouchInput : IMessageFilter, IDisposable
         _target = target;
         _recognizer = new TouchGestureRecognizer(
             tolerance: TouchMetrics.Scale(TouchMetrics.LongPressTolerance, target.DeviceDpi),
-            scrollStep: TouchMetrics.Scale(28, target.DeviceDpi));
+            scrollStep: TouchMetrics.Scale(28, target.DeviceDpi),
+            pinchStep: TouchMetrics.Scale(28, target.DeviceDpi),
+            swipeDistance: TouchMetrics.Scale(90, target.DeviceDpi));
         _timer.Tick += (_, _) => Run(_recognizer.Poll(DateTime.UtcNow));
     }
 
@@ -62,6 +64,12 @@ internal sealed class SessionTouchInput : IMessageFilter, IDisposable
     }
 
     public event EventHandler? RightClickUsed;
+
+    /// <summary>
+    /// Gesto a più dita che non è mouse: tasti da mandare al PC remoto (Alt+Tab, Win+D, Win+Tab) o comando per la finestra
+    /// di RdpManager (scheda precedente o successiva, mostra o nascondi la barra). Lo esegue chi ascolta (la vista della sessione).
+    /// </summary>
+    public event EventHandler<TouchActionKind>? CommandRequested;
 
     public bool PreFilterMessage(ref Message m)
     {
@@ -106,6 +114,8 @@ internal sealed class SessionTouchInput : IMessageFilter, IDisposable
         {
             if (ActionSink is { } sink)
                 sink(a);
+            else if (TouchActionKinds.IsWindowCommand(a.Kind) || TouchActionKinds.IsRemoteKeys(a.Kind))
+                CommandRequested?.Invoke(this, a.Kind);
             else
                 Inject(a);
         }
@@ -141,6 +151,10 @@ internal sealed class SessionTouchInput : IMessageFilter, IDisposable
             case TouchActionKind.Scroll:
                 Send(MoveInput(a.Location), Wheel(a.Amount));
                 break;
+            case TouchActionKind.Zoom:
+                // Pizzico = Ctrl+rotella: il Ctrl locale passa alla sessione insieme alla rotella.
+                Send(MoveInput(a.Location), Key(VK_CONTROL, false), Wheel(a.Amount), Key(VK_CONTROL, true));
+                break;
         }
     }
 
@@ -151,6 +165,14 @@ internal sealed class SessionTouchInput : IMessageFilter, IDisposable
         int y = (int)Math.Round((screen.Y - v.Top) * 65535.0 / Math.Max(1, v.Height - 1));
         return Mouse(x, y, 0, MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK);
     }
+
+    private const ushort VK_CONTROL = 0x11;
+
+    private static NativeMethods.INPUT Key(ushort vk, bool up) => new()
+    {
+        type = NativeMethods.INPUT_KEYBOARD,
+        u = new NativeMethods.InputUnion { ki = new NativeMethods.KEYBDINPUT { wVk = vk, dwFlags = up ? NativeMethods.KEYEVENTF_KEYUP : 0, dwExtraInfo = NativeMethods.OwnInputMarker } },
+    };
 
     private static NativeMethods.INPUT Button(uint flag) => Mouse(0, 0, 0, flag);
 

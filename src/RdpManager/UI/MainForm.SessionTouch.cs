@@ -20,7 +20,30 @@ public sealed partial class MainForm
     private void WireSessionTouch(RdpSessionView view)
     {
         view.TouchMode = _doc.Settings.SessionTouch;
+        view.TouchCommandRequested += (_, kind) => ExecuteTouchCommand(kind);
         view.TouchModeToggleRequested += (_, _) => SetSessionTouchMode(SessionTouchModes.Toggle(_doc.Settings.SessionTouch));
+    }
+
+    /// <summary>Gesti a più dita per la finestra: scheda precedente o successiva, barra comandi della sessione (a schermo intero).</summary>
+    internal void ExecuteTouchCommand(TouchActionKind kind)
+    {
+        if (_locked)
+            return;
+        switch (kind)
+        {
+            case TouchActionKind.PreviousTab:
+                CycleTab(-1);
+                break;
+            case TouchActionKind.NextTab:
+                CycleTab(1);
+                break;
+            case TouchActionKind.ShowBar:
+                ShowFullScreenBarFromHandle();
+                break;
+            case TouchActionKind.HideBar:
+                ExecuteTouchSessionAction(SessionBarAction.HideBar);
+                break;
+        }
     }
 
     /// <summary>Cambia la modalità del tocco per tutte le sessioni e la salva.</summary>

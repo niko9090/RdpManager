@@ -765,6 +765,10 @@ basta lo stesso login: connessioni, cartelle, profili di credenziali e testi rap
   - **Apri con mstsc**: genera un file `.rdp` temporaneo e avvia `mstsc.exe` (alternativa se il
     controllo incorporato non funziona); il file viene cancellato dopo 30 secondi;
   - **Chiudi scheda** (Ctrl+F4, clic con il tasto centrale sulla scheda).
+- **Gesti touch dentro la sessione** (schermi a tocco, con «Tocco: mouse» nella barra della sessione): un dito
+  = mouse (pressione lunga = clic destro); **due dita**: tocco = clic destro, scorrimento = rotella, pizzico = zoom
+  (Ctrl+rotella); **tre dita**: scorrimento a sinistra/destra = scheda precedente/successiva, in su/giù = mostra/nascondi
+  la barra, tocco = Alt+Tab sul PC remoto; **quattro dita**: giù = Win+D, su = Win+Tab sul PC remoto.
 - **Riapri all'avvio** (File → Impostazioni): chiudendo l'app si ricordano le sessioni aperte e al
   prossimo avvio si riaprono, nello stesso ordine.
 - **Testi rapidi** (*Sessione → Testi rapidi*, «Invia» nella barra della sessione, «Testi» nella barra a

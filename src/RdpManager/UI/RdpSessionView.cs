@@ -79,6 +79,7 @@ public sealed class RdpSessionView : UserControl
         _bar.Items.Add(new ToolStripButton("Chiudi", null, (_, _) => CloseRequested?.Invoke(this, EventArgs.Empty)) { Alignment = ToolStripItemAlignment.Right });
         _bar.OverflowButton.ToolTipText = "Altri comandi";
         _touch = new SessionTouchInput(_host);
+        _touch.CommandRequested += (_, kind) => OnTouchCommand(kind);
         _touch.RightClickUsed += (_, _) => { _rightClickButton.Checked = false; UpdateTouchFilter(); };
         _touchModeButton.Click += (_, _) => TouchModeToggleRequested?.Invoke(this, EventArgs.Empty);
         _rightClickButton.CheckedChanged += (_, _) => { _touch.RightClickArmed = _rightClickButton.Checked; UpdateTouchFilter(); FocusSession(); };
@@ -107,6 +108,28 @@ public sealed class RdpSessionView : UserControl
 
     /// <summary>Si chiede di passare dal tocco «remoto» al dito che fa da mouse (e viceversa): la finestra salva la scelta per tutte le sessioni.</summary>
     public event EventHandler? TouchModeToggleRequested;
+
+    /// <summary>Gesto a più dita che riguarda RdpManager e non il PC remoto (scheda precedente/successiva, mostra/nascondi la barra): lo esegue la finestra principale.</summary>
+    public event EventHandler<TouchActionKind>? TouchCommandRequested;
+
+    private void OnTouchCommand(TouchActionKind kind)
+    {
+        switch (kind)
+        {
+            case TouchActionKind.AltTab:
+                SendAltTab();
+                break;
+            case TouchActionKind.ShowDesktop:
+                SendWinD();
+                break;
+            case TouchActionKind.TaskView:
+                SendWinTab();
+                break;
+            default:
+                TouchCommandRequested?.Invoke(this, kind);
+                break;
+        }
+    }
 
     /// <summary>Come il dito agisce sulla sessione (la modalità mouse vale subito; il tocco remoto dalla prossima connessione).</summary>
     public SessionTouchMode TouchMode
@@ -389,6 +412,15 @@ public sealed class RdpSessionView : UserControl
 
     /// <summary>Invia il tasto Windows (apre il menu Start del PC remoto).</summary>
     public bool SendWindowsKey() => SendScanCodes(0x15B); // Windows di sinistra: scan code 0x5B con il bit dei tasti estesi
+
+    /// <summary>Alt+Tab sul PC remoto (tocco a tre dita).</summary>
+    public bool SendAltTab() => SendScanCodes(0x38, 0x0F);
+
+    /// <summary>Win+D sul PC remoto: mostra il desktop (quattro dita giù).</summary>
+    public bool SendWinD() => SendScanCodes(0x15B, 0x20);
+
+    /// <summary>Win+Tab sul PC remoto: vista attività (quattro dita su).</summary>
+    public bool SendWinTab() => SendScanCodes(0x15B, 0x0F);
 
     /// <summary>Preme i tasti nell'ordine dato e li rilascia in ordine inverso (scan code).</summary>
     private bool SendScanCodes(params int[] scanCodes)
