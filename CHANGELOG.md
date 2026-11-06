@@ -1,5 +1,13 @@
 # Novità di RdpManager
 
+## Non rilasciato
+
+**Chiusura che non si blocca più**
+- Correzione: alla chiusura la finestra poteva diventare bianca e restare ferma (bisognava terminare il programma da Gestione attività).
+  Ora l'uscita ha un cane da guardia su un thread suo: se la chiusura non finisce entro 8 secondi il programma esce comunque.
+- Alla chiusura si interrompono sincronizzazione e VPN automatica in corso (niente più attese sulla rete), e le sessioni RDP
+  si disconnettono prima di essere eliminate, aspettando al massimo 3 secondi.
+
 ## 1.11.0
 
 **Icona nuova**

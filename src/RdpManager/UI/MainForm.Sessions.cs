@@ -468,6 +468,9 @@ public sealed partial class MainForm
             e.Cancel = true;
             return;
         }
+        // Da qui l'uscita è decisa: niente più sincronizzazioni o VPN in corso, e un cane da guardia su un thread suo
+        // fa uscire il programma comunque se la chiusura si blocca (vedi ShutdownWatchdog).
+        BeginShutdown();
         Overview?.Close();
         foreach (var v in views)
             EndHistory(v, "Uscita da RdpManager");
@@ -483,8 +486,9 @@ public sealed partial class MainForm
             _doc.Settings.OpenSessions = open;
             SaveConnections();
         }
-        if (_closingForUpdate)
-            DisconnectSessionsInOrder(views, TimeSpan.FromSeconds(8));
+        // Prima si chiede la disconnessione a tutte (non blocca), poi si aspetta poco: eliminare il controllo RDP
+        // ancora connesso può restare appeso sul thread dell'interfaccia.
+        DisconnectSessionsInOrder(views, _closingForUpdate ? TimeSpan.FromSeconds(8) : TimeSpan.FromSeconds(3));
         UnregisterSessionHotkeys();
         _edgeTimer.Stop();
         _reachTimer.Stop();
@@ -496,6 +500,40 @@ public sealed partial class MainForm
         }
         foreach (var v in views)
             v.Dispose();
+    }
+
+    private ShutdownWatchdog? _shutdownWatchdog;
+    private readonly CancellationTokenSource _shutdownCts = new();
+
+    /// <summary>Per le prove: uscita forzata al posto di <c>Environment.Exit</c>.</summary>
+    internal Action ForcedExit { get; set; } = ShutdownWatchdog.DefaultExit;
+
+    /// <summary>Per le prove: terminazione di riserva al posto di <c>Process.Kill</c>.</summary>
+    internal Action ForcedKill { get; set; } = ShutdownWatchdog.DefaultKill;
+
+    /// <summary>Per le prove: tempo concesso alla chiusura; null = quello di serie (più lungo se si chiude per aggiornare).</summary>
+    internal TimeSpan? ShutdownTimeout { get; set; }
+
+    /// <summary>L'uscita è decisa (nessun annullamento): ferma ciò che va in rete e arma l'uscita forzata.</summary>
+    private void BeginShutdown()
+    {
+        _shutdownCts.Cancel();
+        _syncDelay.Stop();
+        _syncPoll.Stop();
+        _shutdownWatchdog?.Stop();
+        var timeout = ShutdownTimeout ?? (_closingForUpdate ? ShutdownWatchdog.DefaultTimeout + TimeSpan.FromSeconds(12) : ShutdownWatchdog.DefaultTimeout);
+        _shutdownWatchdog = ShutdownWatchdog.Start(timeout, ForcedExit, ForcedKill, msg => AppLog.Default?.Warning(msg));
+    }
+
+    protected override void OnFormClosing(FormClosingEventArgs e)
+    {
+        base.OnFormClosing(e);
+        if (e.Cancel)
+        {
+            // Chiusura annullata (da noi o da un altro gestore): si riparte da capo la prossima volta.
+            _shutdownWatchdog?.Stop();
+            _shutdownWatchdog = null;
+        }
     }
 
     // ---------- scorciatoie e hook di tastiera ----------
