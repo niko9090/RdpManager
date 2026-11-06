@@ -12,6 +12,7 @@ public class TouchForm : Form
     {
         AutoScaleDimensions = new SizeF(96f, 96f);
         AutoScaleMode = AutoScaleMode.Dpi;
+        Icon = AppIcon.Instance;
     }
 
     /// <summary>Vero dopo che i controlli sono stati adattati al tocco e la finestra misurata sull'area di lavoro.</summary>
