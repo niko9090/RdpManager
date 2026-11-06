@@ -65,7 +65,7 @@ public class WireGuardConfigTests
     {
         var (priv, _) = WireGuardKeys.Generate();
         var (_, serverPub) = WireGuardKeys.Generate();
-        return new WireGuardConfig { PrivateKey = priv, Address = "10.66.0.2/32", Dns = "10.66.0.1", PeerPublicKey = serverPub };
+        return new WireGuardConfig { PrivateKey = priv, Address = "10.66.0.2/32", Dns = "10.66.0.1", PeerPublicKey = serverPub, Endpoint = "vpn.example.com:51820" };
     }
 
     [Fact]
@@ -154,6 +154,7 @@ public class VpnProfileTests : IDisposable
         var pub = p.GenerateKeys();
         var (_, serverPub) = WireGuardKeys.Generate();
         p.ServerPublicKey = serverPub;
+        p.Endpoint = "vpn.example.com:51820";
         p.Save(path);
 
         var plainPriv = p.ToConfig().PrivateKey;
@@ -234,7 +235,7 @@ public class WireGuardTunnelTests : IDisposable
     {
         var (priv, _) = WireGuardKeys.Generate();
         var (_, serverPub) = WireGuardKeys.Generate();
-        return new WireGuardConfig { PrivateKey = priv, Address = "10.66.0.2/32", PeerPublicKey = serverPub };
+        return new WireGuardConfig { PrivateKey = priv, Address = "10.66.0.2/32", PeerPublicKey = serverPub, Endpoint = "vpn.example.com:51820" };
     }
 
     private (WireGuardNtTunnel tunnel, FakeServices svc, InProcessElevator el) Make(int? code = null)

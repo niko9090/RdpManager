@@ -78,7 +78,7 @@ public class WireGuardServerPackageTests
     {
         var add = Read("scripts", "aggiungi-pc.sh");
         Assert.Contains("WG_ENDPOINT", add);
-        Assert.DoesNotContain(Endpoint, add);
+        Assert.Contains("${WG_ENDPOINT:?", add); // obbligatorio, nessun predefinito
         Assert.Contains("wg syncconf", add);
         Assert.Contains("10.66.0.", add);
         foreach (var name in new[] { "aggiungi-pc.sh", "elenca-pc.sh", "rimuovi-pc.sh", "prima-generazione.sh" })

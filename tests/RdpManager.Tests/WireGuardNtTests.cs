@@ -92,7 +92,7 @@ public class WireGuardNtStructsTests
         Assert.Equal(0u, BinaryPrimitives.ReadUInt32LittleEndian(p) & WireGuardNtStructs.PeerHasKeepalive);
         Assert.Equal(2u, BinaryPrimitives.ReadUInt32LittleEndian(p[128..]));
         var second = p[(136 + 24)..];
-        Assert.Equal(new byte[] { 192, 168, 1, 0 }, second[..4].ToArray());
+        Assert.Equal(new byte[] { 192, 0, 2, 0 }, second[..4].ToArray());
         Assert.Equal(24, second[18]);
     }
 
@@ -233,6 +233,7 @@ public class VpnTunnelRunnerTests
         Address = "10.66.0.2/32",
         PeerPublicKey = Convert.ToBase64String(new byte[32].Select(_ => (byte)2).ToArray()),
         AllowedIPs = "10.66.0.0/24,192.0.2.0/24",
+        Endpoint = "vpn.example.com:51820",
     };
 
     [Fact]

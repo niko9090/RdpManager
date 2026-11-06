@@ -63,6 +63,8 @@ public class VpnProvisioningTests
 
         p.Address = "10.66.0.9/32";
         p.ServerPublicKey = ServerKey;
+        Assert.True(VpnProvisioning.NeedsProvisioning(p)); // manca l'endpoint: nessun predefinito
+        p.Endpoint = "vpn.example.com:51820";
         Assert.False(VpnProvisioning.NeedsProvisioning(p)); // anche un profilo fatto a mano resta com'e'
     }
 
