@@ -631,7 +631,8 @@ public sealed partial class MainForm
         if (!Visible)
             Show();
         Close();
-        _exitRequested = false; // chiusura annullata (es. sessioni connesse): si torna come prima
+        if (!_shutdownInProgress)
+            _exitRequested = false; // chiusura annullata (es. sessioni connesse): si torna come prima
     }
 
     /// <summary>Con «resta nell'area di notifica» la chiusura nasconde la finestra; vero se l'ha fatto.</summary>
@@ -828,7 +829,7 @@ public sealed partial class MainForm
             return;
         _installNowRequested = _closingForUpdate = true;
         ExitApp();
-        if (!IsDisposed && Visible)
+        if (!IsDisposed && Visible && !_shutdownInProgress)
         {
             _installNowRequested = _closingForUpdate = false; // uscita annullata: non si installa
             ShowNotice("Aggiornamento annullato.");
@@ -843,7 +844,7 @@ public sealed partial class MainForm
 
     private string InstallDir => InstallDirOverride ?? Path.GetDirectoryName(Path.GetFullPath(Application.ExecutablePath))!;
     private string RunnerBackupDir => Path.Combine(UpdateRunnerFolder, "riserva");
-    private bool _runnerReady;
+    private bool _runnerReady, _installerStarted;
 
     /// <summary>
     /// Copia la cartella installata in update-runner\riserva: da lì parte il programma di aggiornamento (fuori dalla
@@ -898,6 +899,8 @@ public sealed partial class MainForm
     /// </summary>
     private void StartVerifiedInstaller(bool relaunch)
     {
+        if (_installerStarted)
+            return;
         if (!_runnerReady && !PrepareUpdateRunner(quiet: true))
             return;
         var job = CreateUpdateJob(relaunch);
@@ -917,30 +920,13 @@ public sealed partial class MainForm
             foreach (var a in job.ToArguments())
                 psi.ArgumentList.Add(a);
             StartInstaller(psi);
+            _installerStarted = true;
         }
         catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
         {
             AppLog.Default?.Error("Avvio del programma di aggiornamento non riuscito", ex);
             MessageBox.Show("Impossibile avviare l'aggiornamento: " + ex.Message, "Aggiornamento", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
-    }
-
-    /// <summary>
-    /// Prima di chiudere per l'aggiornamento: disconnette le sessioni una per una, senza riconnessioni, e aspetta
-    /// (al massimo <paramref name="timeout"/>) che il controllo RDP le dia per chiuse, così l'app esce subito e pulita.
-    /// </summary>
-    internal static void DisconnectSessionsInOrder(IReadOnlyList<RdpSessionView> views, TimeSpan timeout)
-    {
-        foreach (var v in views)
-            v.DisconnectForShutdown();
-        var until = DateTime.UtcNow + timeout;
-        while (views.Any(v => v.State is SessionState.Connected or SessionState.Connecting) && DateTime.UtcNow < until)
-        {
-            Application.DoEvents();
-            Thread.Sleep(50);
-        }
-        int left = views.Count(v => v.State is SessionState.Connected or SessionState.Connecting);
-        AppLog.Default?.Info($"Aggiornamento: {views.Count - left} sessioni disconnesse" + (left > 0 ? $", {left} ancora aperte (chiuse con il controllo)" : ""));
     }
 
     /// <summary>Messaggio del programma di aggiornamento quando l'aggiornamento non è riuscito (argomento --aggiornamento-fallito).</summary>

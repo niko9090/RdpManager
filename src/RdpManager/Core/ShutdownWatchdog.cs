@@ -26,14 +26,29 @@ public sealed class ShutdownWatchdog
         _log = log;
     }
 
+    /// <summary>
+    /// Vero solo nel programma vero (lo imposta <c>Program.Main</c>): negli altri processi (prove automatiche, che aprono
+    /// e chiudono molte finestre) l'uscita e la terminazione di serie non fanno niente, così non portano via il processo.
+    /// </summary>
+    public static bool Enabled { get; set; }
+
     /// <summary>Uscita normale del processo (<c>Environment.Exit</c>) e, se non basta, terminazione (<c>Kill</c>).</summary>
-    public static Action DefaultExit { get; } = () => Environment.Exit(0);
+    public static Action DefaultExit { get; } = () =>
+    {
+        if (Enabled)
+            Environment.Exit(0);
+    };
 
     public static Action DefaultKill { get; } = () =>
     {
+        if (!Enabled)
+            return;
         using var self = Process.GetCurrentProcess();
         self.Kill();
     };
+
+    /// <summary>Tempo fra l'uscita forzata e la terminazione di riserva.</summary>
+    public static TimeSpan KillDelay { get; set; } = TimeSpan.FromSeconds(2);
 
     /// <summary>Avvia il conto alla rovescia. <paramref name="exit"/> è l'uscita forzata; se non porta via il processo entro 2 secondi segue <paramref name="kill"/>.</summary>
     public static ShutdownWatchdog Start(TimeSpan timeout, Action? exit = null, Action? kill = null, Action<string>? log = null)
@@ -55,8 +70,14 @@ public sealed class ShutdownWatchdog
         if (Interlocked.CompareExchange(ref _state, 2, 0) != 0)
             return;
         try { _log?.Invoke($"Chiusura bloccata oltre {_timeout.TotalSeconds:0} secondi: uscita forzata"); } catch (Exception) { }
+        // La terminazione di riserva si arma prima, su un thread suo: se _exit() si blocca (chiusura delle DLL, mstscax)
+        // non deve impedirle di partire.
+        var killDelay = KillDelay;
+        new Thread(() =>
+        {
+            Thread.Sleep(killDelay);
+            try { _kill(); } catch (Exception) { }
+        }) { IsBackground = true, Name = "RdpManager-terminazione" }.Start();
         try { _exit(); } catch (Exception) { }
-        Thread.Sleep(TimeSpan.FromSeconds(2));
-        try { _kill(); } catch (Exception) { }
     }
 }
