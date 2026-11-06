@@ -42,7 +42,7 @@ public sealed partial class MainForm
         _syncPoll.Start();
         Shown += async (_, _) =>
         {
-            if (_autoSync && _sync.SignedIn)
+            if (_autoSync && _sync.SignedIn && !_shutdownCts.IsCancellationRequested)
             {
                 await RunSyncAsync(manual: false);
                 if (await EnsureVpnAsync() is { Length: > 0 } vpnLine && !IsDisposed)
@@ -60,7 +60,7 @@ public sealed partial class MainForm
     /// <summary>Dopo ogni salvataggio: se c'è qualcosa da mandare al server, sincronizza fra poco (senza bloccare niente).</summary>
     private void ScheduleSync()
     {
-        if (!_autoSync || _syncApplying || _locked || _sync is not { SignedIn: true })
+        if (!_autoSync || _syncApplying || _locked || _shutdownCts.IsCancellationRequested || _sync is not { SignedIn: true })
             return;
         if (_sync.HasLocalChanges(SyncMerge.Snapshot(_doc)))
         {
@@ -98,12 +98,14 @@ public sealed partial class MainForm
             return new SyncOutcome(SyncStatus.NotSignedIn, "Nessun account di sincronizzazione.");
         if (_locked)
             return new SyncOutcome(SyncStatus.Error, "L'app è bloccata con il PIN: sblocca per sincronizzare.");
+        if (_shutdownCts.IsCancellationRequested)
+            return new SyncOutcome(SyncStatus.Error, "Il programma si sta chiudendo.");
         SyncOutcome outcome;
         try
         {
-            outcome = await _sync.SyncAsync(new FormSyncAccess(this));
+            outcome = await _sync.SyncAsync(new FormSyncAccess(this), _shutdownCts.Token);
         }
-        catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException)
+        catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException or OperationCanceledException)
         {
             return new SyncOutcome(SyncStatus.Error, "Sincronizzazione interrotta: " + ex.Message);
         }

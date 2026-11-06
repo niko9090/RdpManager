@@ -456,46 +456,192 @@ public sealed partial class MainForm
 
     private void OnFormClosing(object? sender, FormClosingEventArgs e)
     {
-        if (HideToTrayInsteadOfClosing(e))
-            return;
-        var views = AllViews.ToList();
-        int connected = views.Count(v => v.State == SessionState.Connected);
-        // Con «Aggiorna ora» la conferma è già stata chiesta (e le sessioni si riaprono dopo).
-        if (connected > 0 && e.CloseReason == CloseReason.UserClosing && !_closingForUpdate &&
-            MessageBox.Show(this, $"Ci sono {connected} sessioni connesse. Disconnetterle e uscire?", "Esci",
-                MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+        // Una chiusura già in corso (domanda aperta o disconnessione delle sessioni in attesa): un altro clic sulla X,
+        // «Esci» dall'area di notifica o una scorciatoia non ne fanno partire una seconda e non toccano il cane da guardia.
+        if (!_sessionsDisconnected && (_shutdownInProgress || _closeQuestionOpen))
         {
             e.Cancel = true;
+            _closeCancelledByUs = true;
             return;
         }
-        Overview?.Close();
-        foreach (var v in views)
-            EndHistory(v, "Uscita da RdpManager");
-        // Si ricordano le sessioni aperte (nell'ordine delle schede) per riaprirle al prossimo avvio.
-        var open = _doc.Settings.ReopenSessionsOnStartup || _closingForUpdate ? views.Select(v => v.Connection.Id).ToList() : [];
-        if (_closingForUpdate && open.Count > 0 && !_doc.Settings.ReopenOnceAfterUpdate)
+        if (!_sessionsDisconnected)
         {
-            _doc.Settings.ReopenOnceAfterUpdate = true;
-            _doc.Settings.OpenSessions = [];   // forza il salvataggio qui sotto
+            if (HideToTrayInsteadOfClosing(e))
+                return;
+            var asked = AllViews.ToList();
+            int connected = asked.Count(v => v.State == SessionState.Connected);
+            // Con «Aggiorna ora» la conferma è già stata chiesta (e le sessioni si riaprono dopo).
+            if (connected > 0 && e.CloseReason == CloseReason.UserClosing && !_closingForUpdate)
+            {
+                _closeQuestionOpen = true;
+                DialogResult answer;
+                try
+                {
+                    answer = MessageBox.Show(this, $"Ci sono {connected} sessioni connesse. Disconnetterle e uscire?", "Esci",
+                        MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                }
+                finally { _closeQuestionOpen = false; }
+                if (answer != DialogResult.Yes)
+                {
+                    e.Cancel = true;
+                    return;
+                }
+            }
+            // «Alla chiusura»: la copia di riserva si prepara prima di armare il cane da guardia, così non viene interrotta a metà.
+            if (_updates.InstallOnExit && !_installNowRequested && !_runnerReady)
+                PrepareUpdateRunner(quiet: true);
+            // Da qui l'uscita è decisa: niente più sincronizzazioni, VPN o timer, e un cane da guardia su un thread suo
+            // fa uscire il programma comunque se la chiusura si blocca (vedi ShutdownWatchdog).
+            BeginShutdown();
+            var views = _closingViews = AllViews.ToList();
+            Overview?.Close();
+            foreach (var v in views)
+                EndHistory(v, "Uscita da RdpManager");
+            // Si ricordano le sessioni aperte (nell'ordine delle schede) per riaprirle al prossimo avvio.
+            var open = _doc.Settings.ReopenSessionsOnStartup || _closingForUpdate ? views.Select(v => v.Connection.Id).ToList() : [];
+            if (_closingForUpdate && open.Count > 0 && !_doc.Settings.ReopenOnceAfterUpdate)
+            {
+                _doc.Settings.ReopenOnceAfterUpdate = true;
+                _doc.Settings.OpenSessions = [];   // forza il salvataggio qui sotto
+            }
+            if (!open.SequenceEqual(_doc.Settings.OpenSessions))
+            {
+                _doc.Settings.OpenSessions = open;
+                SaveConnections();
+            }
+            // «Aggiorna ora»: il programma di aggiornamento parte adesso (aspetta lui l'uscita, fino a 90 secondi), così
+            // un'uscita forzata più avanti non lo salta.
+            if (_installNowRequested)
+                StartVerifiedInstaller(relaunch: true);
+            // Si chiede la disconnessione a tutte (non blocca). Se qualcuna è ancora connessa la chiusura si annulla e
+            // riparte da sola appena sono giù (o allo scadere): eliminare un controllo RDP connesso può restare appeso.
+            foreach (var v in views)
+                v.DisconnectForShutdown();
+            if (e.CloseReason == CloseReason.UserClosing && StillOpen(views) > 0)
+            {
+                e.Cancel = true;
+                _closeCancelledByUs = true;
+                WaitForSessionsThenClose(views, _closingForUpdate ? TimeSpan.FromSeconds(8) : TimeSpan.FromSeconds(3));
+                return;
+            }
+            LogSessionsDisconnected(views);
         }
-        if (!open.SequenceEqual(_doc.Settings.OpenSessions))
+        FinishClosing();
+    }
+
+    private bool _shutdownInProgress, _sessionsDisconnected, _closeQuestionOpen, _closeCancelledByUs;
+    private System.Windows.Forms.Timer? _sessionsWaitTimer;
+    private List<RdpSessionView> _closingViews = [];
+
+    private static int StillOpen(IReadOnlyList<RdpSessionView> views)
+        => views.Count(v => v.State is SessionState.Connected or SessionState.Connecting);
+
+    private static void LogSessionsDisconnected(IReadOnlyList<RdpSessionView> views)
+    {
+        int left = StillOpen(views);
+        AppLog.Default?.Info($"Chiusura: {views.Count - left} sessioni disconnesse" + (left > 0 ? $", {left} ancora aperte (chiuse con il controllo)" : ""));
+    }
+
+    /// <summary>Aspetta (con un timer, senza bloccare l'interfaccia) che le sessioni siano giù, al massimo <paramref name="timeout"/>, poi richiama Close().</summary>
+    private void WaitForSessionsThenClose(IReadOnlyList<RdpSessionView> views, TimeSpan timeout)
+    {
+        var until = DateTime.UtcNow + timeout;
+        _sessionsWaitTimer?.Dispose();
+        var timer = _sessionsWaitTimer = new System.Windows.Forms.Timer { Interval = 50 };
+        timer.Tick += (_, _) =>
         {
-            _doc.Settings.OpenSessions = open;
-            SaveConnections();
-        }
-        if (_closingForUpdate)
-            DisconnectSessionsInOrder(views, TimeSpan.FromSeconds(8));
+            if (IsDisposed)
+            {
+                timer.Dispose();
+                return;
+            }
+            if (StillOpen(views) > 0 && DateTime.UtcNow < until)
+                return;
+            timer.Stop();
+            timer.Dispose();
+            if (ReferenceEquals(_sessionsWaitTimer, timer))
+                _sessionsWaitTimer = null;
+            LogSessionsDisconnected(views);
+            _sessionsDisconnected = true;
+            Close();
+        };
+        timer.Start();
+    }
+
+    /// <summary>Ultima parte della chiusura: tutto ciò che resta si ferma e si elimina.</summary>
+    private void FinishClosing()
+    {
         UnregisterSessionHotkeys();
-        _edgeTimer.Stop();
-        _reachTimer.Stop();
         foreach (var form in _detached.ToList())
         {
             _detached.Remove(form);
             form.ReleaseView();
             form.Close();
         }
-        foreach (var v in views)
+        foreach (var v in _closingViews)
             v.Dispose();
+    }
+
+    private ShutdownWatchdog? _shutdownWatchdog;
+    private CancellationTokenSource _shutdownCts = new();
+    private readonly List<System.Windows.Forms.Timer> _timersStoppedForShutdown = [];
+
+    /// <summary>Per le prove: uscita forzata al posto di <c>Environment.Exit</c>.</summary>
+    internal Action ForcedExit { get; set; } = ShutdownWatchdog.DefaultExit;
+
+    /// <summary>Per le prove: terminazione di riserva al posto di <c>Process.Kill</c>.</summary>
+    internal Action ForcedKill { get; set; } = ShutdownWatchdog.DefaultKill;
+
+    /// <summary>Per le prove: tempo concesso alla chiusura; null = quello di serie (più lungo se si chiude per aggiornare).</summary>
+    internal TimeSpan? ShutdownTimeout { get; set; }
+
+    /// <summary>Vero se l'uscita è decisa e in corso (per le prove).</summary>
+    internal bool ShutdownInProgress => _shutdownInProgress;
+
+    /// <summary>L'uscita è decisa: ferma ciò che va in rete e tutti i timer, e arma l'uscita forzata.</summary>
+    private void BeginShutdown()
+    {
+        _shutdownInProgress = true;
+        _shutdownCts.Cancel();
+        _timersStoppedForShutdown.Clear();
+        foreach (var t in new[] { _syncDelay, _syncPoll, _edgeTimer, _reachTimer, _updateTimer, _idleTimer, _overviewTimer })
+        {
+            // Quelli che giravano ripartono se la chiusura viene annullata (la panoramica e la sincronizzazione ritardata si riarmano da sole).
+            if (t.Enabled && !ReferenceEquals(t, _overviewTimer) && !ReferenceEquals(t, _syncDelay))
+                _timersStoppedForShutdown.Add(t);
+            t.Stop();
+        }
+        _shutdownWatchdog?.Stop();
+        var timeout = ShutdownTimeout ?? (_closingForUpdate ? ShutdownWatchdog.DefaultTimeout + TimeSpan.FromSeconds(12) : ShutdownWatchdog.DefaultTimeout);
+        _shutdownWatchdog = ShutdownWatchdog.Start(timeout, ForcedExit, ForcedKill, msg => AppLog.Default?.Warning(msg));
+    }
+
+    /// <summary>La chiusura è stata annullata (da un altro gestore o dalla domanda): tutto riparte come prima.</summary>
+    private void CancelShutdown()
+    {
+        _shutdownWatchdog?.Stop();
+        _shutdownWatchdog = null;
+        _sessionsWaitTimer?.Dispose();
+        _sessionsWaitTimer = null;
+        _sessionsDisconnected = false;
+        if (!_shutdownInProgress)
+            return;
+        _shutdownInProgress = false;
+        _shutdownCts.Dispose();
+        _shutdownCts = new CancellationTokenSource();
+        foreach (var t in _timersStoppedForShutdown)
+            t.Start();
+        _timersStoppedForShutdown.Clear();
+    }
+
+    protected override void OnFormClosing(FormClosingEventArgs e)
+    {
+        _closeCancelledByUs = false;
+        base.OnFormClosing(e);
+        // Annullata da noi per aspettare le sessioni o per ignorare una chiusura annidata: la chiusura vera continua.
+        // Annullata da altri (domanda, un altro gestore): si riparte da capo la prossima volta.
+        if (e.Cancel && !_closeCancelledByUs)
+            CancelShutdown();
     }
 
     // ---------- scorciatoie e hook di tastiera ----------

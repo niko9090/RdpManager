@@ -48,6 +48,7 @@ internal static class Program
         int f = Array.FindIndex(args, a => a.Equals(UpdateJob.FailedArgument, StringComparison.OrdinalIgnoreCase));
         if (f >= 0 && f + 1 < args.Length)
             form.UpdateFailureMessage = args[f + 1];
+        ShutdownWatchdog.Enabled = true; // solo qui il cane da guardia della chiusura può far uscire il processo
         Application.Run(form);
     }
 }

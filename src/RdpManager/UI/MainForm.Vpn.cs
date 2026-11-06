@@ -37,9 +37,9 @@ public sealed partial class MainForm
     {
         try
         {
-            if (!_sync.SignedIn || !VpnProvisioning.NeedsProvisioning(VpnProfile.Load()))
+            if (!_sync.SignedIn || _shutdownCts.IsCancellationRequested || !VpnProvisioning.NeedsProvisioning(VpnProfile.Load()))
                 return "";
-            var profile = await VpnProvisioning.EnsureAsync(_sync);
+            var profile = await VpnProvisioning.EnsureAsync(_sync, ct: _shutdownCts.Token);
             if (profile is null)
                 return "";
             AppLog.Default?.Info("VPN: profilo ottenuto dal server, indirizzo " + profile.Address);
@@ -54,7 +54,7 @@ public sealed partial class MainForm
             return ""; // il server non offre la VPN automatica: niente avviso a ogni avvio
         }
         catch (Exception ex) when (ex is SyncServerException or SyncUnreachableException or Vpn.VpnException
-                                       or ArgumentException or InvalidOperationException or FormatException)
+                                       or ArgumentException or InvalidOperationException or FormatException or OperationCanceledException)
         {
             AppLog.Default?.Info("VPN automatica non riuscita: " + ex.Message);
             return "VPN non configurata: " + ex.Message;
