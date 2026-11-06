@@ -168,7 +168,7 @@ public sealed partial class MainForm
     internal void OpenSession(RdpConnection c)
     {
         // Bloccata con il PIN: nessuna sessione nuova (né password lette) finché non si sblocca.
-        if (_locked)
+        if (_locked || _shutdownInProgress)
             return;
         // Una sessione per connessione: se è già aperta la si porta in primo piano.
         var existing = AllViews.FirstOrDefault(v => v.Connection == c);
@@ -456,9 +456,15 @@ public sealed partial class MainForm
 
     private void OnFormClosing(object? sender, FormClosingEventArgs e)
     {
+        // Già annullata prima di noi (Validate, finestre possedute): niente effetti, e OnFormClosing riparte da capo.
+        if (e.Cancel)
+            return;
+        // Spegnimento o riavvio di Windows: la chiusura non si annulla mai (si bloccherebbe l'arresto) e non si elimina
+        // nulla di ciò che è ancora connesso dentro WM_QUERYENDSESSION: si chiede solo la disconnessione.
+        bool windows = e.CloseReason == CloseReason.WindowsShutDown;
         // Una chiusura già in corso (domanda aperta o disconnessione delle sessioni in attesa): un altro clic sulla X,
         // «Esci» dall'area di notifica o una scorciatoia non ne fanno partire una seconda e non toccano il cane da guardia.
-        if (!_sessionsDisconnected && (_shutdownInProgress || _closeQuestionOpen))
+        if (!windows && !_sessionsDisconnected && (_shutdownInProgress || _closeQuestionOpen))
         {
             e.Cancel = true;
             _closeCancelledByUs = true;
@@ -492,7 +498,13 @@ public sealed partial class MainForm
                 PrepareUpdateRunner(quiet: true);
             // Da qui l'uscita è decisa: niente più sincronizzazioni, VPN o timer, e un cane da guardia su un thread suo
             // fa uscire il programma comunque se la chiusura si blocca (vedi ShutdownWatchdog).
-            BeginShutdown();
+            BeginShutdown(armWatchdog: !windows);
+            _closeCommitted = true; // da qui la chiusura non si annulla più (solo noi, per aspettare le sessioni)
+            if (windows)
+            {
+                _sessionsWaitTimer?.Dispose();
+                _sessionsWaitTimer = null;
+            }
             var views = _closingViews = AllViews.ToList();
             Overview?.Close();
             foreach (var v in views)
@@ -509,10 +521,10 @@ public sealed partial class MainForm
                 _doc.Settings.OpenSessions = open;
                 SaveConnections();
             }
-            // «Aggiorna ora»: il programma di aggiornamento parte adesso (aspetta lui l'uscita, fino a 90 secondi), così
-            // un'uscita forzata più avanti non lo salta.
-            if (_installNowRequested)
-                StartVerifiedInstaller(relaunch: true);
+            // «Aggiorna ora» e «Alla chiusura»: il programma di aggiornamento parte adesso (aspetta lui l'uscita, fino a
+            // 90 secondi), così un'uscita forzata più avanti non lo salta.
+            if (_installNowRequested || _updates.InstallOnExit)
+                StartVerifiedInstaller(relaunch: _installNowRequested);
             // Si chiede la disconnessione a tutte (non blocca). Se qualcuna è ancora connessa la chiusura si annulla e
             // riparte da sola appena sono giù (o allo scadere): eliminare un controllo RDP connesso può restare appeso.
             foreach (var v in views)
@@ -521,15 +533,23 @@ public sealed partial class MainForm
             {
                 e.Cancel = true;
                 _closeCancelledByUs = true;
-                WaitForSessionsThenClose(views, _closingForUpdate ? TimeSpan.FromSeconds(8) : TimeSpan.FromSeconds(3));
+                // Durante l'attesa niente sessioni nuove né comandi (CancelShutdown riabilita la finestra).
+                Enabled = false;
+                WaitForSessionsThenClose(views, ClosingForInstall ? TimeSpan.FromSeconds(8) : TimeSpan.FromSeconds(3));
                 return;
             }
             LogSessionsDisconnected(views);
         }
-        FinishClosing();
+        _closeCommitted = true;
+        FinishClosing(keepConnected: windows);
     }
 
-    private bool _shutdownInProgress, _sessionsDisconnected, _closeQuestionOpen, _closeCancelledByUs;
+    private bool _shutdownInProgress, _sessionsDisconnected, _closeQuestionOpen;
+    // Valgono per la singola chiamata di OnFormClosing (salvati e ripristinati là): le chiusure annidate non si pestano.
+    private bool _closeCancelledByUs, _closeCommitted;
+
+    /// <summary>Si chiude per installare un aggiornamento (subito o «Alla chiusura»): più tempo per tutto.</summary>
+    private bool ClosingForInstall => _closingForUpdate || _installNowRequested || (_updates.InstallOnExit && _updates.Ready is not null);
     private System.Windows.Forms.Timer? _sessionsWaitTimer;
     private List<RdpSessionView> _closingViews = [];
 
@@ -569,9 +589,13 @@ public sealed partial class MainForm
     }
 
     /// <summary>Ultima parte della chiusura: tutto ciò che resta si ferma e si elimina.</summary>
-    private void FinishClosing()
+    private void FinishClosing(bool keepConnected)
     {
         UnregisterSessionHotkeys();
+        // Spegnimento di Windows: l'arresto spetta al sistema, niente viene eliminato (eliminare un controllo RDP
+        // connesso dentro WM_QUERYENDSESSION è proprio ciò che si bloccava) e, se l'arresto viene annullato da un'altra app, la finestra è intatta.
+        if (keepConnected)
+            return;
         foreach (var form in _detached.ToList())
         {
             _detached.Remove(form);
@@ -598,21 +622,43 @@ public sealed partial class MainForm
     /// <summary>Vero se l'uscita è decisa e in corso (per le prove).</summary>
     internal bool ShutdownInProgress => _shutdownInProgress;
 
-    /// <summary>L'uscita è decisa: ferma ciò che va in rete e tutti i timer, e arma l'uscita forzata.</summary>
-    private void BeginShutdown()
+    /// <summary>Per le prove: il segnale di annullamento della chiusura in corso.</summary>
+    internal CancellationToken ShutdownToken => _shutdownCts.Token;
+
+    /// <summary>Per le prove: il timer del messaggio in basso e quello delle miniature.</summary>
+    internal bool NoticeTimerRunning => _noticeTimer.Enabled;
+
+    internal void ShowNoticeForTests(string text) => ShowNotice(text);
+
+    /// <summary>Per le prove: come WM_ENDSESSION di Windows (<paramref name="ending"/> falso = arresto annullato da un'altra app).</summary>
+    internal void EndSessionForTests(bool ending)
     {
-        _shutdownInProgress = true;
+        var m = Message.Create(Handle, NativeMethods.WM_ENDSESSION, ending ? (IntPtr)1 : IntPtr.Zero, IntPtr.Zero);
+        WndProc(ref m);
+    }
+
+    /// <summary>L'uscita è decisa: ferma ciò che va in rete e tutti i timer, e arma l'uscita forzata.</summary>
+    private void BeginShutdown(bool armWatchdog = true)
+    {
         _shutdownCts.Cancel();
-        _timersStoppedForShutdown.Clear();
-        foreach (var t in new[] { _syncDelay, _syncPoll, _edgeTimer, _reachTimer, _updateTimer, _idleTimer, _overviewTimer })
+        if (!_shutdownInProgress)
         {
-            // Quelli che giravano ripartono se la chiusura viene annullata (la panoramica e la sincronizzazione ritardata si riarmano da sole).
-            if (t.Enabled && !ReferenceEquals(t, _overviewTimer) && !ReferenceEquals(t, _syncDelay))
-                _timersStoppedForShutdown.Add(t);
-            t.Stop();
+            _shutdownInProgress = true;
+            _timersStoppedForShutdown.Clear();
+            foreach (var t in new[] { _syncDelay, _syncPoll, _edgeTimer, _reachTimer, _updateTimer, _idleTimer, _overviewTimer, _thumbTimer, _noticeTimer })
+            {
+                // Quelli che giravano ripartono se la chiusura viene annullata (la panoramica e la sincronizzazione ritardata si riarmano da sole).
+                if (t.Enabled && !ReferenceEquals(t, _overviewTimer) && !ReferenceEquals(t, _syncDelay))
+                    _timersStoppedForShutdown.Add(t);
+                t.Stop();
+            }
         }
         _shutdownWatchdog?.Stop();
-        var timeout = ShutdownTimeout ?? (_closingForUpdate ? ShutdownWatchdog.DefaultTimeout + TimeSpan.FromSeconds(12) : ShutdownWatchdog.DefaultTimeout);
+        _shutdownWatchdog = null;
+        // Con lo spegnimento di Windows l'arresto lo governa il sistema: niente uscita forzata a metà della sua attesa.
+        if (!armWatchdog)
+            return;
+        var timeout = ShutdownTimeout ?? (ClosingForInstall ? ShutdownWatchdog.DefaultTimeout + TimeSpan.FromSeconds(12) : ShutdownWatchdog.DefaultTimeout);
         _shutdownWatchdog = ShutdownWatchdog.Start(timeout, ForcedExit, ForcedKill, msg => AppLog.Default?.Warning(msg));
     }
 
@@ -624,9 +670,17 @@ public sealed partial class MainForm
         _sessionsWaitTimer?.Dispose();
         _sessionsWaitTimer = null;
         _sessionsDisconnected = false;
+        // Ciò che aveva deciso l'uscita non vale più, anche se l'annullamento arriva tardi.
+        _exitRequested = false;
+        _installNowRequested = _closingForUpdate = false;
+        if (!IsDisposed)
+            Enabled = true;
         if (!_shutdownInProgress)
             return;
         _shutdownInProgress = false;
+        foreach (var v in _closingViews)
+            v.CancelShutdown();
+        _closingViews = [];
         _shutdownCts.Dispose();
         _shutdownCts = new CancellationTokenSource();
         foreach (var t in _timersStoppedForShutdown)
@@ -634,13 +688,35 @@ public sealed partial class MainForm
         _timersStoppedForShutdown.Clear();
     }
 
+    /// <summary>Per le prove: la stessa strada di una chiusura vera, con gli argomenti scelti da chi prova.</summary>
+    internal void RaiseClosingForTests(FormClosingEventArgs e) => OnFormClosing(e);
+
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
-        _closeCancelledByUs = false;
-        base.OnFormClosing(e);
-        // Annullata da noi per aspettare le sessioni o per ignorare una chiusura annidata: la chiusura vera continua.
+        var savedByUs = _closeCancelledByUs;
+        var savedCommitted = _closeCommitted;
+        _closeCancelledByUs = _closeCommitted = false;
+        bool byUs, committed;
+        try
+        {
+            base.OnFormClosing(e);
+            byUs = _closeCancelledByUs;
+            committed = _closeCommitted;
+        }
+        finally
+        {
+            _closeCancelledByUs = savedByUs;
+            _closeCommitted = savedCommitted;
+        }
+        if (committed)
+        {
+            // Dopo il punto di non ritorno nessun altro gestore può annullare: si annulla solo se l'abbiamo deciso noi (attesa delle sessioni).
+            e.Cancel = byUs;
+            return;
+        }
+        // Annullata da noi per ignorare una chiusura annidata: la chiusura vera continua.
         // Annullata da altri (domanda, un altro gestore): si riparte da capo la prossima volta.
-        if (e.Cancel && !_closeCancelledByUs)
+        if (e.Cancel && !byUs)
             CancelShutdown();
     }
 
@@ -822,6 +898,9 @@ public sealed partial class MainForm
             else
                 UnregisterSessionHotkeys();
         }
+        // Arresto di Windows annullato (da un'altra app): OnFormClosing non viene richiamato, quindi si ripristina qui.
+        if (m.Msg == NativeMethods.WM_ENDSESSION && m.WParam == IntPtr.Zero)
+            CancelShutdown();
         if (m.Msg == NativeMethods.WM_HOTKEY)
         {
             int id = (int)m.WParam;

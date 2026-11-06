@@ -350,7 +350,19 @@ public sealed class RdpSessionView : UserControl
         Disconnect();
     }
 
+    /// <summary>La chiusura dell'app è stata annullata: la riconnessione automatica torna attiva.</summary>
+    public void CancelShutdown() => _closing = false;
+
     public void Disconnect()
+    {
+        bool neverStarted = _pendingConnect;
+        DisconnectCore();
+        // Mai partita (il controllo non era ancora pronto): nessun evento di disconnessione arriverà, quindi la si porta giù qui.
+        if (neverStarted && State == SessionState.Connecting)
+            SetState(SessionState.Disconnected, "Disconnessa.");
+    }
+
+    private void DisconnectCore()
     {
         _pendingConnect = false;
         _reconnectTimer.Stop();
@@ -905,7 +917,7 @@ public sealed class RdpSessionView : UserControl
     {
         if (_rdp is null)
             return;
-        Disconnect();
+        DisconnectCore();
         var old = _rdp;
         _rdp = null;
         _host.Controls.Remove(old);

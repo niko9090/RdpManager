@@ -11,7 +11,14 @@
   e ripartono se la chiusura viene annullata.
 - Se l'uscita forzata si blocca, parte comunque la terminazione del processo (su un thread separato).
 - «Aggiorna ora»: il programma di aggiornamento parte prima di disconnettere le sessioni; con «Installa alla chiusura» la copia di riserva è pronta prima che il conto alla rovescia parta.
-- Il profilo VPN si salva tramite un file temporaneo, come l'elenco delle connessioni.
+- Il profilo VPN si salva tramite un file temporaneo con nome univoco (cancellato se la scrittura fallisce), come l'elenco delle connessioni.
+- Spegnimento o riavvio di Windows: la chiusura non viene mai annullata (niente «RdpManager impedisce l'arresto»), alle sessioni connesse si chiede
+  solo la disconnessione senza eliminarne i controlli, e se un'altra app blocca l'arresto la finestra torna intatta.
+- Dopo l'inizio della chiusura non si può più annullarla (prima restavano veri i segnali di aggiornamento e uscita); una chiusura già annullata
+  prima di arrivare al programma (finestre possedute, convalida) non fa niente. Con «Installa alla chiusura» il programma di aggiornamento parte subito, con il tempo lungo.
+- Durante l'attesa della disconnessione la finestra è disattivata (niente sessioni nuove né comandi); si fermano anche i timer delle miniature e dei messaggi.
+- Le sessioni mai partite passano a «Disconnessa», e se la chiusura viene annullata la riconnessione automatica torna attiva.
+- Prove: le finestre dei test si chiudono sempre per intero (anche con sessioni «in corso»), così non restano aperte nel test dopo.
 
 ## 1.11.0
 

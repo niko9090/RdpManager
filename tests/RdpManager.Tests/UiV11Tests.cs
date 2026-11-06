@@ -57,7 +57,7 @@ public sealed class UiV11Tests(ITestOutputHelper output) : IDisposable
                 if (form.IsFullScreen)
                     form.ToggleFullScreen();
                 // Le sessioni «connesse» simulate farebbero chiedere conferma alla chiusura.
-                foreach (var v in form.AllViews.Where(v => v.State == SessionState.Connected))
+                foreach (var v in form.AllViews.Where(v => v.State is SessionState.Connected or SessionState.Connecting).ToList())
                     v.SetStateForTests(SessionState.Disconnected, "Disconnessa");
                 form.Close();
                 Pump(TimeSpan.FromMilliseconds(200));

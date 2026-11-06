@@ -38,6 +38,37 @@ public sealed class ShutdownHangTests
         new(new ConnectionStore(Path.Combine(Path.GetTempPath(), "RdpManagerShutdown-" + Guid.NewGuid().ToString("N") + ".json")),
             systemIntegration: false);
 
+    private static bool PumpUntil(Func<bool> condition, int ms)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (!condition() && sw.ElapsedMilliseconds < ms)
+        {
+            Application.DoEvents();
+            Thread.Sleep(15);
+        }
+        return condition();
+    }
+
+    /// <summary>Apre una sessione verso un host che non esiste e la porta in uno stato fermo (nessuna riconnessione in corso).</summary>
+    private static RdpSessionView OpenSettledView(MainForm form)
+    {
+        var connection = new RdpConnection { Name = "prova", Host = "host-inesistente.invalid", Username = "u", Password = "p" };
+        form.Document.Connections.Add(connection);
+        form.OpenSession(connection);
+        var view = form.AllViews.Single();
+        Assert.True(PumpUntil(() => view.State == SessionState.Disconnected, 30_000), "la sessione non si è fermata");
+        view.Disconnect(); // ferma la riconnessione automatica
+        return view;
+    }
+
+    private static void CloseCleanly(MainForm form)
+    {
+        foreach (var v in form.AllViews.ToList())
+            v.SetStateForTests(SessionState.Disconnected, "Disconnessa");
+        form.Close();
+        PumpUntil(() => form.IsDisposed, 2000);
+    }
+
     [Fact]
     public void BlockedClosing_ForcesExit_WhileUiThreadIsStillStuck()
     {
@@ -65,19 +96,179 @@ public sealed class ShutdownHangTests
     }
 
     [Fact]
-    public void CancelledClosing_DoesNotForceExit()
+    public void CancelAlreadySetOnEntry_HasNoEffects()
     {
         RunSta(() =>
         {
             using var exited = new ManualResetEventSlim();
             using var form = NewForm();
-            form.ShutdownTimeout = TimeSpan.FromMilliseconds(400);
+            form.ShutdownTimeout = TimeSpan.FromMilliseconds(300);
             form.ForcedExit = exited.Set;
             form.ForcedKill = () => { };
             form.Show();
+            var view = OpenSettledView(form);
+            view.SetStateForTests(SessionState.Connecting, "Connessione"); // se la chiusura la toccasse, cambierebbe
+            var token = form.ShutdownToken;
+
+            // WinForms preimposta e.Cancel (Validate fallita, finestre possedute che annullano): nessun effetto.
+            var e = new FormClosingEventArgs(CloseReason.UserClosing, cancel: true);
+            form.RaiseClosingForTests(e);
+
+            Assert.True(e.Cancel);
+            Assert.False(form.ShutdownInProgress);
+            Assert.False(token.IsCancellationRequested);
+            Assert.Equal(SessionState.Connecting, view.State);
+            Assert.False(exited.Wait(TimeSpan.FromSeconds(1)), "chiusura annullata ma il programma è uscito");
+            CloseCleanly(form);
+        });
+    }
+
+    [Fact]
+    public void CancelAfterPointOfNoReturn_IsIgnored()
+    {
+        RunSta(() =>
+        {
+            using var form = NewForm();
+            form.ForcedExit = () => { };
+            form.ForcedKill = () => { };
+            form.Show();
+            // Un gestore che arriva dopo quello del programma e prova ad annullare: troppo tardi, gli effetti sono già avvenuti.
             form.FormClosing += (_, e) => e.Cancel = true;
             form.Close();
-            Assert.False(exited.Wait(TimeSpan.FromSeconds(1.5)), "chiusura annullata ma il programma è uscito");
+            Assert.True(form.IsDisposed, "la chiusura è stata annullata dopo il punto di non ritorno");
+        });
+    }
+
+    [Fact]
+    public void NestedClose_DoesNotLeakItsFlagsIntoTheOuterClose()
+    {
+        RunSta(() =>
+        {
+            using var form = NewForm();
+            form.ForcedExit = () => { };
+            form.ForcedKill = () => { };
+            form.Show();
+            bool innerCancelled = false, entered = false;
+            form.FormClosing += (_, _) =>
+            {
+                if (entered)
+                    return;
+                entered = true;
+                // Chiusura annidata nel gestore della prima: viene annullata (da noi) ma non deve toccare quella esterna.
+                var inner = new FormClosingEventArgs(CloseReason.UserClosing, cancel: false);
+                form.RaiseClosingForTests(inner);
+                innerCancelled = inner.Cancel;
+            };
+            form.Close();
+            Assert.True(innerCancelled);
+            Assert.True(form.IsDisposed, "la chiusura annidata ha annullato quella esterna");
+        });
+    }
+
+    [Fact]
+    public void WindowsShutdown_NeverCancels_AndKeepsConnectedViewsAlive()
+    {
+        RunSta(() =>
+        {
+            using var exited = new ManualResetEventSlim();
+            using var form = NewForm();
+            form.ShutdownTimeout = TimeSpan.FromMilliseconds(300);
+            form.ForcedExit = exited.Set;
+            form.ForcedKill = () => { };
+            form.Show();
+            var view = OpenSettledView(form);
+            view.SetStateForTests(SessionState.Connected, "Connessa");
+            var token = form.ShutdownToken;
+            bool disposed = false;
+            view.Disposed += (_, _) => disposed = true;
+
+            var e = new FormClosingEventArgs(CloseReason.WindowsShutDown, cancel: false);
+            form.RaiseClosingForTests(e);
+
+            // Niente annullamento (Windows direbbe «RdpManager impedisce l'arresto») e niente eliminazione del controllo connesso.
+            Assert.False(e.Cancel);
+            Assert.False(disposed);
+            Assert.True(form.Enabled);
+            Assert.True(form.ShutdownInProgress);
+            Assert.True(token.IsCancellationRequested);
+            // Con Windows l'arresto lo governa il sistema: nessuna uscita forzata a metà.
+            Assert.False(exited.Wait(TimeSpan.FromSeconds(1)));
+
+            // Un'altra app blocca l'arresto: WM_ENDSESSION con wParam = 0 e la finestra torna com'era.
+            form.EndSessionForTests(ending: false);
+            Assert.False(form.ShutdownInProgress);
+            Assert.False(disposed);
+            Assert.False(form.ShutdownToken.IsCancellationRequested);
+            CloseCleanly(form);
+        });
+    }
+
+    [Fact]
+    public void WindowsShutdown_WhileQuestionOrWaitIsPending_DoesNotCancel()
+    {
+        RunSta(() =>
+        {
+            using var form = NewForm();
+            form.ForcedExit = () => { };
+            form.ForcedKill = () => { };
+            form.Show();
+            var view = OpenSettledView(form);
+            view.SetStateForTests(SessionState.Connecting, "Connessione"); // resta «in corso»: l'attesa parte
+
+            var first = new FormClosingEventArgs(CloseReason.UserClosing, cancel: false);
+            form.RaiseClosingForTests(first);
+            Assert.True(first.Cancel);
+            Assert.True(form.ShutdownInProgress);
+
+            var windows = new FormClosingEventArgs(CloseReason.WindowsShutDown, cancel: false);
+            form.RaiseClosingForTests(windows);
+            Assert.False(windows.Cancel);
+            form.EndSessionForTests(ending: false);
+            Assert.False(form.ShutdownInProgress);
+            Assert.True(form.Enabled);
+            CloseCleanly(form);
+        });
+    }
+
+    [Fact]
+    public void WaitingForSessions_BlocksNewSessions_AndCancelRestoresTheWindow()
+    {
+        RunSta(() =>
+        {
+            using var form = NewForm();
+            form.ForcedExit = () => { };
+            form.ForcedKill = () => { };
+            form.Show();
+            var view = OpenSettledView(form);
+            view.SetStateForTests(SessionState.Connecting, "Connessione");
+            var other = new RdpConnection { Name = "altra", Host = "altro.invalid", Username = "u", Password = "p" };
+            form.Document.Connections.Add(other);
+
+            var e = new FormClosingEventArgs(CloseReason.UserClosing, cancel: false);
+            form.RaiseClosingForTests(e);
+            Assert.True(e.Cancel); // attesa delle sessioni
+            Assert.False(form.Enabled);
+            form.OpenSession(other);
+            Assert.Single(form.AllViews);
+
+            form.RaiseClosingForTests(new FormClosingEventArgs(CloseReason.UserClosing, cancel: true));
+            Assert.True(form.Enabled);
+            form.OpenSession(other);
+            Assert.Equal(2, form.AllViews.Count());
+            CloseCleanly(form);
+        });
+    }
+
+    [Fact]
+    public void NeverStartedSession_GoesToDisconnected()
+    {
+        RunSta(() =>
+        {
+            using var view = new RdpSessionView(new RdpConnection { Name = "x", Host = "host-inesistente.invalid" });
+            view.Connect(); // senza finestra visibile il controllo non parte: resta in attesa
+            Assert.Equal(SessionState.Connecting, view.State);
+            view.Disconnect();
+            Assert.Equal(SessionState.Disconnected, view.State);
         });
     }
 
@@ -125,31 +316,37 @@ public sealed class ShutdownHangTests
             form.ForcedExit = () => { };
             form.ForcedKill = () => { };
             form.Show();
-            bool cancel = true;
-            form.FormClosing += (_, e) => e.Cancel = cancel;
-            form.Close();
+            var view = OpenSettledView(form);
+            view.SetStateForTests(SessionState.Connecting, "Connessione");
+            form.ShowNoticeForTests("messaggio");
+            Assert.True(form.NoticeTimerRunning);
+            var before = form.ShutdownToken;
+
+            form.RaiseClosingForTests(new FormClosingEventArgs(CloseReason.UserClosing, cancel: false)); // l'attesa parte
+            Assert.True(form.ShutdownInProgress);
+            Assert.True(before.IsCancellationRequested);
+            Assert.False(form.NoticeTimerRunning);
+
+            // Annullata da altri: timer e segnale tornano come prima.
+            form.RaiseClosingForTests(new FormClosingEventArgs(CloseReason.UserClosing, cancel: true));
             Assert.False(form.ShutdownInProgress);
-            cancel = false;
-            form.Close(); // una seconda chiusura riesce
-            Assert.True(form.IsDisposed);
+            Assert.True(form.NoticeTimerRunning);
+            Assert.False(form.ShutdownToken.IsCancellationRequested);
+            Assert.NotEqual(before, form.ShutdownToken);
+            CloseCleanly(form);
         });
     }
 
     [Fact]
     public void Watchdog_Kills_EvenIfExitNeverReturns()
     {
-        var old = ShutdownWatchdog.KillDelay;
-        ShutdownWatchdog.KillDelay = TimeSpan.FromMilliseconds(100);
-        try
-        {
-            using var hang = new ManualResetEventSlim();
-            using var killed = new ManualResetEventSlim();
-            var dog = ShutdownWatchdog.Start(TimeSpan.FromMilliseconds(100), () => hang.Wait(TimeSpan.FromSeconds(30)), killed.Set);
-            Assert.True(killed.Wait(TimeSpan.FromSeconds(5)), "l'uscita è rimasta appesa e la terminazione non è partita");
-            Assert.True(dog.Fired);
-            hang.Set();
-        }
-        finally { ShutdownWatchdog.KillDelay = old; }
+        using var hang = new ManualResetEventSlim();
+        using var killed = new ManualResetEventSlim();
+        var dog = ShutdownWatchdog.Start(TimeSpan.FromMilliseconds(100), () => hang.Wait(TimeSpan.FromSeconds(30)), killed.Set,
+            killDelay: TimeSpan.FromMilliseconds(100));
+        Assert.True(killed.Wait(TimeSpan.FromSeconds(5)), "l'uscita è rimasta appesa e la terminazione non è partita");
+        Assert.True(dog.Fired);
+        hang.Set();
     }
 
     [Fact]
@@ -170,7 +367,21 @@ public sealed class ShutdownHangTests
             new VpnProfile { Address = "10.0.0.2/32" }.Save(path);
             new VpnProfile { Address = "10.0.0.3/32" }.Save(path);
             Assert.Equal("10.0.0.3/32", VpnProfile.Load(path).Address);
-            Assert.False(File.Exists(path + ".tmp"));
+            Assert.Empty(Directory.GetFiles(dir, "*.tmp"));
+        }
+        finally { try { Directory.Delete(dir, recursive: true); } catch (IOException) { } }
+    }
+
+    [Fact]
+    public void VpnProfile_Save_FailureLeavesNoTempFile()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "RdpManagerVpnSave-" + Guid.NewGuid().ToString("N"));
+        var path = Path.Combine(dir, "vpn.json");
+        try
+        {
+            Directory.CreateDirectory(path); // il file di destinazione è una cartella: il Move fallisce
+            Assert.ThrowsAny<Exception>(() => new VpnProfile { Address = "10.0.0.2/32" }.Save(path));
+            Assert.Empty(Directory.GetFiles(dir, "*.tmp"));
         }
         finally { try { Directory.Delete(dir, recursive: true); } catch (IOException) { } }
     }

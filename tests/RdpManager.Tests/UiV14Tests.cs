@@ -62,7 +62,7 @@ public sealed class UiV14Tests : IDisposable
                 form.LeaveSplit();
             if (form.IsFullScreen)
                 form.ToggleFullScreen();
-            foreach (var v in form.AllViews.Where(v => v.State == SessionState.Connected))
+            foreach (var v in form.AllViews.Where(v => v.State is SessionState.Connected or SessionState.Connecting).ToList())
                 v.SetStateForTests(SessionState.Disconnected, "Disconnessa");
             form.ExitApp();
         }

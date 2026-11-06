@@ -99,7 +99,11 @@ public sealed class CertificateWarningTests : IDisposable
             Assert.Contains("richiesta interattiva è disattivata", view.StateText);
             Assert.Equal(0, view.AuthenticationWarningCount);
             Assert.True(form.Enabled && WindowAttentionProbe.IsEnabled(form));
+            // Chiusura pulita: una sessione ancora «in corso» (riconnessione) farebbe annullare Close() e lascerebbe finestre aperte.
+            foreach (var v in form.AllViews.Where(v => v.State is SessionState.Connected or SessionState.Connecting).ToList())
+                v.SetStateForTests(SessionState.Disconnected, "Disconnessa");
             form.Close();
+            PumpUntil(() => form.IsDisposed, TimeSpan.FromSeconds(2));
         });
         Assert.Empty(watcher.Seen);
     }
@@ -148,7 +152,11 @@ public sealed class CertificateWarningTests : IDisposable
             Log($"primo piano: {form.LastAttentionResult}, avviso in primo piano={dialog.ForegroundIsDialog}");
             if (form.LastAttentionResult == WindowAttention.Result.Foreground)
                 Assert.True(dialog.ForegroundIsDialog || WindowAttentionProbe.ForegroundIsOurs());
+            // Chiusura pulita: una sessione ancora «in corso» (riconnessione) farebbe annullare Close() e lascerebbe finestre aperte.
+            foreach (var v in form.AllViews.Where(v => v.State is SessionState.Connected or SessionState.Connecting).ToList())
+                v.SetStateForTests(SessionState.Disconnected, "Disconnessa");
             form.Close();
+            PumpUntil(() => form.IsDisposed, TimeSpan.FromSeconds(2));
         });
         Assert.Equal([RdpSessionView.AuthenticationWarningText], statesDuringWarning);
     }
@@ -176,7 +184,11 @@ public sealed class CertificateWarningTests : IDisposable
             Assert.True(dialog.OnScreen, $"l'avviso deve stare dentro lo schermo, era in {dialog.Bounds}");
             Assert.False(dialog.OwnerMinimized);
             Assert.Contains(dialog.Owner, new[] { form.Handle, detached.Handle });
+            // Chiusura pulita: una sessione ancora «in corso» (riconnessione) farebbe annullare Close() e lascerebbe finestre aperte.
+            foreach (var v in form.AllViews.Where(v => v.State is SessionState.Connected or SessionState.Connecting).ToList())
+                v.SetStateForTests(SessionState.Disconnected, "Disconnessa");
             form.Close();
+            PumpUntil(() => form.IsDisposed, TimeSpan.FromSeconds(2));
         });
     }
 
