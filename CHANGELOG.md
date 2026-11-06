@@ -58,7 +58,7 @@
   e toglie solo i propri PC (`GET`/`DELETE /v1/vpn/devices`). Niente più `aggiungi-pc.sh` sul Synology.
 - Nuovo `POST /v1/register`: registrazione dall'app senza chiave di amministrazione (aperta o con codice di registrazione).
 - RdpManager: **Registrati** nella finestra dell'account; dopo accesso o registrazione, se la VPN non ha profilo, crea le
-  chiavi, chiede il profilo al server e accende il tunnel da solo. Indirizzo predefinito del server: `https://syncnetpro.com:8443`
+  chiavi, chiede il profilo al server e accende il tunnel da solo. Nessun indirizzo predefinito: lo scrive l'utente (esempio: `https://vpn.example.com:8443`)
   (proxy inverso HTTPS di DSM); la messa in opera è in `server/rdpm-sync/LEGGIMI.md`.
 
 ## 1.8.0
@@ -103,7 +103,7 @@ Versione che riunisce VPN WireGuard integrata, account con sincronizzazione, gru
 
 **VPN WireGuard integrata (al posto di Tailscale)**
 - «Strumenti → VPN (WireGuard)…»: crea le chiavi (la privata resta cifrata con DPAPI), mostra la chiave pubblica e il
-  frammento `[Peer]` da aggiungere al server (syncnetpro.com:51820, rete 10.66.0.0/24), accende e spegne il tunnel.
+  frammento `[Peer]` da aggiungere al server (vpn.example.com:51820, rete 10.66.0.0/24), accende e spegne il tunnel.
 - Il tunnel usa direttamente il driver **wireguard-nt**: `wireguard.dll` ufficiale (versione 1.1, firmata WireGuard LLC) è
   inclusa nel programma e nell'installer, senza altre DLL né installazioni separate (`tunnel.dll` non serve più).
   Un servizio Windows fornito da RdpManager.exe stesso tiene su il tunnel, con indirizzo e rotte; si installa con

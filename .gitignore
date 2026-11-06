@@ -7,3 +7,8 @@ artifacts/
 TestResults/
 .sierradeck/
 .claude/
+
+# Configurazione locale: dati personali (dominio, NAS, rete). Mai su GitHub; il modello e config/locale.example.json
+config/locale.json
+server/rdpm-sync/.env
+server/caddy-synology/.env

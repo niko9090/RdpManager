@@ -14,7 +14,7 @@ public sealed class SyncState
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
-    public string ServerUrl { get; set; } = SyncHttp.PublicServerUrl;
+    public string ServerUrl { get; set; } = "";
     public string Username { get; set; } = "";
     public string? ProtectedPassword { get; set; }
     public string? ProtectedToken { get; set; }

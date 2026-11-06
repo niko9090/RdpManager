@@ -26,12 +26,12 @@ chiave pubblica. Il contratto per chi scrive il cliente è in `docs/sync-server-
   i peer aggiunti a mano con `aggiungi-pc.sh` restano dove sono e i loro indirizzi non vengono riassegnati.
   All'avvio il server riallinea `wg0.conf` e il tunnel al suo database (i peer di account eliminati spariscono).
 - **I PC senza VPN** (la prima registrazione) non raggiungono `10.66.0.1`: arrivano da Internet su **HTTPS**,
-  attraverso il proxy Caddy (`caddy-rdpm`, porta 8443) che inoltra a `http://localhost:8787`. Il default del cliente è
-  `https://syncnetpro.com:8443`.
+  attraverso il proxy Caddy (`caddy-rdpm`, porta 8443) che inoltra a `http://localhost:8787`. Nell'app si scrive
+  `https://<tuo-dominio>:8443` (il dominio di `config/locale.json`).
 
 ## Messa in opera sul Synology (automatica)
 
-Dal PC, con l'alias SSH `synology` (utente con `sudo` senza password) e DNS `syncnetpro.com` verso l'IP di casa:
+Dal PC, con `config/locale.json` compilato (vedi «Configurazione locale» in fondo: alias SSH del NAS con `sudo` senza password, dominio con DNS verso l'IP di casa):
 
 ```powershell
 pwsh server/deploy-synology.ps1
@@ -51,7 +51,7 @@ Lo script (ripetibile, si può rilanciare per aggiornare) fa tutto da solo:
   risponde 502 e nessuno può accedere). Lo script aspetta Docker e `/dev/net/tun`, li riaccende e controlla
   `/health`; scrive in `/var/log/rdpm-avvio.log`. A mano: `sudo sh /usr/local/etc/rc.d/S99rdpm-avvio.sh adesso`;
 - **HTTPS pubblico**: `caddy-rdpm` ascolta su **8443** (host) e inoltra a `127.0.0.1:8787`, con il certificato
-  Let's Encrypt di `syncnetpro.com` che DSM già gestisce e rinnova (cartella in `/usr/syno/etc/certificate/_archive`,
+  Let's Encrypt del tuo dominio che DSM già gestisce e rinnova (cartella in `/usr/syno/etc/certificate/_archive`,
   montata in sola lettura; Caddy lo rilegge ogni 12 ore). Le porte 80/443 restano a DSM, nessuna regola nel proxy
   inverso di DSM;
 - apre sul router, via **UPnP**, TCP 8443 e UDP 51820 verso il Synology (se il router non supporta UPnP lo script
@@ -60,12 +60,12 @@ Lo script (ripetibile, si può rilanciare per aggiornare) fa tutto da solo:
   `REGISTRATION_CODE=...`: è il codice che l'app chiede una volta alla registrazione (si rilegge anche in
   `/volume1/docker/rdpm-sync/.env`). Non va nel repository.
 
-Prova da fuori LAN: `curl https://syncnetpro.com:8443/health`. Con un'altra porta cambia anche
+Prova da fuori LAN: `curl https://<tuo-dominio>:8443/health`. Con un'altra porta cambia anche
 `SyncHttp.PublicServerUrl` nel client (nella finestra dell'account l'indirizzo si può scrivere a mano).
 Prova completa: dall'app, *Strumenti -> Account e sincronizzazione -> Registrati*; a fine registrazione la VPN è
 accesa e `sudo /usr/local/bin/docker exec rdpm-sync wg show wg0` mostra il nuovo peer con un «latest handshake».
 
-Impostazioni facoltative in `.env`: `RDPM_VPN_ENDPOINT` (default `syncnetpro.com:51820`), `RDPM_VPN_DNS`,
+Impostazioni facoltative in `.env`: `RDPM_VPN_ENDPOINT` (il deploy lo scrive dal dominio di `config/locale.json`), `RDPM_VPN_DNS`,
 `RDPM_SYNC_OPEN_REGISTRATION=1` (registrazione libera, sconsigliata: chi si registra entra nella VPN).
 
 Se il contenitore `wireguard` viene ricreato, `rdpm-sync` perde rete e socket: in `/volume1/docker/rdpm-sync` lancia
@@ -116,7 +116,7 @@ subito).
 In alternativa, con la chiave di amministrazione via HTTP (serve il segreto derivato dalla password, cioè lo fa il
 cliente: vedi il contratto, `POST /v1/admin/accounts`).
 
-In RdpManager l'indirizzo di default è `https://syncnetpro.com:8443`; con la VPN accesa vale anche
+In RdpManager l'indirizzo del server va scritto (nessun valore predefinito); con la VPN accesa vale anche
 `http://10.66.0.1:8787`. Più PC con lo stesso utente e la stessa password vedono gli stessi dati.
 
 ## Impostazioni (variabili d'ambiente)
@@ -133,7 +133,7 @@ In RdpManager l'indirizzo di default è `https://syncnetpro.com:8443`; con la VP
 | `RDPM_SYNC_REGISTRATION_CODE` | vuota | se impostato, la registrazione richiede questo codice (attiva anche senza `OPEN_REGISTRATION`) |
 | `RDPM_VPN_CONF` | vuota (nel container `/vpn/wg0.conf`) | percorso di `wg0.conf`; vuota = VPN automatica spenta |
 | `RDPM_VPN_SERVER_PUBLIC_KEY` | letta da `server.pub` accanto a `wg0.conf` | chiave pubblica del server WireGuard |
-| `RDPM_VPN_ENDPOINT` | `syncnetpro.com:51820` | endpoint scritto nei profili |
+| `RDPM_VPN_ENDPOINT` | vuota (nessun default) | endpoint scritto nei profili |
 | `RDPM_VPN_DNS` | vuota | DNS scritto nei profili |
 | `RDPM_VPN_INTERFACE`, `RDPM_VPN_WG` | `wg0`, `wg` | interfaccia e comando `wg` |
 | `RDPM_VPN_MAX_DEVICES` | `20` | PC per account |
@@ -145,3 +145,9 @@ dotnet run --project server/rdpm-sync
 $env:RDPM_SYNC_ADMIN_KEY = "una-frase-casuale-lunga"   # PowerShell
 dotnet run --project server/rdpm-sync -- crea-account prova
 ```
+
+## Configurazione locale
+
+Dominio, alias SSH del NAS e rete locale stanno in `config/locale.json` (radice del progetto), che non si pubblica: copia
+`config/locale.example.json` e compilalo. `deploy-synology.ps1` lo legge e passa i valori allo script sul NAS; il `.env`
+sul NAS (da `.env.example`) è escluso dal repository. Nel codice non c'è nessun indirizzo predefinito.

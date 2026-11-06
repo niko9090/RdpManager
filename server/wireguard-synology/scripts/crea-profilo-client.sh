@@ -6,7 +6,7 @@
 set -eu
 
 DIR="${WG_DIR:-/config/wg_confs}"
-ENDPOINT="${WG_ENDPOINT:-syncnetpro.com:51820}"
+ENDPOINT="${WG_ENDPOINT:?imposta WG_ENDPOINT (nome-pubblico:porta, per esempio vpn.example.com:51820)}"
 [ $# -ge 1 ] || { echo "Uso: $0 NOME [10.66.0.N]" >&2; exit 1; }
 NOME="$1"; IP="${2:-}"
 [ -f "$DIR/server.pub" ] || { echo "Manca $DIR/server.pub: lancia prima prima-generazione.sh" >&2; exit 1; }

@@ -4,9 +4,9 @@
 Address = 10.66.0.1/24
 ListenPort = 51820
 PrivateKey = __CHIAVE_PRIVATA__
-# Inoltro tra i PC della VPN e verso la LAN 192.168.1.0/24 (NAT in uscita su eth0).
+# Inoltro tra i PC della VPN e verso la tua rete locale (__RETE_LAN__, da config/locale.json; NAT in uscita su eth0).
 # Se non serve raggiungere PC della LAN senza client, togli le due righe PostUp/PostDown.
-PostUp = iptables-legacy -A FORWARD -i %i -j ACCEPT; iptables-legacy -A FORWARD -o %i -j ACCEPT; iptables-legacy -t nat -A POSTROUTING -s 10.66.0.0/24 -d 192.168.1.0/24 -o eth0 -j MASQUERADE
-PostDown = iptables-legacy -D FORWARD -i %i -j ACCEPT; iptables-legacy -D FORWARD -o %i -j ACCEPT; iptables-legacy -t nat -D POSTROUTING -s 10.66.0.0/24 -d 192.168.1.0/24 -o eth0 -j MASQUERADE
+PostUp = iptables-legacy -A FORWARD -i %i -j ACCEPT; iptables-legacy -A FORWARD -o %i -j ACCEPT; iptables-legacy -t nat -A POSTROUTING -s 10.66.0.0/24 -d __RETE_LAN__ -o eth0 -j MASQUERADE
+PostDown = iptables-legacy -D FORWARD -i %i -j ACCEPT; iptables-legacy -D FORWARD -o %i -j ACCEPT; iptables-legacy -t nat -D POSTROUTING -s 10.66.0.0/24 -d __RETE_LAN__ -o eth0 -j MASQUERADE
 
 # I [Peer] sono aggiunti da scripts/aggiungi-pc.sh (ogni blocco inizia con "# PC: nome").

@@ -38,7 +38,8 @@ public sealed class SyncOptions
 
     /// <summary>Chiave pubblica del server; se vuota si legge server.pub accanto a wg0.conf.</summary>
     public string VpnServerPublicKey { get; set; } = "";
-    public string VpnEndpoint { get; set; } = "syncnetpro.com:51820";
+    /// <summary>Endpoint pubblico del server WireGuard (nome:porta) scritto nei profili; senza, la VPN automatica resta spenta.</summary>
+    public string VpnEndpoint { get; set; } = "";
     public string VpnDns { get; set; } = "";
     public int MaxDevicesPerAccount { get; set; } = 20;
 

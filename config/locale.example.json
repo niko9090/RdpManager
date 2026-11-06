@@ -1,0 +1,24 @@
+{
+  "_commento": "Modello della configurazione locale. Copialo in config/locale.json (che NON si pubblica: e' nel .gitignore) e metti i tuoi valori. Le chiavi che cominciano con _ sono commenti e vengono ignorate.",
+
+  "_dominio": "Nome pubblico del tuo server (DNS verso l'IP di casa/ufficio). Serve per il certificato HTTPS, per l'endpoint VPN e per l'indirizzo che si scrive nell'app.",
+  "dominio": "vpn.example.com",
+
+  "_portaHttps": "Porta pubblica del proxy HTTPS davanti a rdpm-sync (l'app si collega a https://dominio:portaHttps).",
+  "portaHttps": 8443,
+
+  "_portaVpn": "Porta UDP del server WireGuard.",
+  "portaVpn": 51820,
+
+  "_sshAlias": "Alias SSH del NAS (voce Host in ~/.ssh/config) usato dagli script di deploy e di verifica. L'utente deve avere sudo senza password.",
+  "sshAlias": "nas",
+
+  "_sshPorta": "Porta SSH del NAS (22 se non l'hai cambiata).",
+  "sshPorta": 22,
+
+  "_cartellaNas": "Cartella del NAS dove vivono i contenitori (wireguard, rdpm-sync, caddy).",
+  "cartellaNas": "/volume1/docker",
+
+  "_reteLan": "Rete locale del NAS (CIDR) raggiungibile dai PC in VPN; vuota = nessun inoltro verso la LAN.",
+  "reteLan": "192.0.2.0/24"
+}

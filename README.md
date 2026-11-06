@@ -697,8 +697,8 @@ non cerca niente finché non premi un pulsante.
 ### Account di sincronizzazione (stesso login = stesse cose)
 
 **Strumenti › Account e sincronizzazione…** collega questo PC a un account del server `rdpm-sync` (vedi
-`server/rdpm-sync/LEGGIMI.md` per avviarlo sul Synology). Si indicano l'indirizzo (predefinito
-`https://syncnetpro.com:8443`; con la VPN accesa vale anche `http://10.66.0.1:8787`), il nome utente e la password, poi **Accedi**,
+`server/rdpm-sync/LEGGIMI.md` per avviarlo sul Synology). Si indica l'indirizzo del proprio server (nessun valore predefinito; vedi «Configurazione locale»; esempio
+`https://vpn.example.com:8443`), il nome utente e la password, poi **Accedi**,
 oppure **Registrati** se l'account non c'è ancora (il server può chiedere un codice di registrazione). Sugli altri PC
 basta lo stesso login: connessioni, cartelle, profili di credenziali e testi rapidi sono gli stessi.
 
@@ -903,6 +903,23 @@ Nell'app:
 
 Quando il fuoco è dentro una sessione remota, tutte le altre combinazioni vengono inviate al PC
 remoto (così Ctrl+N, F5 ecc. funzionano nelle app remote).
+
+## Configurazione locale (dominio, NAS, rete)
+
+Il repository è pubblico e non contiene dati personali: nessun dominio, indirizzo o nome del tuo server è scritto nel codice.
+Ognuno compila la propria configurazione.
+
+1. Copia `config/locale.example.json` in `config/locale.json` (il file vero è nel `.gitignore`: non finisce mai su GitHub)
+   e scrivi i tuoi valori: dominio pubblico, alias SSH e porta del NAS, cartella dei contenitori, rete locale.
+   Il modello ha i commenti in italiano.
+2. `server/deploy-synology.ps1` e `verifica/vpn-registrazione-e2e.ps1` leggono da lì (con `server/config-locale.ps1`):
+   niente valori scritti negli script. Il deploy compila da solo anche `server/rdpm-sync/.env` sul NAS.
+   Se lo scrivi a mano, parti da `server/rdpm-sync/.env.example` (una volta copiato in `.env` è escluso dal repository).
+3. Nell'app l'indirizzo del server non ha un valore predefinito: in **Strumenti › Account e sincronizzazione…** si scrive
+   l'indirizzo del proprio server (per esempio `https://vpn.example.com:8443`); finché è vuoto l'app lo chiede.
+   L'endpoint VPN arriva dal server nel profilo automatico, oppure lo scrivi nella finestra della VPN.
+
+I valori `vpn.example.com` e `192.0.2.x` negli esempi sono segnaposto (domini e reti riservati alla documentazione).
 
 ## Dove sono salvati i dati
 

@@ -12,7 +12,7 @@ public class VpnProvisioningTests
     private static string GrantJson(string address = "10.66.0.5/32", string dns = "", string? serverKey = null) =>
         JsonSerializer.Serialize(new
         {
-            name = "Ufficio", address, serverPublicKey = serverKey ?? ServerKey, endpoint = "syncnetpro.com:51820",
+            name = "Ufficio", address, serverPublicKey = serverKey ?? ServerKey, endpoint = "vpn.example.com:51820",
             allowedIPs = "10.66.0.0/24", dns, persistentKeepalive = 25,
         });
 
@@ -27,7 +27,7 @@ public class VpnProvisioningTests
 
         Assert.Equal("10.66.0.5/32", profile.Address);
         Assert.Equal(ServerKey, profile.ServerPublicKey);
-        Assert.Equal("syncnetpro.com:51820", profile.Endpoint);
+        Assert.Equal("vpn.example.com:51820", profile.Endpoint);
         Assert.Equal("Ufficio", profile.PcName);
         Assert.False(VpnProvisioning.NeedsProvisioning(profile));
         Assert.Equal(pub, profile.PublicKey); // la chiave del PC non cambia
@@ -38,7 +38,7 @@ public class VpnProvisioningTests
         Assert.Contains("Address = 10.66.0.5/32", conf);
         Assert.Contains("DNS = 10.66.0.1", conf);
         Assert.Contains("PublicKey = " + ServerKey, conf);
-        Assert.Contains("Endpoint = syncnetpro.com:51820", conf);
+        Assert.Contains("Endpoint = vpn.example.com:51820", conf);
         Assert.Contains("AllowedIPs = 10.66.0.0/24", conf);
         Assert.Contains("PersistentKeepalive = 25", conf);
     }
@@ -125,6 +125,7 @@ public class VpnProvisioningEndToEndTests : IAsyncLifetime
             ServerHashIterations = 1000,
             OpenRegistration = true,
             VpnServerPublicKey = ServerKey,
+            VpnEndpoint = "vpn.example.com:51820",
         };
         _app = RdpmSync.SyncApp.Build(options, null, "http://127.0.0.1:0", _wg);
         _app.Start();

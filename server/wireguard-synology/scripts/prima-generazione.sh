@@ -18,7 +18,12 @@ umask 077
 wg genkey > "$DIR/server.key"
 wg pubkey < "$DIR/server.key" > "$DIR/server.pub"
 CHIAVE=$(cat "$DIR/server.key")
-sed "s|__CHIAVE_PRIVATA__|$CHIAVE|" "$MODELLO" > "$CONF"
+# WG_LAN = rete locale da raggiungere dalla VPN (CIDR); vuota = niente inoltro verso la LAN (righe PostUp/PostDown tolte)
+if [ -n "${WG_LAN:-}" ]; then
+  sed -e "s|__CHIAVE_PRIVATA__|$CHIAVE|" -e "s|__RETE_LAN__|$WG_LAN|g" "$MODELLO" > "$CONF"
+else
+  sed -e "s|__CHIAVE_PRIVATA__|$CHIAVE|" -e '/^PostUp\|^PostDown/d' "$MODELLO" > "$CONF"
+fi
 
 echo "Fatto. Chiave pubblica del server:"
 cat "$DIR/server.pub"

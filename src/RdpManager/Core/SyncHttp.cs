@@ -33,15 +33,6 @@ public sealed record PutOutcome(bool Conflict, string? Etag);
 /// <summary>Chiamate HTTP del contratto v1 (docs/sync-server-api.md), senza logica di sincronizzazione.</summary>
 public sealed class SyncHttp : IDisposable
 {
-    /// <summary>Indirizzo predefinito: il server sul Synology, visto dalla VPN WireGuard (porta 8787 di rdpm-sync).</summary>
-    public const string DefaultServerUrl = "http://10.66.0.1:8787";
-
-    /// <summary>
-    /// Indirizzo pubblico del server (HTTPS, dietro il proxy inverso del Synology): serve a chi non ha ancora la VPN,
-    /// cioè alla registrazione e alla richiesta del primo profilo VPN.
-    /// </summary>
-    public const string PublicServerUrl = "https://syncnetpro.com:8443";
-
     private readonly HttpClient _http;
 
     public SyncHttp(string baseUrl, TimeSpan? timeout = null)
@@ -58,7 +49,7 @@ public sealed class SyncHttp : IDisposable
         if (!text.Contains("://", StringComparison.Ordinal))
             text = "http://" + text;
         if (!Uri.TryCreate(text, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https") || uri.Host.Length == 0)
-            throw new ArgumentException("L'indirizzo del server non è valido (esempio: http://10.66.0.1:8787).");
+            throw new ArgumentException("L'indirizzo del server non è valido (esempio: https://vpn.example.com:8443).");
         return uri.GetLeftPart(UriPartial.Path).TrimEnd('/') + "/";
     }
 

@@ -51,7 +51,7 @@ internal sealed class SyncAccountDialog : TouchForm
                    + "se perdi la password, non si recuperano.",
             AutoSize = true,
         });
-        Row("Indirizzo del server", _server);
+        Row("Indirizzo del server (quello del tuo server, per esempio https://vpn.example.com:8443)", _server);
         Row("Nome utente", _user);
         layout.Controls.Add(_passwordLabel);
         layout.Controls.Add(_password);

@@ -11,7 +11,7 @@ public class WireGuardServerPackageTests
     private const string Port = "51820";
     private const string Network = "10.66.0.0/24";
     private const string ServerAddress = "10.66.0.1/24";
-    private const string Endpoint = "syncnetpro.com";
+    private const string Endpoint = "vpn.example.com";
 
     private static string PackageDir()
     {
@@ -67,7 +67,7 @@ public class WireGuardServerPackageTests
         Assert.Contains(Port + "/UDP", text);
         Assert.Contains(Network, text);
         Assert.Contains(Endpoint, text);
-        Assert.Contains("192.168.1.199", text);
+        Assert.Contains("192.0.2.10", text);
         Assert.Contains("wireguard-nt", text);
         Assert.Contains("wireguard.dll", text);
         Assert.Contains("src/RdpManager/Vpn/dll/amd64/", text);
@@ -77,7 +77,8 @@ public class WireGuardServerPackageTests
     public void Add_script_uses_endpoint_syncconf_and_lf_endings()
     {
         var add = Read("scripts", "aggiungi-pc.sh");
-        Assert.Contains(Endpoint + ":" + Port, add);
+        Assert.Contains("WG_ENDPOINT", add);
+        Assert.DoesNotContain(Endpoint, add);
         Assert.Contains("wg syncconf", add);
         Assert.Contains("10.66.0.", add);
         foreach (var name in new[] { "aggiungi-pc.sh", "elenca-pc.sh", "rimuovi-pc.sh", "prima-generazione.sh" })

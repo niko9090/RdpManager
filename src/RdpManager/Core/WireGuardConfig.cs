@@ -4,10 +4,11 @@ using System.Text;
 
 namespace RdpManager.Core;
 
-/// <summary>Valori fissi della VPN di RdpManager: rete a stella 10.66.0.0/24, server sul Synology.</summary>
+/// <summary>Valori fissi della VPN di RdpManager: rete a stella 10.66.0.0/24, server sul NAS (valori di partenza: il server può usarne altri).</summary>
 public static class VpnDefaults
 {
-    public const string DefaultEndpoint = "syncnetpro.com:51820";
+    /// <summary>Nessun endpoint predefinito: lo comunica il proprio server (profilo automatico) o lo scrive l'utente.</summary>
+    public const string DefaultEndpoint = "";
     public const string Network = "10.66.0.0/24";
     public const string ServerAddress = "10.66.0.1";
     public const int Keepalive = 25;
@@ -42,7 +43,7 @@ public sealed record WireGuardConfig
         if (!WireGuardKeys.IsValidKey(PeerPublicKey))
             errors.Add("La chiave pubblica del server non è valida (32 byte in base64).");
         if (!TryParseEndpoint(Endpoint, out _, out _))
-            errors.Add("L'endpoint deve essere nome-o-IP:porta, per esempio syncnetpro.com:51820.");
+            errors.Add("L'endpoint deve essere nome-o-IP:porta, per esempio vpn.example.com:51820.");
         var allowed = AllowedIPs.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
         if (allowed.Length == 0 || !allowed.All(a => TryParseCidr(a, out _, out _)))
             errors.Add("AllowedIPs deve contenere reti IPv4 con prefisso (per esempio 10.66.0.0/24).");
