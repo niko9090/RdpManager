@@ -1,6 +1,6 @@
 # Novità di RdpManager
 
-## Non rilasciato
+## 1.10.0
 
 **Finestra principale più comoda col dito (modalità tocco)**
 - Nuova **modalità tocco**: automatica se il PC ha uno schermo touch, oppure da *Impostazioni › Generale › Modalità tocco*
