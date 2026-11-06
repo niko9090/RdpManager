@@ -39,6 +39,7 @@ DefaultDirName={autopf}\RdpManager VPN
 DisableDirPage=yes
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
+SetupIconFile=..\src\RdpManager\app.ico
 UninstallDisplayIcon={app}\{#AppExe}
 UninstallDisplayName={#AppName}
 ArchitecturesAllowed=x64compatible
@@ -57,7 +58,7 @@ Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 Source: "{#ProfilePath}"; DestDir: "{app}"; DestName: "vpn.conf"; Flags: ignoreversion
 
 [Icons]
-Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"
+Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"; IconFilename: "{app}\{#AppExe}"
 
 [Registry]
 ; Avvio automatico dell'icona all'accesso (stesso nome e formato di AutoStartManager); si toglie anche dal menu dell'icona.

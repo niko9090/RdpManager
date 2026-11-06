@@ -21,6 +21,8 @@
     <Description>Client VPN WireGuard per i PC dei clienti: servizio Windows più icona nell'area di notifica</Description>
     <NeutralLanguage>it-IT</NeutralLanguage>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Stessa icona di RdpManager (collegamento nel menu Start, elenco programmi). -->
+    <ApplicationIcon>..\RdpManager\app.ico</ApplicationIcon>
   </PropertyGroup>
 
   <!--
