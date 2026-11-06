@@ -144,8 +144,7 @@ internal sealed class SyncAccountDialog : TouchForm
             var outcome = await _syncNow();
             SetBusy(false);
             if (!outcome.Ok)
-                _status.Text += "
-" + outcome.Message;
+                _status.Text += "\n" + outcome.Message;
         }
         catch (Exception ex) when (ex is SyncServerException or SyncUnreachableException or ArgumentException)
         {

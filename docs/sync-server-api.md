@@ -163,7 +163,7 @@ dell'account con «Importa configurazione…»):
 }
 ```
 
-Campi tutti facoltativi (almeno uno); chiavi che cominciano con `_` = commenti; `server` senza schema vale `http://`.
+Campi tutti facoltativi (almeno uno); chiavi che cominciano con `_` = commenti; `server` senza schema vale `https://`.
 `codiceRegistrazione` è il valore di `RDPM_SYNC_REGISTRATION_CODE`. Sul server di chi gestisce, `server/crea-config-client.ps1`
 lo genera da `config/locale.json`.
 

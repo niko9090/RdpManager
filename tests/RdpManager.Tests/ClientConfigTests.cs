@@ -35,7 +35,7 @@ public class ClientConfigTests : IDisposable
     public void File_valido_si_importa()
     {
         var cfg = ClientConfig.Load(Write(_dir, Valid));
-        Assert.Equal("https://vpn.example.com:8443", cfg.ServerUrl);
+        Assert.Equal("https://vpn.example.com:8443/", cfg.ServerUrl);
         Assert.Equal("codice-di-prova", cfg.RegistrationCode);
         Assert.Equal("vpn.example.com:51820", cfg.VpnEndpoint);
     }
@@ -76,10 +76,10 @@ public class ClientConfigTests : IDisposable
         Assert.Null(ClientConfig.FindDefault(exe, data));
 
         Write(data, """{ "server": "https://dati.example.com" }""");
-        Assert.Equal("https://dati.example.com", ClientConfig.FindDefault(exe, data)!.ServerUrl);
+        Assert.Equal("https://dati.example.com/", ClientConfig.FindDefault(exe, data)!.ServerUrl);
 
         Write(exe, """{ "server": "https://exe.example.com" }""");
-        Assert.Equal("https://exe.example.com", ClientConfig.FindDefault(exe, data)!.ServerUrl);
+        Assert.Equal("https://exe.example.com/", ClientConfig.FindDefault(exe, data)!.ServerUrl);
     }
 
     [Fact]
@@ -89,6 +89,6 @@ public class ClientConfigTests : IDisposable
         var data = Path.Combine(_dir, "dati");
         Write(exe, "rotto");
         Write(data, """{ "server": "https://dati.example.com" }""");
-        Assert.Equal("https://dati.example.com", ClientConfig.FindDefault(exe, data)!.ServerUrl);
+        Assert.Equal("https://dati.example.com/", ClientConfig.FindDefault(exe, data)!.ServerUrl);
     }
 }

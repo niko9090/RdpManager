@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Hosting;
 using RdpManager.Core;
 
 namespace RdpManager.Tests;
