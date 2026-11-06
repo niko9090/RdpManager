@@ -10,7 +10,7 @@ Il server conserva un blocco opaco per account, con una versione per evitare sov
 
 ## 1. Generalità
 
-- Base URL configurabile dall'utente, es. `http://192.168.1.199:8787` (LAN o VPN WireGuard). Nessun prefisso.
+- Base URL configurabile dall'utente, es. `http://192.0.2.10:8787` (LAN o VPN WireGuard). Nessun prefisso.
 - Tutte le risposte JSON sono UTF-8, nomi in camelCase. Il documento viaggia come `application/octet-stream`.
 - Errori: stato HTTP appropriato e corpo
   `{"error":"<codice>","message":"<testo in italiano>","currentEtag":null|"\"v3\"","retryAfterSeconds":null|N}`.
@@ -153,7 +153,7 @@ Con il codice impostato, codice mancante o sbagliato = `403 invalid_registration
 ### VPN: `/v1/vpn/devices` (Bearer)
 Il PC genera la coppia di chiavi WireGuard e manda **solo la chiave pubblica**. `503 vpn_disabled` se il server non gestisce WireGuard.
 - `POST /v1/vpn/devices` `{"name":"Ufficio","publicKey":"<base64, 44 car.>"}` → `201` (nuovo) o `200` (già presente):
-  `{"name","address":"10.66.0.N/32","serverPublicKey","endpoint":"syncnetpro.com:51820","allowedIPs":"10.66.0.0/24","dns":"","persistentKeepalive":25}`.
+  `{"name","address":"10.66.0.N/32","serverPublicKey","endpoint":"vpn.example.com:51820","allowedIPs":"10.66.0.0/24","dns":"","persistentKeepalive":25}`.
   `name`: 1–64 caratteri tra lettere, cifre, spazio, `.` `_` `-`. Idempotente: stessa chiave = stesso peer; stesso nome con chiave
   nuova = stesso indirizzo e chiave sostituita. Errori: `400 invalid_name`, `400 invalid_public_key`, `409 key_in_use` (chiave di
   un altro account), `409 too_many_devices`, `409 network_full`, `503 vpn_unavailable` (WireGuard non risponde: nulla è salvato).

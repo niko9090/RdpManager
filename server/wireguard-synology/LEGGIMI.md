@@ -1,7 +1,7 @@
 # Server WireGuard su Synology per RdpManager
 
 Questa cartella contiene tutto il necessario per far girare il server VPN
-WireGuard sul Synology (DSM, IP in LAN 192.168.1.199) con Container Manager.
+WireGuard sul Synology (DSM, IP in LAN 192.0.2.10) con Container Manager.
 
 Dati della rete (devono coincidere con il client RdpManager):
 
@@ -10,7 +10,7 @@ Dati della rete (devono coincidere con il client RdpManager):
 | Rete VPN | 10.66.0.0/24 |
 | Server | 10.66.0.1 |
 | PC | 10.66.0.2 e successivi |
-| Endpoint pubblico | syncnetpro.com:51820 (UDP) |
+| Endpoint pubblico | vpn.example.com:51820 (UDP) |
 | Keepalive | 25 secondi |
 
 ## 1. Prerequisiti
@@ -50,13 +50,13 @@ e i profili: e' escluso dal repository (`.gitignore`).
 
 ## 4. Router, firewall e DNS
 
-1. **Router**: inoltra la porta **51820/UDP** (esterna e interna) verso **192.168.1.199**.
+1. **Router**: inoltra la porta **51820/UDP** (esterna e interna) verso **192.0.2.10**.
 2. **Firewall DSM**: **Pannello di controllo -> Sicurezza -> Firewall**, aggiungi una regola
    che consenta la porta personalizzata **UDP 51820** da qualsiasi origine (o dai tuoi
    paesi) e che stia sopra la regola "Nega tutto".
-3. **DNS**: `syncnetpro.com` deve puntare all'IP pubblico di casa. Se l'IP cambia, usa il
+3. **DNS**: `vpn.example.com` deve puntare all'IP pubblico di casa. Se l'IP cambia, usa il
    DDNS (**Pannello di controllo -> Accesso esterno -> DDNS**) e un CNAME da
-   `syncnetpro.com`/sottodominio verso il nome DDNS, oppure aggiorna il record A con il tuo gestore.
+   `vpn.example.com`/sottodominio verso il nome DDNS, oppure aggiorna il record A con il tuo gestore.
 
 ## 5. Aggiungere un PC
 
@@ -103,10 +103,10 @@ sudo /usr/local/bin/docker exec wireguard sh /scripts/rimuovi-pc.sh NomePC
   "latest handshake" di pochi secondi dopo l'attivazione.
 - Dal PC con la VPN attiva: `ping 10.66.0.1`.
 - Se non risponde: controlla porta UDP sul router, regola del firewall DSM, DNS di
-  `syncnetpro.com`, e che le chiavi pubbliche coincidano.
-- Per raggiungere anche PC della LAN senza client (192.168.1.0/24) servono le righe
+  `vpn.example.com`, e che le chiavi pubbliche coincidano.
+- Per raggiungere anche PC della LAN senza client (la tua rete locale, es. 192.0.2.0/24) servono le righe
   `PostUp`/`PostDown` di `wg0.conf` (gia' presenti, con NAT verso la LAN) e che il
-  client abbia `192.168.1.0/24` tra gli indirizzi permessi.
+  client abbia `la rete locale` tra gli indirizzi permessi.
 
 ## 6b. Server di sincronizzazione
 

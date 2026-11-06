@@ -41,7 +41,7 @@ public class VpnTests
         new(o =>
         {
             o.VpnServerPublicKey = ServerKey;
-            o.VpnEndpoint = "syncnetpro.com:51820";
+            o.VpnEndpoint = "vpn.example.com:51820";
             configure?.Invoke(o);
         }, wireGuard: wg);
 
@@ -73,7 +73,7 @@ public class VpnTests
         var j = await Json(r);
         Assert.Equal("10.66.0.2/32", j.GetProperty("address").GetString());
         Assert.Equal(ServerKey, j.GetProperty("serverPublicKey").GetString());
-        Assert.Equal("syncnetpro.com:51820", j.GetProperty("endpoint").GetString());
+        Assert.Equal("vpn.example.com:51820", j.GetProperty("endpoint").GetString());
         Assert.Equal("10.66.0.0/24", j.GetProperty("allowedIPs").GetString());
         Assert.Equal("10.66.0.1", j.GetProperty("dns").GetString());
         Assert.Equal(25, j.GetProperty("persistentKeepalive").GetInt32());

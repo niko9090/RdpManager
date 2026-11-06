@@ -6,7 +6,7 @@ set -eu
 
 DIR="${WG_DIR:-/config/wg_confs}"
 CONF="$DIR/wg0.conf"
-ENDPOINT="${WG_ENDPOINT:-syncnetpro.com:51820}"
+ENDPOINT="${WG_ENDPOINT:?imposta WG_ENDPOINT (nome-pubblico:porta, per esempio vpn.example.com:51820)}"
 
 [ $# -ge 2 ] || { echo "Uso: $0 NOME CHIAVE_PUBBLICA [10.66.0.N]" >&2; exit 1; }
 NOME="$1"; CHIAVE="$2"; IP="${3:-}"

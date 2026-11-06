@@ -80,9 +80,9 @@ public class SyncCryptoTests
         Assert.Throws<ArgumentException>(() => SyncHttp.NormalizeUrl(input));
 
     [Fact]
-    public void Indirizzo_predefinito_VPN_e_porta_del_server()
+    public void Nessun_server_predefinito_e_porta_del_server()
     {
-        Assert.Equal("http://10.66.0.1:8787", SyncHttp.DefaultServerUrl);
+        Assert.Equal("", new SyncState().ServerUrl);
         Assert.Equal(8787, new RdpmSync.SyncOptions().Port);
     }
 }

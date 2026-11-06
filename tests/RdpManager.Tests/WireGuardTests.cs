@@ -65,14 +65,14 @@ public class WireGuardConfigTests
     {
         var (priv, _) = WireGuardKeys.Generate();
         var (_, serverPub) = WireGuardKeys.Generate();
-        return new WireGuardConfig { PrivateKey = priv, Address = "10.66.0.2/32", Dns = "10.66.0.1", PeerPublicKey = serverPub };
+        return new WireGuardConfig { PrivateKey = priv, Address = "10.66.0.2/32", Dns = "10.66.0.1", PeerPublicKey = serverPub, Endpoint = "vpn.example.com:51820" };
     }
 
     [Fact]
     public void Defaults_AreSynologyStar()
     {
         var c = Sample();
-        Assert.Equal("syncnetpro.com:51820", c.Endpoint);
+        Assert.Equal("vpn.example.com:51820", c.Endpoint);
         Assert.Equal("10.66.0.0/24", c.AllowedIPs);
         Assert.Equal(25, c.PersistentKeepalive);
         Assert.True(c.IsValid);
@@ -92,7 +92,7 @@ public class WireGuardConfigTests
     public void Parse_AcceptsCommentsCaseAndUnknownKeys()
     {
         var c = Sample();
-        var text = $"# commento\n[interface]\nprivatekey={c.PrivateKey}\nADDRESS = 10.66.0.2/32 # il mio\nMTU=1380\n\n[PEER]\nPublicKey = {c.PeerPublicKey}\nEndpoint = syncnetpro.com:51820\nAllowedIPs = 10.66.0.0/24\nPersistentKeepalive = 25\n";
+        var text = $"# commento\n[interface]\nprivatekey={c.PrivateKey}\nADDRESS = 10.66.0.2/32 # il mio\nMTU=1380\n\n[PEER]\nPublicKey = {c.PeerPublicKey}\nEndpoint = vpn.example.com:51820\nAllowedIPs = 10.66.0.0/24\nPersistentKeepalive = 25\n";
         var p = WireGuardConfig.Parse(text);
         Assert.Equal(c with { Dns = "" }, p);
     }
@@ -154,6 +154,7 @@ public class VpnProfileTests : IDisposable
         var pub = p.GenerateKeys();
         var (_, serverPub) = WireGuardKeys.Generate();
         p.ServerPublicKey = serverPub;
+        p.Endpoint = "vpn.example.com:51820";
         p.Save(path);
 
         var plainPriv = p.ToConfig().PrivateKey;
@@ -234,7 +235,7 @@ public class WireGuardTunnelTests : IDisposable
     {
         var (priv, _) = WireGuardKeys.Generate();
         var (_, serverPub) = WireGuardKeys.Generate();
-        return new WireGuardConfig { PrivateKey = priv, Address = "10.66.0.2/32", PeerPublicKey = serverPub };
+        return new WireGuardConfig { PrivateKey = priv, Address = "10.66.0.2/32", PeerPublicKey = serverPub, Endpoint = "vpn.example.com:51820" };
     }
 
     private (WireGuardNtTunnel tunnel, FakeServices svc, InProcessElevator el) Make(int? code = null)

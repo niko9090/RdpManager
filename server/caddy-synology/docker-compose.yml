@@ -1,4 +1,4 @@
-# Proxy HTTPS pubblico per rdpm-sync: https://syncnetpro.com:8443 -> http://127.0.0.1:8787.
+# Proxy HTTPS pubblico per rdpm-sync: https://TUO-DOMINIO:8443 -> http://127.0.0.1:8787.
 # Usa il certificato Let's Encrypt che DSM gestisce e rinnova da solo (cartella montata in sola lettura,
 # CERT_DIR e' scritta in .env da deploy-synology.ps1). Le porte 80/443 sono di DSM: qui solo la 8443.
 services:
@@ -8,7 +8,7 @@ services:
     network_mode: host
     restart: unless-stopped
     environment:
-      CERT_HOST: ${CERT_HOST:-syncnetpro.com}
+      CERT_HOST: ${CERT_HOST:?CERT_HOST e CERT_DIR sono scritti in .env da deploy-synology.ps1}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ${CERT_DIR}:/certs:ro

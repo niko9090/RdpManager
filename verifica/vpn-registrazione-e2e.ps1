@@ -6,11 +6,13 @@
 # piccolo helper C# con HMAC-SHA256, verificato sul vettore di prova di docs/sync-server-api.md, sezione 2).
 
 $ErrorActionPreference = 'Stop'
-$script:base = 'https://syncnetpro.com:8443'
-$script:sshAlias = 'synology'
-$script:sshPort = 26
+. (Join-Path (Split-Path -Parent $PSScriptRoot) 'server/config-locale.ps1')
+$cfg = Get-ConfigLocale   # dominio, SSH e cartella del NAS: da config/locale.json (non pubblicato)
+$script:base = $cfg.UrlServer
+$script:sshAlias = $cfg.SshAlias
+$script:sshPort = $cfg.SshPorta
 $script:docker = 'sudo -n env PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin docker'
-$script:envFile = '/volume1/docker/rdpm-sync/.env'
+$script:envFile = "$($cfg.CartellaNas)/rdpm-sync/.env"
 $script:fallimenti = 0
 
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch { }
@@ -160,7 +162,7 @@ try {
     if ($d1) {
         Verifica 'address 10.66.0.N/32' ([string]$d1.address -match '^10\.66\.0\.\d{1,3}/32$') "address=$($d1.address)"
         Verifica 'serverPublicKey uguale alla chiave reale del server WireGuard' (([string]$d1.serverPublicKey -eq $chiaveServerNAS) -and ($chiaveServerNAS.Length -eq 44)) "risposta=$($d1.serverPublicKey)"
-        Verifica 'endpoint syncnetpro.com:51820' ([string]$d1.endpoint -eq 'syncnetpro.com:51820') "endpoint=$($d1.endpoint)"
+        Verifica "endpoint $($cfg.Dominio):$($cfg.PortaVpn)" ([string]$d1.endpoint -eq "$($cfg.Dominio):$($cfg.PortaVpn)") "endpoint=$($d1.endpoint)"
         Verifica 'nome del dispositivo nella risposta' ([string]$d1.name -eq $script:nomePc)
     }
     else { Verifica 'corpo della risposta POST /v1/vpn/devices' $false }

@@ -86,13 +86,13 @@ public class WireGuardNtStructsTests
     [Fact]
     public void BuildConfiguration_MultipleAllowedIps_AndNoKeepalive()
     {
-        var buf = WireGuardNtStructs.BuildConfiguration(Config("10.66.0.0/24, 192.168.1.0/24", keepalive: 0), IPAddress.Loopback);
+        var buf = WireGuardNtStructs.BuildConfiguration(Config("10.66.0.0/24, 192.0.2.0/24", keepalive: 0), IPAddress.Loopback);
         Assert.Equal(80 + 136 + 2 * 24, buf.Length);
         var p = buf.AsSpan(80);
         Assert.Equal(0u, BinaryPrimitives.ReadUInt32LittleEndian(p) & WireGuardNtStructs.PeerHasKeepalive);
         Assert.Equal(2u, BinaryPrimitives.ReadUInt32LittleEndian(p[128..]));
         var second = p[(136 + 24)..];
-        Assert.Equal(new byte[] { 192, 168, 1, 0 }, second[..4].ToArray());
+        Assert.Equal(new byte[] { 192, 0, 2, 0 }, second[..4].ToArray());
         Assert.Equal(24, second[18]);
     }
 
@@ -232,7 +232,8 @@ public class VpnTunnelRunnerTests
         PrivateKey = Convert.ToBase64String(new byte[32].Select(_ => (byte)1).ToArray()),
         Address = "10.66.0.2/32",
         PeerPublicKey = Convert.ToBase64String(new byte[32].Select(_ => (byte)2).ToArray()),
-        AllowedIPs = "10.66.0.0/24,192.168.1.0/24",
+        AllowedIPs = "10.66.0.0/24,192.0.2.0/24",
+        Endpoint = "vpn.example.com:51820",
     };
 
     [Fact]
@@ -243,8 +244,8 @@ public class VpnTunnelRunnerTests
         string? resolved = null;
         using var runner = new VpnTunnelRunner(driver, h => { resolved = h; return IPAddress.Parse("198.51.100.7"); });
         runner.Start(Config(), "RdpManager");
-        Assert.Equal("syncnetpro.com", resolved);
-        Assert.Equal(["create RdpManager/RdpManager", "config", "addr 10.66.0.2/32", "route 10.66.0.0/24", "route 192.168.1.0/24", "up"], log);
+        Assert.Equal("vpn.example.com", resolved);
+        Assert.Equal(["create RdpManager/RdpManager", "config", "addr 10.66.0.2/32", "route 10.66.0.0/24", "route 192.0.2.0/24", "up"], log);
         Assert.True(runner.IsRunning);
         Assert.Equal(198, driver.Adapter!.Block![80 + 76 + 4]);
     }

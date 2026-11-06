@@ -2,11 +2,13 @@
 # Eseguito SUL Synology (come root) da deploy-synology.ps1. Idempotente. Non stampa segreti salvo la riga finale.
 set -eu
 export PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/syno/bin
-BASE=/volume1/docker
+BASE="${DEPLOY_BASE:-/volume1/docker}"
 DOCKER=/usr/local/bin/docker
 DC="/usr/local/bin/docker-compose"
 export COMPOSE_HTTP_TIMEOUT=600
-HOST="${DEPLOY_HOST:-syncnetpro.com}"
+HOST="${DEPLOY_HOST:?manca DEPLOY_HOST: lo passa deploy-synology.ps1 da config/locale.json}"
+LAN="${DEPLOY_LAN:-}"
+PORT_VPN="${DEPLOY_PORT_VPN:-51820}"
 
 say() { echo "[deploy] $*"; }
 
@@ -39,7 +41,7 @@ rm -rf "$SRC"
 (cd "$BASE/wireguard" && $DC build)
 if [ ! -f "$BASE/wireguard/config/wg0.conf" ] || [ ! -f "$BASE/wireguard/config/server.pub" ]; then
   say "prima generazione delle chiavi del server WireGuard"
-  $DOCKER run --rm -e WG_DIR=/config/wg_confs -v "$BASE/wireguard/config:/config/wg_confs" \
+  $DOCKER run --rm -e WG_DIR=/config/wg_confs -e WG_LAN="$LAN" -v "$BASE/wireguard/config:/config/wg_confs" \
     -v "$BASE/wireguard/scripts:/scripts:ro" --entrypoint sh rdpmanager/wireguard-go:latest /scripts/prima-generazione.sh
 fi
 
@@ -56,7 +58,7 @@ setv() { # setv CHIAVE VALORE: riempie la riga vuota o aggiunge la chiave
 if [ -z "$(getv RDPM_SYNC_REGISTRATION_CODE)" ] && [ -z "$(getv RDPM_SYNC_OPEN_REGISTRATION)" ]; then
   setv RDPM_SYNC_REGISTRATION_CODE "$(rnd 32)"; say "creato codice di registrazione"
 fi
-[ -n "$(getv RDPM_VPN_ENDPOINT)" ] || setv RDPM_VPN_ENDPOINT "$HOST:51820"
+[ -n "$(getv RDPM_VPN_ENDPOINT)" ] || setv RDPM_VPN_ENDPOINT "$HOST:$PORT_VPN"
 
 # 5. Certificato di DSM per $HOST
 CERT_DIR=
