@@ -106,10 +106,32 @@ public sealed partial class MainForm
             return;
         _touchActive = active;
         _touchModeApplied = true;
+        if (_mainTouch is not null)
+            _mainTouch.Enabled = active;
         ApplyTouch();
     }
 
     private bool _touchModeApplied;
+    private SessionTouchInput? _mainTouch;
+
+    /// <summary>
+    /// Gesti a tre dita nella finestra principale (fuori dalle sessioni): scheda precedente/successiva, se sono nella mappa.
+    /// Usa lo stesso filtro dei messaggi WM_POINTER della sessione, ma senza consumarli.
+    /// </summary>
+    internal SessionTouchInput? MainTouchInput => _mainTouch;
+
+    private void InitMainTouchGestures()
+    {
+        _mainTouch = new SessionTouchInput(this)
+        {
+            CommandsOnly = true,
+            Ignore = hwnd => AllViews.Any(v => v.IsHandleCreated && SessionTouchInput.IsInside(v.Handle, hwnd)),
+            GestureMap = _doc.Settings.GestureMap,
+        };
+        _mainTouch.CommandRequested += (_, kind) => ExecuteTouchCommand(kind);
+        _mainTouch.Enabled = _touchActive;
+        Disposed += (_, _) => _mainTouch.Dispose();
+    }
 
     /// <summary>Tocco sulla X di una scheda larga: chiude quella sessione. Falso se il punto non è su una X.</summary>
     internal bool TryCloseTabAt(Point location)
@@ -194,6 +216,7 @@ public sealed partial class MainForm
     private void InitTouch()
     {
         RefreshTouchMode();
+        InitMainTouchGestures();
         ApplyTouch(); // di nuovo: i menu e la barra possono aver aggiunto voci dopo la prima volta
         DpiChanged += (_, _) => ApplyTouch();
         // Un portatile che si trasforma in tablet (o uno schermo che si collega) cambia la modalità automatica.

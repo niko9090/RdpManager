@@ -769,6 +769,9 @@ basta lo stesso login: connessioni, cartelle, profili di credenziali e testi rap
   = mouse (pressione lunga = clic destro); **due dita**: tocco = clic destro, scorrimento = rotella, pizzico = zoom
   (Ctrl+rotella); **tre dita**: scorrimento a sinistra/destra = scheda precedente/successiva, in su/giù = mostra/nascondi
   la barra, tocco = Alt+Tab sul PC remoto; **quattro dita**: giù = Win+D, su = Win+Tab sul PC remoto.
+  Sono i valori predefiniti: in *Impostazioni › Generale › Gesti a più dita* si sceglie l'azione di ogni gesto (o «Spento»),
+  con «Ripristina predefiniti». Nella finestra principale, su uno schermo touch, tre dita a sinistra/destra cambiano scheda
+  (se il gesto è attivo).
 - **Riapri all'avvio** (File → Impostazioni): chiudendo l'app si ricordano le sessioni aperte e al
   prossimo avvio si riaprono, nello stesso ordine.
 - **Testi rapidi** (*Sessione → Testi rapidi*, «Invia» nella barra della sessione, «Testi» nella barra a

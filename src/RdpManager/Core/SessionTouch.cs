@@ -83,11 +83,14 @@ public enum TouchGesture
 }
 
 /// <summary>
-/// Tabella gesto → azione, in un solo posto. Qui ci sono i valori predefiniti; il costruttore accetta una tabella
-/// diversa (pronta per le Impostazioni). Un gesto senza voce non fa nulla.
+/// Tabella gesto → azione, in un solo posto. Qui ci sono i valori predefiniti; le Impostazioni ne salvano una diversa
+/// (<see cref="FromSettings"/> / <see cref="ToSettings"/>). Un gesto senza voce, o «Spento», non fa nulla.
 /// </summary>
 public sealed class TouchGestureMap
 {
+    /// <summary>Valore salvato per un gesto spento.</summary>
+    public const string OffText = "Off";
+
     /// <summary>
     /// Valori predefiniti. Il tocco a tre dita fa Alt+Tab sul PC remoto (e non apre la barra: la barra ha già i suoi due
     /// scorrimenti su/giù, e Alt+Tab da tablet è ciò che manca di più).
@@ -104,6 +107,43 @@ public sealed class TouchGestureMap
         [TouchGesture.FourFingerSwipeDown] = TouchActionKind.ShowDesktop,
     };
 
+    /// <summary>Le azioni tra cui scegliere per ogni gesto (oltre a «Spento»), nell'ordine dell'elenco.</summary>
+    public static IReadOnlyList<TouchActionKind> Choices { get; } =
+    [
+        TouchActionKind.RightClick, TouchActionKind.Click, TouchActionKind.AltTab, TouchActionKind.ShowDesktop, TouchActionKind.TaskView,
+        TouchActionKind.PreviousTab, TouchActionKind.NextTab, TouchActionKind.ShowBar, TouchActionKind.HideBar,
+    ];
+
+    /// <summary>Testo italiano di un gesto, per le Impostazioni.</summary>
+    public static string Describe(TouchGesture gesture) => gesture switch
+    {
+        TouchGesture.TwoFingerTap => "Tocco con due dita",
+        TouchGesture.ThreeFingerTap => "Tocco con tre dita",
+        TouchGesture.ThreeFingerSwipeLeft => "Tre dita verso sinistra",
+        TouchGesture.ThreeFingerSwipeRight => "Tre dita verso destra",
+        TouchGesture.ThreeFingerSwipeUp => "Tre dita verso l'alto",
+        TouchGesture.ThreeFingerSwipeDown => "Tre dita verso il basso",
+        TouchGesture.FourFingerSwipeUp => "Quattro dita verso l'alto",
+        TouchGesture.FourFingerSwipeDown => "Quattro dita verso il basso",
+        _ => gesture.ToString(),
+    };
+
+    /// <summary>Testo italiano di un'azione (null = spento), per l'elenco delle Impostazioni.</summary>
+    public static string Describe(TouchActionKind? kind) => kind switch
+    {
+        null => "Spento",
+        TouchActionKind.RightClick => "Clic destro",
+        TouchActionKind.Click => "Clic sinistro",
+        TouchActionKind.AltTab => "Alt+Tab sul PC remoto",
+        TouchActionKind.ShowDesktop => "Mostra il desktop remoto (Win+D)",
+        TouchActionKind.TaskView => "Vista attività remota (Win+Tab)",
+        TouchActionKind.PreviousTab => "Scheda precedente",
+        TouchActionKind.NextTab => "Scheda successiva",
+        TouchActionKind.ShowBar => "Mostra la barra",
+        TouchActionKind.HideBar => "Nascondi la barra",
+        _ => kind.ToString()!,
+    };
+
     private readonly IReadOnlyDictionary<TouchGesture, TouchActionKind> _table;
 
     public TouchGestureMap(IReadOnlyDictionary<TouchGesture, TouchActionKind>? table = null) => _table = table ?? Defaults;
@@ -112,6 +152,43 @@ public sealed class TouchGestureMap
 
     /// <summary>L'azione del gesto, o null se non ne ha.</summary>
     public TouchActionKind? ActionFor(TouchGesture gesture) => _table.TryGetValue(gesture, out var kind) ? kind : null;
+
+    /// <summary>Copia con l'azione del gesto cambiata (null = spento).</summary>
+    public TouchGestureMap With(TouchGesture gesture, TouchActionKind? kind)
+    {
+        var table = new Dictionary<TouchGesture, TouchActionKind>(_table);
+        if (kind is { } k)
+            table[gesture] = k;
+        else
+            table.Remove(gesture);
+        return new TouchGestureMap(table);
+    }
+
+    /// <summary>
+    /// Legge la mappa salvata (gesto → azione o «Off»). Una voce mancante o non valida vale il predefinito: un'impostazione
+    /// vecchia senza mappa (null) dà tutti i predefiniti.
+    /// </summary>
+    public static TouchGestureMap FromSettings(IReadOnlyDictionary<string, string>? saved)
+    {
+        if (saved is null || saved.Count == 0)
+            return Default;
+        var table = new Dictionary<TouchGesture, TouchActionKind>();
+        foreach (var gesture in Enum.GetValues<TouchGesture>())
+        {
+            string? text = saved.FirstOrDefault(p => string.Equals(p.Key, gesture.ToString(), StringComparison.OrdinalIgnoreCase)).Value;
+            if (text is not null && text.Trim().Equals(OffText, StringComparison.OrdinalIgnoreCase))
+                continue; // spento
+            if (text is not null && Enum.TryParse(text.Trim(), true, out TouchActionKind kind) && Choices.Contains(kind))
+                table[gesture] = kind;
+            else if (Defaults.TryGetValue(gesture, out var def))
+                table[gesture] = def;
+        }
+        return new TouchGestureMap(table);
+    }
+
+    /// <summary>La mappa da salvare: una voce per ogni gesto (azione o «Off»).</summary>
+    public Dictionary<string, string> ToSettings() =>
+        Enum.GetValues<TouchGesture>().ToDictionary(g => g.ToString(), g => _table.TryGetValue(g, out var k) ? k.ToString() : OffText);
 }
 
 /// <summary>
@@ -144,7 +221,6 @@ public sealed class TouchGestureRecognizer
     private readonly TimeSpan _doubleTap;
     private readonly TimeSpan _joinWindow;
     private readonly TimeSpan _tapMax;
-    private readonly TouchGestureMap _map;
     private int _primary = -1;
     private int _groupSize;
     private bool _dragging, _multi, _longFired, _moved;
@@ -168,8 +244,11 @@ public sealed class TouchGestureRecognizer
         _doubleTap = doubleTap ?? TimeSpan.FromMilliseconds(400);
         _joinWindow = joinWindow ?? TimeSpan.FromMilliseconds(250);
         _tapMax = tapMax ?? TimeSpan.FromMilliseconds(350);
-        _map = map ?? TouchGestureMap.Default;
+        Map = map ?? TouchGestureMap.Default;
     }
+
+    /// <summary>Cosa fa ogni gesto a più dita; si può cambiare mentre il riconoscitore è in funzione (vale dal gesto successivo).</summary>
+    public TouchGestureMap Map { get; set; }
 
     /// <summary>Il prossimo tocco (o la prossima pressione lunga) vale come clic destro, poi torna normale (pulsante «Clic destro» della barra).</summary>
     public bool NextTapIsRightClick { get; set; }
@@ -420,7 +499,7 @@ public sealed class TouchGestureRecognizer
 
     private IEnumerable<TouchAction> Emit(TouchGesture gesture, Point at)
     {
-        if (_map.ActionFor(gesture) is not { } kind)
+        if (Map.ActionFor(gesture) is not { } kind)
             yield break;
         // Il clic parte dal punto del gesto; i tasti e i comandi della finestra non hanno un punto.
         if (kind is TouchActionKind.RightClick or TouchActionKind.Click)

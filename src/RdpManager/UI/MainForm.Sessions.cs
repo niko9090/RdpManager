@@ -92,8 +92,14 @@ public sealed partial class MainForm
             log.Verbose = _doc.Settings.VerboseLog;
         if (Form.ActiveForm == this || NativeMethods.IsOwnProcessForeground())
             RegisterSessionHotkeys();
+        var gestureMap = _doc.Settings.GestureMap;
         foreach (var v in AllViews)
+        {
             v.TouchMode = _doc.Settings.SessionTouch;
+            v.GestureMap = gestureMap;
+        }
+        if (_mainTouch is not null)
+            _mainTouch.GestureMap = gestureMap;
         _fullScreenItem.ShortcutKeyDisplayString = $"F11, {_shortcuts[ShortcutAction.ToggleFullScreen]}";
         _sidebarItem.ShortcutKeyDisplayString = _shortcuts[ShortcutAction.ToggleSidebar].ToString();
         _nextSessionItem.ShortcutKeyDisplayString = _shortcuts[ShortcutAction.NextSession].ToString();

@@ -145,6 +145,13 @@ public sealed class RdpSessionView : UserControl
 
     internal SessionTouchInput TouchInput => _touch;
 
+    /// <summary>Cosa fa ogni gesto a più dita dentro la sessione.</summary>
+    public TouchGestureMap GestureMap
+    {
+        get => _touch.GestureMap;
+        set => _touch.GestureMap = value;
+    }
+
     internal ToolStrip Bar => _bar;
 
     private void UpdateTouchFilter() => _touch.Enabled = _touchMode == SessionTouchMode.Mouse || _rightClickButton.Checked;

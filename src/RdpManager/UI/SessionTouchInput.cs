@@ -20,6 +20,25 @@ internal sealed class SessionTouchInput : IMessageFilter, IDisposable
     private readonly System.Windows.Forms.Timer _timer = new() { Interval = 50 };
     private bool _installed;
 
+    /// <summary>La mappa dei gesti a più dita (dalle Impostazioni).</summary>
+    public TouchGestureMap GestureMap
+    {
+        get => _recognizer.Map;
+        set => _recognizer.Map = value ?? TouchGestureMap.Default;
+    }
+
+    /// <summary>
+    /// Uso nella finestra principale, fuori dalla sessione: i messaggi del dito non si consumano e non si manda niente al
+    /// sistema; si riportano solo i comandi scheda precedente/successiva (<see cref="CommandRequested"/>).
+    /// </summary>
+    internal bool CommandsOnly { get; init; }
+
+    /// <summary>Finestre da lasciare in pace (nella finestra principale: le sessioni, che hanno il loro filtro).</summary>
+    internal Func<IntPtr, bool>? Ignore { get; init; }
+
+    /// <summary>La finestra <paramref name="hwnd"/> è <paramref name="parent"/> o ne è figlia.</summary>
+    internal static bool IsInside(IntPtr parent, IntPtr hwnd) => parent != IntPtr.Zero && (hwnd == parent || IsChild(parent, hwnd));
+
     /// <summary>Per le prove: riceve le azioni invece di muovere il mouse.</summary>
     internal Action<TouchAction>? ActionSink { get; set; }
 
@@ -75,7 +94,7 @@ internal sealed class SessionTouchInput : IMessageFilter, IDisposable
     {
         if (m.Msg is not (WM_POINTERDOWN or WM_POINTERUPDATE or WM_POINTERUP or WM_POINTERCAPTURECHANGED))
             return false;
-        if (!_target.IsHandleCreated || !_target.Visible || !BelongsToTarget(m.HWnd))
+        if (!_target.IsHandleCreated || !_target.Visible || !BelongsToTarget(m.HWnd) || Ignore?.Invoke(m.HWnd) == true)
             return false;
         int id = (int)((long)m.WParam & 0xFFFF);
         if (!GetPointerType((uint)id, out int type) || type != PT_TOUCH)
@@ -103,6 +122,8 @@ internal sealed class SessionTouchInput : IMessageFilter, IDisposable
         }
         if (armed && !_recognizer.NextTapIsRightClick)
             RightClickUsed?.Invoke(this, EventArgs.Empty);
+        if (CommandsOnly)
+            return false;
         return true; // il dito lo gestiamo noi: niente clic automatico di Windows in più
     }
 
@@ -112,6 +133,8 @@ internal sealed class SessionTouchInput : IMessageFilter, IDisposable
     {
         foreach (var a in actions)
         {
+            if (CommandsOnly && a.Kind is not (TouchActionKind.PreviousTab or TouchActionKind.NextTab))
+                continue;
             if (ActionSink is { } sink)
                 sink(a);
             else if (TouchActionKinds.IsWindowCommand(a.Kind) || TouchActionKinds.IsRemoteKeys(a.Kind))

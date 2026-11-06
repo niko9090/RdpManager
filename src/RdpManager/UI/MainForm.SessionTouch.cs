@@ -20,6 +20,7 @@ public sealed partial class MainForm
     private void WireSessionTouch(RdpSessionView view)
     {
         view.TouchMode = _doc.Settings.SessionTouch;
+        view.GestureMap = _doc.Settings.GestureMap;
         view.TouchCommandRequested += (_, kind) => ExecuteTouchCommand(kind);
         view.TouchModeToggleRequested += (_, _) => SetSessionTouchMode(SessionTouchModes.Toggle(_doc.Settings.SessionTouch));
     }
