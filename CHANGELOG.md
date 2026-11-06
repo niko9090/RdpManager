@@ -1,5 +1,15 @@
 # Novità di RdpManager
 
+## Non rilasciato
+
+**Registrazione più semplice (niente più «chiave di amministrazione»)**
+- «Registrati» non chiede più `RDPM_SYNC_ADMIN_KEY`: usa il codice di registrazione del server (un codice d'invito) o
+  nessun codice se la registrazione è aperta. Se serve e manca, l'app lo chiede («Codice di registrazione (te lo dà chi gestisce il server)»).
+- Nuovo file di configurazione `rdpmanager-config.json` (server, codice di registrazione, endpoint VPN): pulsante
+  **Importa configurazione…** nel dialogo dell'account; l'app lo carica da sola se è accanto all'eseguibile o in `%APPDATA%\RdpManager`.
+- Server: `server/crea-config-client.ps1` crea il file da `config/locale.json` (nuovo campo `codiceRegistrazione`);
+  il deploy sul Synology imposta `RDPM_SYNC_REGISTRATION_CODE` con quel valore.
+
 ## 1.10.0
 
 **Finestra principale più comoda col dito (modalità tocco)**

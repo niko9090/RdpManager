@@ -150,6 +150,23 @@ Attiva solo se il server ha `RDPM_SYNC_OPEN_REGISTRATION=1` o `RDPM_SYNC_REGISTR
 Con il codice impostato, codice mancante o sbagliato = `403 invalid_registration_code`. Altri errori come per l'amministrazione
 (`400 invalid_username`, `400 invalid_password`, `409 account_exists`); 10 tentativi per indirizzo ogni 15 minuti, poi `429`.
 
+### File di configurazione del client
+L'app non chiede mai la chiave di amministrazione: registra con `POST /v1/register`. Indirizzo e codice di registrazione
+possono stare in `rdpmanager-config.json` (accanto a `RdpManager.exe`, in `%APPDATA%\RdpManager`, oppure importato dal dialogo
+dell'account con «Importa configurazione…»):
+
+```json
+{
+  "server": "https://vpn.example.com:8443",
+  "codiceRegistrazione": "codice-lungo-e-casuale",
+  "vpnEndpoint": "vpn.example.com:51820"
+}
+```
+
+Campi tutti facoltativi (almeno uno); chiavi che cominciano con `_` = commenti; `server` senza schema vale `http://`.
+`codiceRegistrazione` è il valore di `RDPM_SYNC_REGISTRATION_CODE`. Sul server di chi gestisce, `server/crea-config-client.ps1`
+lo genera da `config/locale.json`.
+
 ### VPN: `/v1/vpn/devices` (Bearer)
 Il PC genera la coppia di chiavi WireGuard e manda **solo la chiave pubblica**. `503 vpn_disabled` se il server non gestisce WireGuard.
 - `POST /v1/vpn/devices` `{"name":"Ufficio","publicKey":"<base64, 44 car.>"}` → `201` (nuovo) o `200` (già presente):

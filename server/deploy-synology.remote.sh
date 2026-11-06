@@ -55,7 +55,10 @@ setv() { # setv CHIAVE VALORE: riempie la riga vuota o aggiunge la chiave
   if grep -qE "^$1=" "$ENVF"; then sed -i "s|^$1=.*|$1=$2|" "$ENVF"; else echo "$1=$2" >> "$ENVF"; fi
 }
 [ -n "$(getv RDPM_SYNC_ADMIN_KEY)" ] || { setv RDPM_SYNC_ADMIN_KEY "$(rnd 40)"; say "creata chiave admin"; }
-if [ -z "$(getv RDPM_SYNC_REGISTRATION_CODE)" ] && [ -z "$(getv RDPM_SYNC_OPEN_REGISTRATION)" ]; then
+# codice scelto in config/locale.json (DEPLOY_REG_CODE): vale sempre e sostituisce quello nel .env
+if [ -n "${DEPLOY_REG_CODE:-}" ]; then
+  [ "$(getv RDPM_SYNC_REGISTRATION_CODE)" = "$DEPLOY_REG_CODE" ] || { setv RDPM_SYNC_REGISTRATION_CODE "$DEPLOY_REG_CODE"; say "impostato codice di registrazione da config/locale.json"; }
+elif [ -z "$(getv RDPM_SYNC_REGISTRATION_CODE)" ] && [ -z "$(getv RDPM_SYNC_OPEN_REGISTRATION)" ]; then
   setv RDPM_SYNC_REGISTRATION_CODE "$(rnd 32)"; say "creato codice di registrazione"
 fi
 [ -n "$(getv RDPM_VPN_ENDPOINT)" ] || setv RDPM_VPN_ENDPOINT "$HOST:$PORT_VPN"
