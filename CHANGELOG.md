@@ -31,6 +31,15 @@
   schermo intero, insieme a «Nascondi la barra».
 - A schermo intero, su uno schermo a tocco, con la barra nascosta compare una linguetta sul bordo per richiamarla col dito.
 
+**Gesti a più dita dentro la sessione** (con il dito che fa da mouse)
+- Due dita: tocco breve = clic destro nel punto medio; scorrimento = rotella; **pizzico = zoom** (Ctrl+rotella verso il PC remoto).
+- Tre dita: scorrimento a sinistra/destra = scheda di sessione precedente/successiva in RdpManager; scorrimento in su/giù =
+  mostra/nascondi la barra comandi; **tocco = Alt+Tab** sul PC remoto.
+- Quattro dita: scorrimento giù = Win+D (mostra il desktop), su = Win+Tab, sul PC remoto.
+- Il numero di dita è quello appoggiato entro 250 ms dal primo; un dito che arriva dopo non cambia il gesto già cominciato.
+  Le associazioni gesto → azione sono in un'unica tabella predefinita (`TouchGestureMap`), pronta per renderla modificabile.
+- Cambia: due dita ferme e fugaci (sotto i 350 ms) ora fanno clic destro; prima non facevano nulla.
+
 ## 1.9.0
 
 **VPN automatica e registrazione dall'app** (`rdpm-sync` 1.1.0)

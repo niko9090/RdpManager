@@ -106,14 +106,14 @@ public sealed class SessionTouchGestureTests
     }
 
     [Fact]
-    public void TwoFingers_NeverClick_EvenWhenLiftedWithoutMoving()
+    public void TwoFingers_HeldStillALongTime_DoNothing()
     {
         var r = Recognizer();
         r.Down(1, new Point(10, 10), T0);
         r.Down(2, new Point(80, 10), T0.AddMilliseconds(10));
-        Assert.Empty(r.Up(2, new Point(80, 10), T0.AddMilliseconds(60)));
-        Assert.Empty(r.Up(1, new Point(10, 10), T0.AddMilliseconds(70)));
         Assert.Empty(r.Poll(T0.AddSeconds(2)));
+        Assert.Empty(r.Up(2, new Point(80, 10), T0.AddSeconds(2)));
+        Assert.Empty(r.Up(1, new Point(10, 10), T0.AddSeconds(2).AddMilliseconds(10)));
         // finito tutto, un nuovo tocco funziona di nuovo
         r.Down(1, new Point(10, 10), T0.AddSeconds(3));
         Assert.Contains(TouchActionKind.Click, Kinds(r.Up(1, new Point(10, 10), T0.AddSeconds(3).AddMilliseconds(50))));
