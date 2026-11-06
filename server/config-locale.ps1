@@ -26,6 +26,9 @@ function Get-ConfigLocale {
         SshAlias    = [string](Valore 'sshAlias' $null)
         SshPorta    = [int](Valore 'sshPorta' 22)
         CartellaNas = [string](Valore 'cartellaNas' '/volume1/docker')
+        CodiceRegistrazione = $(
+            $c = [string]$(if ($j.PSObject.Properties['codiceRegistrazione']) { $j.codiceRegistrazione } else { '' })
+            if ($c -like 'SOSTITUISCI*') { '' } else { $c })
         ReteLan     = [string]$(if ($j.PSObject.Properties['reteLan']) { $j.reteLan } else { '' })
         UrlServer   = "https://${dominio}:$portaHttps"
     }

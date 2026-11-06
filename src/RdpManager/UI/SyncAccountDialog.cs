@@ -18,6 +18,8 @@ internal sealed class SyncAccountDialog : TouchForm
     private readonly Button _syncButton = new() { Text = "Sincronizza ora", AutoSize = true };
     private readonly Button _signOut = new() { Text = "Esci dall'account", AutoSize = true };
     private readonly Func<Task<string>>? _afterSignIn;
+    private readonly Button _import = new() { Text = "Importa configurazione…", AutoSize = true };
+    private string? _registrationCode;
     private bool _busy;
 
     public SyncAccountDialog(SyncService sync, Func<Task<SyncOutcome>> syncNow, Func<SyncOutcome?> lastOutcome,
@@ -56,7 +58,7 @@ internal sealed class SyncAccountDialog : TouchForm
         layout.Controls.Add(_passwordLabel);
         layout.Controls.Add(_password);
         var buttons = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, 10, 0, 0) };
-        buttons.Controls.AddRange([_signIn, _create, _syncButton, _signOut]);
+        buttons.Controls.AddRange([_signIn, _create, _syncButton, _signOut, _import]);
         layout.Controls.Add(buttons);
         layout.Controls.Add(_status);
         var bottom = new FlowLayoutPanel { AutoSize = true, Anchor = AnchorStyles.Right };
@@ -70,9 +72,12 @@ internal sealed class SyncAccountDialog : TouchForm
         _create.Click += async (_, _) => await SignInAsync(create: true);
         _syncButton.Click += async (_, _) => await SyncNowAsync();
         _signOut.Click += async (_, _) => await SignOutAsync();
+        _import.Click += (_, _) => ImportConfig();
 
         _server.Text = sync.State.ServerUrl;
         _user.Text = sync.State.Username;
+        if (!sync.SignedIn && ClientConfig.FindDefault() is { } found)
+            Apply(found);
         Refresh_();
     }
 
@@ -82,9 +87,9 @@ internal sealed class SyncAccountDialog : TouchForm
         _server.Enabled = _user.Enabled = !inside && !_busy;
         _password.Visible = _passwordLabel.Visible = !inside;
         _password.Enabled = !_busy;
-        _signIn.Visible = _create.Visible = !inside;
+        _signIn.Visible = _create.Visible = _import.Visible = !inside;
         _syncButton.Visible = _signOut.Visible = inside;
-        _signIn.Enabled = _create.Enabled = _syncButton.Enabled = _signOut.Enabled = !_busy;
+        _signIn.Enabled = _create.Enabled = _import.Enabled = _syncButton.Enabled = _signOut.Enabled = !_busy;
         AcceptButton = inside ? _syncButton : _signIn;
         if (_busy)
             return;
@@ -119,8 +124,7 @@ internal sealed class SyncAccountDialog : TouchForm
             $"Troppi tentativi sbagliati: riprova fra {Math.Max(1, (s + 59) / 60)} minuti.",
         SyncServerException { Code: "invalid_registration_code" } => "Codice di registrazione sbagliato.",
         SyncServerException { Code: "account_exists" } => "Esiste già un account con questo nome: usa «Accedi».",
-        SyncServerException { Code: "unauthorized" } => "Chiave di amministrazione sbagliata.",
-        SyncServerException { Code: "admin_disabled" } => "Sul server la creazione di account via rete è spenta: crealo sul server (vedi LEGGIMI di rdpm-sync).",
+        SyncServerException { Code: "registration_disabled" } => "Questo server non accetta registrazioni dall'app: chiedi a chi lo gestisce.",
         SyncServerException s => s.Message,
         _ => ex.Message,
     };
@@ -129,19 +133,11 @@ internal sealed class SyncAccountDialog : TouchForm
     {
         if (_busy)
             return;
-        string? adminKey = null;
-        if (create)
-        {
-            adminKey = TextPromptDialog.Ask(this, "Crea account",
-                "Chiave di amministrazione del server (RDPM_SYNC_ADMIN_KEY):", secret: true);
-            if (string.IsNullOrEmpty(adminKey))
-                return;
-        }
         SetBusy(true, create ? "Creo l'account…" : "Accedo…");
         try
         {
-            if (adminKey is not null)
-                await _sync.CreateAccountAsync(_server.Text, adminKey, _user.Text, _password.Text);
+            if (create)
+                await RegisterAsync();
             await _sync.SignInAsync(_server.Text, _user.Text, _password.Text);
             _password.Clear();
             SetBusy(true, "Sincronizzo…");
@@ -158,35 +154,60 @@ internal sealed class SyncAccountDialog : TouchForm
     }
 
     /// <summary>
-    /// Registrazione dall'app. Se il server vuole un codice lo chiede; se la registrazione aperta è spenta
-    /// ripiega sulla vecchia via con la chiave di amministrazione.
+    /// Registrazione con codice (o senza, se il server è aperto). Usa il codice del file di configurazione; se il server
+    /// ne vuole uno e non c'è (o è sbagliato) lo chiede all'utente.
     /// </summary>
     private async Task RegisterAsync()
     {
-        string? code = null;
         while (true)
         {
             try
             {
-                await _sync.RegisterAsync(_server.Text, _user.Text, _password.Text, code);
+                await _sync.RegisterAsync(_server.Text, _user.Text, _password.Text, _registrationCode);
                 return;
             }
             catch (SyncServerException ex) when (ex.Code == "invalid_registration_code")
             {
-                code = TextPromptDialog.Ask(this, "Registrazione", "Codice di registrazione del server:", secret: true);
-                if (string.IsNullOrEmpty(code))
-                    throw new ArgumentException("Registrazione annullata.");
-            }
-            catch (SyncServerException ex) when (ex.Code == "registration_disabled")
-            {
-                var adminKey = TextPromptDialog.Ask(this, "Crea account",
-                    "La registrazione libera è spenta. Chiave di amministrazione del server (RDPM_SYNC_ADMIN_KEY):", secret: true);
-                if (string.IsNullOrEmpty(adminKey))
-                    throw new ArgumentException("Registrazione annullata.");
-                await _sync.CreateAccountAsync(_server.Text, adminKey, _user.Text, _password.Text);
-                return;
+                SetBusy(false);
+                var code = TextPromptDialog.Ask(this, "Registrazione",
+                    "Codice di registrazione (te lo dà chi gestisce il server):", secret: true);
+                if (string.IsNullOrWhiteSpace(code))
+                    throw new ArgumentException("Registrazione annullata: serve il codice di registrazione.");
+                _registrationCode = code.Trim();
+                SetBusy(true, "Creo l'account…");
             }
         }
+    }
+
+    private void ImportConfig()
+    {
+        if (_busy)
+            return;
+        using var open = new OpenFileDialog
+        {
+            Title = "Importa configurazione",
+            Filter = "Configurazione RdpManager (*.json)|*.json|Tutti i file (*.*)|*.*",
+            FileName = ClientConfig.FileName,
+        };
+        if (open.ShowDialog(this) != DialogResult.OK)
+            return;
+        try
+        {
+            Apply(ClientConfig.Load(open.FileName));
+            _status.Text = "Configurazione importata: ora scrivi nome utente e password e premi «Registrati» (o «Accedi»).";
+        }
+        catch (Exception ex) when (ex is FormatException or FileNotFoundException)
+        {
+            _status.Text = "Configurazione non importata: " + ex.Message;
+        }
+    }
+
+    private void Apply(ClientConfig config)
+    {
+        if (config.ServerUrl.Length > 0)
+            _server.Text = config.ServerUrl;
+        if (config.RegistrationCode.Length > 0)
+            _registrationCode = config.RegistrationCode;
     }
 
     private async Task SyncNowAsync()

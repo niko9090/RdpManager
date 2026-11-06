@@ -3,8 +3,8 @@
   Mette in opera (o aggiorna) sul Synology wireguard + rdpm-sync + proxy HTTPS. Idempotente.
 .DESCRIPTION
   Copia server/wireguard-synology, server/rdpm-sync (senza bin/obj) e server/caddy-synology sul NAS,
-  installa Docker se manca, genera le chiavi WireGuard e il .env (chiave admin e codice di registrazione
-  casuali) solo se mancano, avvia i contenitori con restart unless-stopped e verifica /health e "wg show".
+  installa Docker se manca, genera le chiavi WireGuard e il .env (chiave admin casuale; codice di registrazione
+  preso da config/locale.json, o casuale se non c'e') solo se mancano, avvia i contenitori con restart unless-stopped e verifica /health e "wg show".
   Legge dominio, alias SSH e rete LAN da config/locale.json (modello: config/locale.example.json, non pubblicato).
   Richiede l'alias SSH indicato li' (utente con sudo senza password). Non scrive segreti nel repo.
 .EXAMPLE
@@ -43,7 +43,10 @@ try {
     scp -O -o BatchMode=yes (Join-Path $srv 'deploy-synology.remote.sh') "${Alias}:/tmp/rdpm-deploy.sh"
     if ($LASTEXITCODE) { throw 'scp fallito' }
     ssh -o BatchMode=yes $Alias 'tar -xf /tmp/rdpm-deploy.tar -C /tmp/rdpm-deploy && rm /tmp/rdpm-deploy.tar'
-    $remote = "sudo -n env DEPLOY_HOST=$PublicHost DEPLOY_LAN=$($cfg.ReteLan) DEPLOY_BASE=$($cfg.CartellaNas) DEPLOY_PORT_VPN=$($cfg.PortaVpn) bash /tmp/rdpm-deploy.sh; rc=`$?; rm -f /tmp/rdpm-deploy.sh; exit `$rc"
+    # Il codice di registrazione (se c'e' in config/locale.json) passa come variabile d'ambiente, non come file.
+    $codice = if ($cfg.CodiceRegistrazione -match '^[A-Za-z0-9._-]+$') { " DEPLOY_REG_CODE=$($cfg.CodiceRegistrazione)" } else { '' }
+    if ($cfg.CodiceRegistrazione -and -not $codice) { throw 'codiceRegistrazione: usa solo lettere, cifre e . _ -' }
+    $remote = "sudo -n env DEPLOY_HOST=$PublicHost$codiceDEPLOY_LAN=$($cfg.ReteLan) DEPLOY_BASE=$($cfg.CartellaNas) DEPLOY_PORT_VPN=$($cfg.PortaVpn) bash /tmp/rdpm-deploy.sh; rc=`$?; rm -f /tmp/rdpm-deploy.sh; exit `$rc"
     ssh -o BatchMode=yes $Alias $remote
     if ($LASTEXITCODE) { throw 'deploy fallito sul Synology' }
 }

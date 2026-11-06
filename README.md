@@ -699,8 +699,36 @@ non cerca niente finché non premi un pulsante.
 **Strumenti › Account e sincronizzazione…** collega questo PC a un account del server `rdpm-sync` (vedi
 `server/rdpm-sync/LEGGIMI.md` per avviarlo sul Synology). Si indica l'indirizzo del proprio server (nessun valore predefinito; vedi «Configurazione locale»; esempio
 `https://vpn.example.com:8443`), il nome utente e la password, poi **Accedi**,
-oppure **Registrati** se l'account non c'è ancora (il server può chiedere un codice di registrazione). Sugli altri PC
+oppure **Registrati** se l'account non c'è ancora. Sugli altri PC
 basta lo stesso login: connessioni, cartelle, profili di credenziali e testi rapidi sono gli stessi.
+
+**Registrazione**: non serve nessuna chiave di amministrazione. Il server vuole un **codice di registrazione** (un codice
+d'invito che ti dà chi gestisce il server) oppure, se è aperto, nessun codice. Il modo più semplice è il **file di
+configurazione** (`rdpmanager-config.json`, vedi sotto): lo importi con **Importa configurazione…** e l'app compila
+l'indirizzo e ricorda il codice. Senza file, se il server vuole il codice l'app lo chiede
+(«Codice di registrazione (te lo dà chi gestisce il server)»).
+
+#### File di configurazione del client (`rdpmanager-config.json`)
+
+Lo prepara chi gestisce il server e lo consegna a chi installa. L'app lo carica da sola se lo trova **accanto
+all'eseguibile** (`RdpManager.exe`) o in **`%APPDATA%\RdpManager`**; altrimenti si usa **Importa configurazione…** nel
+dialogo dell'account. Tutti i campi sono facoltativi (basta uno); le chiavi che cominciano con `_` sono commenti.
+
+```json
+{
+  "server": "https://vpn.example.com:8443",
+  "codiceRegistrazione": "codice-lungo-e-casuale",
+  "vpnEndpoint": "vpn.example.com:51820"
+}
+```
+
+- `server`: indirizzo del server `rdpm-sync` (come si scrive nel dialogo).
+- `codiceRegistrazione`: il codice d'invito del server (`RDPM_SYNC_REGISTRATION_CODE`). Contiene un segreto: non pubblicarlo.
+- `vpnEndpoint`: indirizzo `host:porta` del tunnel WireGuard, a titolo informativo (il server lo comunica da solo nel profilo VPN).
+
+Per chi gestisce il server: `pwsh server/crea-config-client.ps1` legge `config/locale.json` e scrive il file in
+`artifacts/config-client/` (ignorata da git). Nel `config/locale.json` il campo `codiceRegistrazione` è lo stesso codice che
+`server/deploy-synology.ps1` imposta sul server.
 
 - **VPN automatica**: dopo l'accesso o la registrazione, se questo PC non ha ancora un profilo VPN, RdpManager crea le
   chiavi WireGuard (la privata resta sul PC, cifrata con DPAPI), manda al server solo la pubblica, riceve indirizzo,
@@ -910,7 +938,8 @@ Il repository è pubblico e non contiene dati personali: nessun dominio, indiriz
 Ognuno compila la propria configurazione.
 
 1. Copia `config/locale.example.json` in `config/locale.json` (il file vero è nel `.gitignore`: non finisce mai su GitHub)
-   e scrivi i tuoi valori: dominio pubblico, alias SSH e porta del NAS, cartella dei contenitori, rete locale.
+   e scrivi i tuoi valori: dominio pubblico, alias SSH e porta del NAS, cartella dei contenitori, rete locale e codice di
+   registrazione. Poi `pwsh server/crea-config-client.ps1` prepara il file `rdpmanager-config.json` da dare ai client.
    Il modello ha i commenti in italiano.
 2. `server/deploy-synology.ps1` e `verifica/vpn-registrazione-e2e.ps1` leggono da lì (con `server/config-locale.ps1`):
    niente valori scritti negli script. Il deploy compila da solo anche `server/rdpm-sync/.env` sul NAS.

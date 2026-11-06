@@ -19,6 +19,9 @@
   "_cartellaNas": "Cartella del NAS dove vivono i contenitori (wireguard, rdpm-sync, caddy).",
   "cartellaNas": "/volume1/docker",
 
+  "_codiceRegistrazione": "Codice d'invito per registrare gli utenti dall'app (finisce anche nel file del client). Scegline uno lungo e casuale. Vuoto = lo genera il deploy sul NAS la prima volta.",
+  "codiceRegistrazione": "SOSTITUISCI-CON-UN-CODICE-LUNGO-E-CASUALE",
+
   "_reteLan": "Rete locale del NAS (CIDR) raggiungibile dai PC in VPN; vuota = nessun inoltro verso la LAN.",
   "reteLan": "192.0.2.0/24"
 }
