@@ -1,24 +1,15 @@
 # Novità di RdpManager
 
-## Non rilasciato
+## 1.11.1 (2026-11-06)
 
 **Chiusura che non si blocca più**
 - Correzione: alla chiusura la finestra poteva diventare bianca e restare ferma (bisognava terminare il programma da Gestione attività).
-  Ora l'uscita ha un cane da guardia su un thread suo: se la chiusura non finisce entro 8 secondi il programma esce comunque.
-- Alla chiusura si interrompono sincronizzazione e VPN automatica in corso (niente più attese sulla rete), e le sessioni RDP
-  si disconnettono prima di essere eliminate, aspettando al massimo 3 secondi (8 se si chiude per aggiornare) senza bloccare la finestra.
-- Un secondo clic sulla X (o «Esci» dall'area di notifica) durante la chiusura viene ignorato; i timer si fermano all'inizio della chiusura
-  e ripartono se la chiusura viene annullata.
-- Se l'uscita forzata si blocca, parte comunque la terminazione del processo (su un thread separato).
-- «Aggiorna ora»: il programma di aggiornamento parte prima di disconnettere le sessioni; con «Installa alla chiusura» la copia di riserva è pronta prima che il conto alla rovescia parta.
-- Il profilo VPN si salva tramite un file temporaneo con nome univoco (cancellato se la scrittura fallisce), come l'elenco delle connessioni.
-- Spegnimento o riavvio di Windows: la chiusura non viene mai annullata (niente «RdpManager impedisce l'arresto»), alle sessioni connesse si chiede
-  solo la disconnessione senza eliminarne i controlli, e se un'altra app blocca l'arresto la finestra torna intatta.
-- Dopo l'inizio della chiusura non si può più annullarla (prima restavano veri i segnali di aggiornamento e uscita); una chiusura già annullata
-  prima di arrivare al programma (finestre possedute, convalida) non fa niente. Con «Installa alla chiusura» il programma di aggiornamento parte subito, con il tempo lungo.
-- Durante l'attesa della disconnessione la finestra è disattivata (niente sessioni nuove né comandi); si fermano anche i timer delle miniature e dei messaggi.
-- Le sessioni mai partite passano a «Disconnessa», e se la chiusura viene annullata la riconnessione automatica torna attiva.
-- Prove: le finestre dei test si chiudono sempre per intero (anche con sessioni «in corso»), così non restano aperte nel test dopo.
+- Le sessioni si scollegano in ordine, aspettando al massimo 3 secondi; l'uscita è garantita entro 8 secondi anche se qualcosa si blocca.
+- Durante lo spegnimento o il riavvio di Windows la chiusura non viene mai bloccata (niente «RdpManager impedisce l'arresto»).
+- Un secondo clic sulla X (o «Esci» dall'area di notifica) durante la chiusura viene ignorato.
+- «Aggiorna ora»: il programma di aggiornamento parte prima di scollegare le sessioni.
+- Sincronizzazione e VPN automatica in corso si interrompono alla chiusura; le sessioni mai partite risultano «Disconnesse».
+- Le novità della 1.11.0 (registrazione semplificata, icona nuova, dati personali fuori dal repository) restano valide, vedi sotto.
 
 ## 1.11.0
 
