@@ -69,7 +69,7 @@ public sealed partial class MainForm : Form
         MinimumSize = new Size(800, 500);
         StartPosition = FormStartPosition.CenterScreen;
         Font = SystemFonts.MessageBoxFont ?? Font;
-        Icon = CreateAppIcon();
+        Icon = AppIcon.Instance;
 
         BuildImages();
         _tree.ImageList = _treeImages;
@@ -1240,20 +1240,4 @@ public sealed partial class MainForm : Form
         return bmp;
     }
 
-    private static Icon CreateAppIcon()
-    {
-        using var bmp = new Bitmap(32, 32);
-        using (var g = Graphics.FromImage(bmp))
-        {
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            using var frame = new SolidBrush(Color.FromArgb(45, 45, 55));
-            using var back = new SolidBrush(Color.FromArgb(40, 110, 200));
-            using var front = new SolidBrush(Color.FromArgb(90, 180, 250));
-            g.FillRectangle(frame, 2, 4, 22, 16);
-            g.FillRectangle(back, 4, 6, 18, 12);
-            g.FillRectangle(frame, 8, 14, 22, 16);
-            g.FillRectangle(front, 10, 16, 18, 12);
-        }
-        return Icon.FromHandle(bmp.GetHicon());
-    }
 }

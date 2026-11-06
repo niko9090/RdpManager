@@ -21,6 +21,7 @@ internal sealed class LockForm : Form
     {
         _tryUnlock = tryUnlock;
         Text = "RdpManager è bloccato";
+        Icon = AppIcon.Instance;
         FormBorderStyle = FormBorderStyle.None;
         StartPosition = FormStartPosition.Manual;
         Bounds = screen;

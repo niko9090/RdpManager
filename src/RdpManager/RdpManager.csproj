@@ -26,6 +26,8 @@
     <RepositoryUrl>https://github.com/niko9090/RdpManager</RepositoryUrl>
     <!-- Avvio con i diritti dell'utente (asInvoker), dichiarato per Windows 10/11. -->
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Icona dell'exe (collegamenti, barra delle applicazioni); si rigenera con assets\genera-icona.ps1. -->
+    <ApplicationIcon>app.ico</ApplicationIcon>
     <!--
       Pubblicazione a cartella (dotnet publish -r win-x64 con self-contained): è quella che va nell'installer.
       L'exe portatile a file unico si chiede esplicitamente con -p:PublishSingleFile=true (vedi build-installer.ps1);
@@ -33,6 +35,11 @@
     -->
     <IncludeNativeLibrariesForSelfExtract Condition="'$(PublishSingleFile)' == 'true'">true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
+
+  <!-- La stessa icona anche come risorsa della dll: finestre e dialoghi la leggono da qui (vedi UI\AppIcon.cs). -->
+  <ItemGroup>
+    <EmbeddedResource Include="app.ico" LogicalName="RdpManager.app.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
