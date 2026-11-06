@@ -1,6 +1,13 @@
 # Novità di RdpManager
 
-## Non rilasciato
+## 1.11.0
+
+**Icona nuova**
+- Nuova icona dell'app: finestre, collegamenti e installer.
+
+**Dati personali fuori dal repository**
+- Server, endpoint VPN e altri dati di installazione stanno in `config/locale.json` (ignorato da git); nel repository
+  restano segnaposto neutri e l'app non ha più un server predefinito.
 
 **Registrazione più semplice (niente più «chiave di amministrazione»)**
 - «Registrati» non chiede più `RDPM_SYNC_ADMIN_KEY`: usa il codice di registrazione del server (un codice d'invito) o
