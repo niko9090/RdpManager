@@ -7,7 +7,7 @@ namespace RdpManager.UI;
 internal static class NativeMethods
 {
     public const int WM_KEYDOWN = 0x0100, WM_SYSKEYDOWN = 0x0104;
-    public const int WM_ACTIVATEAPP = 0x001C;
+    public const int WM_ACTIVATEAPP = 0x001C, WM_ENDSESSION = 0x0016;
 
     public const uint INPUT_KEYBOARD = 1;
     public const uint KEYEVENTF_KEYUP = 0x0002, KEYEVENTF_UNICODE = 0x0004;

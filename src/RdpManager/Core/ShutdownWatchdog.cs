@@ -18,8 +18,11 @@ public sealed class ShutdownWatchdog
     private readonly Action<string>? _log;
     private int _state; // 0 = in attesa, 1 = fermato, 2 = scattato
 
-    private ShutdownWatchdog(TimeSpan timeout, Action exit, Action kill, Action<string>? log)
+    private readonly TimeSpan _killDelay;
+
+    private ShutdownWatchdog(TimeSpan timeout, Action exit, Action kill, Action<string>? log, TimeSpan killDelay)
     {
+        _killDelay = killDelay;
         _timeout = timeout;
         _exit = exit;
         _kill = kill;
@@ -51,9 +54,9 @@ public sealed class ShutdownWatchdog
     public static TimeSpan KillDelay { get; set; } = TimeSpan.FromSeconds(2);
 
     /// <summary>Avvia il conto alla rovescia. <paramref name="exit"/> è l'uscita forzata; se non porta via il processo entro 2 secondi segue <paramref name="kill"/>.</summary>
-    public static ShutdownWatchdog Start(TimeSpan timeout, Action? exit = null, Action? kill = null, Action<string>? log = null)
+    public static ShutdownWatchdog Start(TimeSpan timeout, Action? exit = null, Action? kill = null, Action<string>? log = null, TimeSpan? killDelay = null)
     {
-        var dog = new ShutdownWatchdog(timeout, exit ?? DefaultExit, kill ?? DefaultKill, log);
+        var dog = new ShutdownWatchdog(timeout, exit ?? DefaultExit, kill ?? DefaultKill, log, killDelay ?? KillDelay);
         new Thread(dog.Run) { IsBackground = true, Name = "RdpManager-uscita" }.Start();
         return dog;
     }
@@ -72,7 +75,7 @@ public sealed class ShutdownWatchdog
         try { _log?.Invoke($"Chiusura bloccata oltre {_timeout.TotalSeconds:0} secondi: uscita forzata"); } catch (Exception) { }
         // La terminazione di riserva si arma prima, su un thread suo: se _exit() si blocca (chiusura delle DLL, mstscax)
         // non deve impedirle di partire.
-        var killDelay = KillDelay;
+        var killDelay = _killDelay;
         new Thread(() =>
         {
             Thread.Sleep(killDelay);
