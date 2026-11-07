@@ -1,5 +1,11 @@
 # Novità di RdpManager
 
+## 1.11.2 (2026-11-07)
+
+**Schermo intero corretto (Surface, modalità tocco)**
+- Correzione: a schermo intero con ridimensionamento alto la parte alta non resta più nascosta o fuori vista, perché la misura delle linguette viene riletta a ogni layout.
+- Il menu a sinistra non lascia più immagini doppie: dopo l'entrata e l'uscita dallo schermo intero e dopo un cambio di DPI la finestra viene ridisegnata tutta.
+
 ## 1.11.1 (2026-11-06)
 
 **Chiusura che non si blocca più**
