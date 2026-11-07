@@ -964,8 +964,9 @@ public sealed partial class MainForm
         FormBorderStyle = FormBorderStyle.None;
         UpdateFullScreenBounds();
         ApplySidebarLayout();
-        ResumeLayout();
+        ResumeLayout(true);
         LayoutOverlays();
+        SettleAfterModeChange();
         _fullScreenItem.Checked = true;
         Activate();
         FlashFullScreenBar();
@@ -985,16 +986,44 @@ public sealed partial class MainForm
         _content.Dock = DockStyle.Fill;
         _tabs.Dock = DockStyle.Fill;
         FormBorderStyle = _savedBorder;
-        Bounds = MonitorLayout.EnsureVisible(_savedBounds, Screens.All(), _doc.Settings.PreferredMonitor);
+        var restored = MonitorLayout.EnsureVisible(_savedBounds, Screens.All(), _doc.Settings.PreferredMonitor);
+        Bounds = restored;
         WindowState = _savedState == FormWindowState.Minimized ? FormWindowState.Normal : _savedState;
+        if (WindowState == FormWindowState.Normal && Bounds != restored)
+            Bounds = restored; // con DPI diverso fra i monitor Windows può riscalare la misura passando di schermo
         _menu.Visible = true;
         _statusStrip.Visible = true;
         foreach (var v in AllViews)
             v.ToolbarVisible = true;
         ApplySidebarLayout();
-        ResumeLayout();
+        ResumeLayout(true);
         LayoutOverlays();
+        SettleAfterModeChange();
         _fullScreenItem.Checked = false;
+    }
+
+    /// <summary>
+    /// Dopo l'entrata o l'uscita dallo schermo intero: con DPI alto (e monitor a scale diverse) Windows può riscalare
+    /// la finestra mentre cambia bordo e posizione e lasciare l'immagine vecchia (barra laterale doppia, intestazioni
+    /// in alto). Rimette la misura giusta, ricalcola tutto e ridisegna da capo.
+    /// </summary>
+    private void SettleAfterModeChange()
+    {
+        if (IsDisposed || !IsHandleCreated)
+            return;
+        if (_fullScreen)
+            UpdateFullScreenBounds();
+        PerformLayout();
+        LayoutOverlays();
+        Invalidate(true);
+        Update();
+    }
+
+    protected override void OnDpiChanged(DpiChangedEventArgs e)
+    {
+        base.OnDpiChanged(e);
+        if (_fullScreen && !IsDisposed && IsHandleCreated)
+            BeginInvoke(SettleAfterModeChange);
     }
 
     /// <summary>Monitor dello schermo intero: tutti se la sessione corrente usa tutti i monitor, altrimenti quello scelto.</summary>
@@ -1038,9 +1067,21 @@ public sealed partial class MainForm
             if (_fsBar.Visible != shown)
                 _fsBar.Visible = shown;
             // Le intestazioni delle schede finiscono fuori dall'area visibile: resta solo la sessione.
+            // Le misure delle intestazioni si rileggono ogni volta: con DPI alto o linguette larghe su più righe
+            // cambiano quando la finestra cambia misura, e un valore vecchio lascerebbe le schede visibili in alto.
             _tabs.Dock = DockStyle.None;
-            _tabs.Bounds = new Rectangle(-_tabInsets.Left, -_tabInsets.Top,
-                _content.Width + _tabInsets.Horizontal, _content.Height + _tabInsets.Vertical);
+            for (int pass = 0; pass < 3; pass++)
+            {
+                var want = new Rectangle(-_tabInsets.Left, -_tabInsets.Top,
+                    _content.Width + _tabInsets.Horizontal, _content.Height + _tabInsets.Vertical);
+                if (_tabs.Bounds != want)
+                    _tabs.Bounds = want;
+                var display = _tabs.DisplayRectangle;
+                var insets = new Padding(display.Left, display.Top, _tabs.Width - display.Right, _tabs.Height - display.Bottom);
+                if (insets == _tabInsets)
+                    break;
+                _tabInsets = insets;
+            }
             UpdateFullScreenHandle();
             return;
         }
