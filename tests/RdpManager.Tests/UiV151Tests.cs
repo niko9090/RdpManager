@@ -162,7 +162,7 @@ public sealed class UiV151Tests : IDisposable
     [Theory]
     [InlineData(BarPosition.Left, 80, 0, 340)]
     [InlineData(BarPosition.Right, -80, 0, 340)]
-    [InlineData(BarPosition.Bottom, 0, -80, 340)]
+    [InlineData(BarPosition.Bottom, 0, -40, 300)] // non 340: con schermi bassi (metà area ~333 px) 340 supera il limite
     [InlineData(BarPosition.Left, -500, 0, FullScreenBarSettings.MinWidth)]
     public void FullScreenBar_DragTheEdge_TheSessionAdaptsAndTheSizeIsSaved(BarPosition position, int dx, int dy, int expected)
     {
