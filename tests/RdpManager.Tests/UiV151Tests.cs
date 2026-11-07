@@ -354,4 +354,57 @@ public sealed class UiV151Tests : IDisposable
             Assert.Equal("profilo", saved.ResolveCredentials(saved.Connections.Single(c => c.Name == "B già qui")).Password);
         });
     }
+
+    // ---------- schermo intero pulito (Surface, DPI alto) ----------
+
+    /// <summary>Controlli della finestra, senza il contenuto della barra a schermo intero (che si ricostruisce).</summary>
+    private static int CountOutsideBar(Control parent) =>
+        parent.Controls.Cast<Control>().Sum(c => 1 + (c is FullScreenSideBar ? 0 : CountOutsideBar(c)));
+
+    private static void AssertCleanFullScreen(MainForm form)
+    {
+        Assert.True(form.IsFullScreen);
+        Assert.False(form.Sidebar.Visible, "la barra laterale della finestra deve sparire");
+        Assert.False(Descendants(form).OfType<MenuStrip>().Any(m => m.Visible), "il menu deve sparire");
+        Assert.False(Descendants(form).OfType<StatusStrip>().Any(m => m.Visible), "la barra di stato deve sparire");
+        Assert.Equal(1, Descendants(form).Count(c => ReferenceEquals(c, form.Sidebar)));
+        // Le intestazioni delle schede stanno fuori dall'area visibile: la pagina parte dall'alto della sessione.
+        var area = form.Tabs.Parent!;
+        Assert.Equal(0, area.Top);
+        Assert.Equal(0, form.Tabs.Top + form.Tabs.DisplayRectangle.Top);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void FullScreen_EnterAndLeaveRepeatedly_LeavesNoDuplicatesNorHeaders(bool wideTabs)
+    {
+        WithMainForm(StoreWith(null, Unreachable("Uno"), Unreachable("Due")), form =>
+        {
+            OpenAllConnected(form);
+            if (wideTabs) // linguette alte su più righe, come con tocco e DPI alto
+                TouchUi.SetWideTabs(form.Tabs, true, 96);
+            Pump(100);
+            var border = form.FormBorderStyle;
+            var sidebarVisible = form.Sidebar.Visible;
+            var size = form.Size;
+            int fsBars = Descendants(form).Count(c => c is FullScreenSideBar);
+            int controls = CountOutsideBar(form);
+            for (int i = 0; i < 3; i++)
+            {
+                form.ToggleFullScreen();
+                Pump(150);
+                AssertCleanFullScreen(form);
+                form.ToggleFullScreen();
+                Pump(150);
+                Assert.False(form.IsFullScreen);
+                Assert.Equal(border, form.FormBorderStyle);
+                Assert.Equal(sidebarVisible, form.Sidebar.Visible);
+                Assert.Equal(size, form.Size);
+                Assert.Equal(fsBars, Descendants(form).Count(c => c is FullScreenSideBar));
+                Assert.Equal(controls, CountOutsideBar(form));
+                Assert.Equal(DockStyle.Fill, form.Tabs.Dock);
+            }
+        });
+    }
 }
