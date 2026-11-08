@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Servizi di piattaforma per Linux (custode delle password, VPN WireGuard via NetworkManager/wg-quick) sopra RdpManager.Core.
+    Compila e si prova anche su Windows: nessuna chiamata di sistema vive nei costruttori, i programmi esterni passano da IProcessRunner.
+    L'app Linux chiama LinuxPlatformInit.Register() all'avvio.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>RdpManager.Platform.Linux</RootNamespace>
+    <AssemblyName>RdpManager.Platform.Linux</AssemblyName>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RdpManager.Core\RdpManager.Core.csproj" />
+    <InternalsVisibleTo Include="RdpManager.Tests" />
+  </ItemGroup>
+
+</Project>

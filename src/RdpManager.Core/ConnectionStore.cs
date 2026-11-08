@@ -168,8 +168,7 @@ public sealed class ConnectionStore
         Converters = { new JsonStringEnumConverter() },
     };
 
-    public static string DefaultPath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RdpManager", "connections.json");
+    public static string DefaultPath => Path.Combine(AppPaths.ConfigFolder, "connections.json");
 
     public string FilePath { get; }
 
