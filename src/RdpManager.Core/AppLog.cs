@@ -42,8 +42,7 @@ public sealed class AppLog
     public string CurrentPath => Path.Combine(Directory, FileName);
 
     /// <summary>Cartella predefinita: %LOCALAPPDATA%\RdpManager\logs.</summary>
-    public static string DefaultDirectory => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RdpManager", "logs");
+    public static string DefaultDirectory => Path.Combine(AppPaths.DataFolder, "logs");
 
     /// <summary>Log dell'app; null finché il programma non lo crea (le prove automatiche ne fanno a meno).</summary>
     public static AppLog? Default { get; set; }

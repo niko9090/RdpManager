@@ -45,8 +45,7 @@ public sealed record UpdateJob(
     public const string ExeName = "RdpManager.exe";
 
     /// <summary>Cartelle di lavoro predefinite: %LOCALAPPDATA%\RdpManager\update-runner (fuori da «updates», che si ripulisce).</summary>
-    public static string DefaultRunnerFolder => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RdpManager", "update-runner");
+    public static string DefaultRunnerFolder => Path.Combine(AppPaths.DataFolder, "update-runner");
 
     /// <summary>Argomenti per avviare la copia in modalità aggiornamento (da passare uno per uno, senza virgolette).</summary>
     public IReadOnlyList<string> ToArguments()
