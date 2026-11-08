@@ -8,7 +8,7 @@
 # con packaging/linux/build-packages.sh, che richiede dpkg-deb, rpmbuild (pacchetto «rpm»), squashfs-tools e curl.
 # Se mancano, lo script prova a installarli in WSL come root (apt-get). appimagetool si scarica in artifacts\tools.
 #
-# Uso:   powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-linux.ps1 -Version 1.12.0
+# Uso:   powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-linux.ps1 -Version 1.12.1
 # Senza -Version la versione si legge da <Version> in src\RdpManager\RdpManager.csproj (la stessa fonte dell'installer Windows).
 
 param(

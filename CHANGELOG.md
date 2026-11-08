@@ -1,5 +1,11 @@
 # Novità di RdpManager
 
+## 1.12.1 (2026-11-08)
+
+**VPN senza conferma di amministratore**
+- RdpManager non chiede più la conferma di amministratore di Windows quando accendi, spegni o cambi la VPN.
+- Le operazioni da amministratore le fanno l'installazione e il servizio VPN.
+
 ## 1.12.0 (2026-11-08)
 
 **Impostazioni e menu rifatti**
