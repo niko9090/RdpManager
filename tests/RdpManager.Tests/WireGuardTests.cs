@@ -197,11 +197,12 @@ public class WireGuardTunnelTests : IDisposable
         public bool StopDenied;
         public List<string> Calls = [];
         public string? BinPath;
+        public Action? OnStart;
 
         public TunnelState Query(string name) => Present ? State : TunnelState.Spento;
         public bool Exists(string name) => Present;
         public void Create(string name, string display, string bin) { Calls.Add("create"); Present = true; BinPath = bin; }
-        public void Start(string name) { Calls.Add("start"); State = StartFails ? TunnelState.Errore : TunnelState.Acceso; }
+        public void Start(string name) { Calls.Add("start"); OnStart?.Invoke(); State = StartFails ? TunnelState.Errore : TunnelState.Acceso; }
         public void Stop(string name)
         {
             if (StopDenied)
@@ -226,7 +227,7 @@ public class WireGuardTunnelTests : IDisposable
             Runs.Add([.. args]);
             if (forcedCode is { } c)
                 return c;
-            var helper = new VpnHelper(svc, programData, @"C:\app\RdpManager.exe") { Sleep = _ => { }, Restrict = _ => { } };
+            var helper = new VpnHelper(svc, programData, @"C:\app\RdpManager.exe") { Sleep = _ => { }, Restrict = _ => { }, PrepareInbox = dir => Directory.CreateDirectory(VpnPaths.Inbox(dir)) };
             return helper.Run([.. args]);
         }
     }
@@ -243,7 +244,7 @@ public class WireGuardTunnelTests : IDisposable
         var svc = new FakeServices();
         var el = new InProcessElevator(svc, Path.Combine(_dir, "pd"), code);
         var pd = Path.Combine(_dir, "pd");
-        return (new WireGuardNtTunnel(el, svc, Path.Combine(_dir, "stage"), VpnPaths.InstalledHash(pd)) { Sleep = _ => { } }, svc, el);
+        return (new WireGuardNtTunnel(el, svc, Path.Combine(_dir, "stage"), VpnPaths.InstalledHash(pd), null, VpnPaths.InboxConf(pd, VpnDefaults.TunnelName)) { Sleep = _ => { } }, svc, el);
     }
 
     [Fact]
@@ -261,6 +262,52 @@ public class WireGuardTunnelTests : IDisposable
         Assert.Single(Directory.GetFiles(Path.Combine(_dir, "pd"), "*.conf", SearchOption.AllDirectories));
         Assert.Equal(["--vpn-helper", "su"], el.Runs[0][..2]);
     }
+
+    [Fact]
+    public void Accendi_NewConfigWithServiceInstalled_UsesInboxWithoutElevating()
+    {
+        var (t, svc, el) = Make();
+        var pd = Path.Combine(_dir, "pd");
+        svc.OnStart = () => VpnInbox.Collect(pd, VpnDefaults.TunnelName, _ => { }); // il servizio vero lo fa all'avvio
+        t.Accendi(Config());
+        Assert.Single(el.Runs);
+        Assert.True(Directory.Exists(VpnPaths.Inbox(pd)));
+        t.Spegni();
+
+        var second = Config();
+        t.Accendi(second);
+        Assert.Single(el.Runs); // nessun secondo passaggio dall'assistente (niente UAC)
+        Assert.Equal(TunnelState.Acceso, t.Stato);
+        Assert.Equal(second.ToConf(), File.ReadAllText(VpnPaths.Conf(pd, VpnDefaults.TunnelName)));
+        Assert.Equal(VpnHelper.HashConfig(second.ToConf()), File.ReadAllText(VpnPaths.InstalledHash(pd)).Trim());
+        Assert.False(File.Exists(VpnPaths.InboxConf(pd, VpnDefaults.TunnelName)));
+    }
+
+    [Fact]
+    public void Accendi_InboxIgnoredByService_FallsBackToHelperAndLeavesNoKey()
+    {
+        var (t, _, el) = Make();
+        var pd = Path.Combine(_dir, "pd");
+        t.Accendi(Config());
+        t.Spegni();
+        t.Accendi(Config()); // il servizio finto non raccoglie nulla: l'impronta non corrisponde
+        Assert.Equal(2, el.Runs.Count);
+        Assert.False(File.Exists(VpnPaths.InboxConf(pd, VpnDefaults.TunnelName)));
+    }
+
+    [Fact]
+    public void Inbox_InvalidConfig_IsDiscardedAndInstallsNothing()
+    {
+        var pd = Path.Combine(_dir, "pd");
+        Directory.CreateDirectory(VpnPaths.Inbox(pd));
+        File.WriteAllText(VpnPaths.InboxConf(pd, "RdpManager"), "non è una configurazione");
+        Assert.False(VpnInbox.Collect(pd, "RdpManager", _ => { }));
+        Assert.False(File.Exists(VpnPaths.InboxConf(pd, "RdpManager")));
+        Assert.False(File.Exists(VpnPaths.Conf(pd, "RdpManager")));
+    }
+
+    [Fact]
+    public void Inbox_Empty_DoesNothing() => Assert.False(VpnInbox.Collect(Path.Combine(_dir, "nulla"), "RdpManager", _ => { }));
 
     [Fact]
     public void Accendi_WhenAlreadyOn_DoesNothing()
@@ -334,7 +381,8 @@ public class WireGuardTunnelTests : IDisposable
         t.Spegni();
         t.Accendi(Config());
         Assert.Equal(2, el.Runs.Count);
-        Assert.Equal(["create", "grant", "start", "stop", "delete", "create", "grant", "start"], svc.Calls);
+        // il tentativo dalla cartella d'ingresso (start) non cambia la configurazione: il servizio finto non la raccoglie
+        Assert.Equal(["create", "grant", "start", "stop", "start", "stop", "delete", "create", "grant", "start"], svc.Calls);
     }
 
     [Fact]
@@ -378,7 +426,7 @@ public class WireGuardTunnelTests : IDisposable
     public void Helper_BadArguments_Rejected()
     {
         var svc = new FakeServices();
-        var h = new VpnHelper(svc, _dir, "x.exe") { Sleep = _ => { }, Restrict = _ => { } };
+        var h = new VpnHelper(svc, _dir, "x.exe") { Sleep = _ => { }, Restrict = _ => { }, PrepareInbox = _ => { } };
         Assert.Equal(WireGuardNtTunnel.ExitBadArguments, h.Run(["--vpn-helper"]));
         Assert.Equal(WireGuardNtTunnel.ExitBadArguments, h.Run(["--vpn-helper", "boh"]));
         Assert.Equal(WireGuardNtTunnel.ExitBadArguments, h.Run(["--vpn-helper", "su"]));

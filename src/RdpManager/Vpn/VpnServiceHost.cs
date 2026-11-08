@@ -13,6 +13,9 @@ public static class VpnPaths
     public static string InstalledHash(string programData) => Path.Combine(Directory(programData), "installato.sha256");
     /// <summary>Stato scritto dal servizio ogni due secondi (handshake, byte): leggibile da tutti.</summary>
     public static string Status(string programData) => Path.Combine(Directory(programData), "stato.txt");
+    /// <summary>Cartella dove l'utente (senza UAC) lascia la nuova configurazione; il servizio, all'avvio, la sposta in <see cref="Conf"/>.</summary>
+    public static string Inbox(string programData) => Path.Combine(Directory(programData), "ingresso");
+    public static string InboxConf(string programData, string tunnelName) => Path.Combine(Inbox(programData), tunnelName + ".conf");
     public static string Log(string programData) => Path.Combine(Directory(programData), "servizio.log");
 }
 
@@ -83,6 +86,7 @@ internal static class VpnServiceHost
         try
         {
             SetStatus(StartPending, 0, 20000);
+            VpnInbox.Collect(_programData, _tunnelName, VpnFiles.RestrictToAdministrators); // configurazione lasciata dall'utente senza UAC
             var conf = WireGuardConfig.Parse(File.ReadAllText(VpnPaths.Conf(_programData, _tunnelName)));
             runner.Start(conf, _tunnelName);
             SetStatus(Running, 0, 0);
