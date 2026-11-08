@@ -1,0 +1,83 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:RdpManager.Linux.ViewModels"
+        xmlns:l="using:RdpManager.Linux"
+        x:Class="RdpManager.Linux.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="RdpManager" Width="1100" Height="700" MinWidth="720" MinHeight="420">
+
+  <DockPanel>
+    <Border DockPanel.Dock="Bottom" Padding="10,4" BorderThickness="0,1,0,0"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+      <TextBlock Text="{Binding StatusMessage}" TextTrimming="CharacterEllipsis" MinHeight="18" />
+    </Border>
+
+    <Grid ColumnDefinitions="320,Auto,*">
+      <!-- Elenco connessioni -->
+      <DockPanel Grid.Column="0" Margin="8">
+        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,6">
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <Button Content="Nuova" Command="{Binding NewConnectionCommand}" ToolTip.Tip="Nuova connessione" />
+            <Button Content="Cartella" Command="{Binding NewFolderCommand}" ToolTip.Tip="Nuova cartella" />
+            <Button Content="Modifica" Command="{Binding EditCommand}" />
+            <Button Content="Elimina" Command="{Binding DeleteCommand}" />
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <Button Content="Duplica" Command="{Binding DuplicateCommand}" />
+            <Button Content="Preferita" Command="{Binding FavoriteCommand}" />
+            <Button Content="Profili" Command="{Binding ProfilesCommand}" ToolTip.Tip="Profili di credenziali" />
+            <Button Content="Impostazioni" Command="{Binding SettingsCommand}" />
+          </StackPanel>
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBox Name="SearchBox" Text="{Binding SearchText}" Watermark="Cerca connessioni…" />
+            <Button Grid.Column="1" Content="✕" Margin="4,0,0,0" Command="{Binding ClearSearchCommand}" ToolTip.Tip="Cancella la ricerca" />
+          </Grid>
+        </StackPanel>
+
+        <Grid>
+          <TreeView Name="ConnectionTree" ItemsSource="{Binding Roots}" SelectedItem="{Binding SelectedNode}">
+            <TreeView.Styles>
+              <Style Selector="TreeViewItem" x:DataType="vm:TreeNodeViewModel">
+                <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+              </Style>
+            </TreeView.Styles>
+            <TreeView.ItemTemplate>
+              <TreeDataTemplate DataType="vm:TreeNodeViewModel" ItemsSource="{Binding Children}">
+                <StackPanel Margin="0,2">
+                  <TextBlock Text="{Binding Title}" FontWeight="{Binding IsFolder, Converter={x:Static l:Converters.FolderWeight}}" />
+                  <TextBlock Text="{Binding Subtitle}" FontSize="11" Opacity="0.65" IsVisible="{Binding !IsFolder}" />
+                </StackPanel>
+              </TreeDataTemplate>
+            </TreeView.ItemTemplate>
+          </TreeView>
+          <TextBlock Text="Nessuna connessione trovata." IsVisible="{Binding NoResults}"
+                     HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.7" />
+        </Grid>
+      </DockPanel>
+
+      <GridSplitter Grid.Column="1" Width="4" />
+
+      <!-- Area a schede per le sessioni -->
+      <Grid Grid.Column="2">
+        <TabControl ItemsSource="{Binding Tabs}" SelectedItem="{Binding SelectedTab}" IsVisible="{Binding HasTabs}">
+          <TabControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:SessionTabViewModel">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
+                <Button Content="✕" Padding="4,0" Command="{Binding CloseCommand}" ToolTip.Tip="Chiudi la scheda" />
+              </StackPanel>
+            </DataTemplate>
+          </TabControl.ItemTemplate>
+          <TabControl.ContentTemplate>
+            <DataTemplate x:DataType="vm:SessionTabViewModel">
+              <ContentControl Content="{Binding Content}" />
+            </DataTemplate>
+          </TabControl.ContentTemplate>
+        </TabControl>
+        <TextBlock Text="Nessuna sessione aperta. Fai doppio clic su una connessione per aprirla in una scheda."
+                   IsVisible="{Binding !HasTabs}" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="420"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.7" />
+      </Grid>
+    </Grid>
+  </DockPanel>
+</Window>

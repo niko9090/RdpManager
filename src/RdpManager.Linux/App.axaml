@@ -1,0 +1,20 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:s="using:RdpManager.Linux.Sessions"
+             x:Class="RdpManager.Linux.App"
+             RequestedThemeVariant="Default">
+  <Application.Styles>
+    <FluentTheme />
+  </Application.Styles>
+
+  <Application.DataTemplates>
+    <!-- Contenuto della scheda segnaposto (finché non c'è l'host FreeRDP). -->
+    <DataTemplate DataType="s:PlaceholderSessionContent" x:DataType="s:PlaceholderSessionContent">
+      <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8" MaxWidth="480">
+        <TextBlock Text="{Binding Title}" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" />
+        <TextBlock Text="{Binding Target}" HorizontalAlignment="Center" Opacity="0.7" />
+        <TextBlock Text="{Binding Message}" TextWrapping="Wrap" TextAlignment="Center" />
+      </StackPanel>
+    </DataTemplate>
+  </Application.DataTemplates>
+</Application>
