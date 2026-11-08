@@ -1,5 +1,18 @@
 # Novità di RdpManager
 
+## 1.12.0 (2026-11-08)
+
+**Impostazioni e menu rifatti**
+- Nuove Impostazioni con la navigazione a sezioni a sinistra, titoli e descrizioni per ogni sezione e i pulsanti Salva/Annulla sempre visibili in basso.
+- Menu principali riordinati: Importa ed Esporta stanno in sottomenu e un separatore divide le schede dalle sessioni.
+
+**Menu laterale touch**
+- Il menu laterale a schermo intero è pensato per il dito: voci grandi (48 px) con icona ed etichetta, intestazioni di gruppo, voce attiva ben evidente, scorrimento col dito, pulsante Chiudi e linguetta più grande.
+
+**RdpManager per Linux**
+- Nuovo programma Linux a schede, con albero delle connessioni, ricerca, profili e impostazioni; le sessioni usano FreeRDP.
+- Pacchetti per Ubuntu/Debian/Mint (.deb), Fedora/openSUSE (.rpm) e AppImage (senza installazione), tutti x86_64; serve FreeRDP.
+
 ## 1.11.2 (2026-11-07)
 
 **Schermo intero corretto (Surface, modalità tocco)**
