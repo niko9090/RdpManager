@@ -44,7 +44,7 @@ public sealed class Workspace
         SplitRatio = SplitLayout.ClampRatio(SplitRatio);
         if (string.IsNullOrWhiteSpace(Monitor))
             Monitor = null;
-        if (Shortcut.Length > 0 && !GlobalHotkey.TryParse(Shortcut, out _))
+        if (Shortcut.Length > 0 && !HotkeyRules.IsValid(Shortcut))
             Shortcut = "";
     }
 }

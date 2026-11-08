@@ -9,6 +9,7 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
+        PlatformInit.Register();
         var programData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "RdpManager");
         // «--vpn-service <nome>»: questo processo è il servizio del tunnel WireGuard (wireguard-nt); nessuna interfaccia.
         if (VpnServiceArgs.TryParse(args, out var tunnelName))

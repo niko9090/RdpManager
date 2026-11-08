@@ -78,7 +78,7 @@ public sealed class AppSettings
 
     /// <summary>
     /// Scorciatoie personalizzate: nome di <see cref="ShortcutAction"/> → combinazione ("Ctrl+Alt+Destra").
-    /// Le azioni assenti usano i valori predefiniti; vedi <see cref="GetShortcuts"/>.
+    /// Le azioni assenti usano i valori predefiniti; vedi GetShortcuts (estensione in RdpManager).
     /// </summary>
     public Dictionary<string, string> Shortcuts { get; set; } = [];
 
@@ -94,9 +94,9 @@ public sealed class AppSettings
 
     /// <summary>
     /// Scorciatoia globale (RegisterHotKey) che richiama l'app da qualunque programma; stringa vuota = disattivata.
-    /// Serve Ctrl o Alt (vedi <see cref="GlobalHotkey"/>).
+    /// Serve Ctrl o Alt (vedi <see cref="HotkeyRules"/>).
     /// </summary>
-    public string GlobalHotkey { get; set; } = Core.GlobalHotkey.DefaultText;
+    public string GlobalHotkey { get; set; } = HotkeyRules.DefaultText;
 
     /// <summary>Si annotano inizio, fine, durata e motivo di ogni sessione (history.json).</summary>
     public bool HistoryEnabled { get; set; } = true;
@@ -174,7 +174,6 @@ public sealed class AppSettings
     [System.Text.Json.Serialization.JsonIgnore]
     public bool LockEnabled => LockPin is { IsValid: true };
 
-    public ShortcutMap GetShortcuts() => ShortcutMap.FromSettings(Shortcuts);
 
     /// <summary>
     /// Copia da esportare in un .rdpm: senza ciò che vale solo per questo PC (monitor scelto, sessioni da riaprire).
@@ -241,7 +240,6 @@ public sealed class AppSettings
         return copy;
     }
 
-    public void SetShortcuts(ShortcutMap map) => Shortcuts = map.ToSettings();
 
     /// <summary>Ripara i valori mancanti o non validi dopo il caricamento.</summary>
     public void Normalize()
@@ -259,9 +257,9 @@ public sealed class AppSettings
             SessionTouch = SessionTouchMode.Remote;
         // null = file della 1.0/1.1 senza il campo: si usa il predefinito; "" = disattivata dall'utente.
         if (GlobalHotkey is null)
-            GlobalHotkey = Core.GlobalHotkey.DefaultText;
-        else if (GlobalHotkey.Length > 0 && !Core.GlobalHotkey.TryParse(GlobalHotkey, out _))
-            GlobalHotkey = Core.GlobalHotkey.DefaultText;
+            GlobalHotkey = HotkeyRules.DefaultText;
+        else if (GlobalHotkey.Length > 0 && !HotkeyRules.IsValid(GlobalHotkey))
+            GlobalHotkey = HotkeyRules.DefaultText;
         SplitRatio = SplitLayout.ClampRatio(SplitRatio);
         if (!Enum.IsDefined(ConnectionOrder))
             ConnectionOrder = ConnectionOrder.Alphabetical;

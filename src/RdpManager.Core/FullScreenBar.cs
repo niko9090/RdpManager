@@ -371,7 +371,7 @@ public static class FullScreenBarLayout
     /// sessioni sono già nella sezione delle sessioni connesse).
     /// </summary>
     public static IReadOnlyList<ShortcutAction> QuickActions { get; } =
-        Enum.GetValues<ShortcutAction>().Where(a => ShortcutMap.SessionNumber(a) is null).ToList();
+        Enum.GetValues<ShortcutAction>().Where(a => a is < ShortcutAction.Session1 or > ShortcutAction.Session9).ToList();
 
     /// <summary>Azioni sulla sessione attiva: le funzioni della 1.1 che stavano nella barra in alto.</summary>
     public static IReadOnlyList<SessionBarAction> SessionActions { get; } = Enum.GetValues<SessionBarAction>();
