@@ -405,7 +405,7 @@ public sealed class UiV15Tests(ITestOutputHelper output) : IDisposable
                 dlg.MoveSectionForTests(-1);
                 Assert.Equal(7, dlg.BarSectionsBox.Items.Count);
                 dlg.BarSectionsBox.SetItemChecked(6, false); // Testi rapidi
-                Descendants(dlg).OfType<Button>().Single(b => b.Text == "OK").PerformClick();
+                Descendants(dlg).OfType<Button>().Single(b => b.Text == "Salva").PerformClick();
 
                 var bar = settings.Bar;
                 Assert.Equal((BarPosition.Bottom, BarMode.AutoReveal, 200, 700, SessionListStyle.Thumbnails),

@@ -47,23 +47,30 @@ public sealed class SettingsDialog : TouchForm
     {
         _settings = settings;
         Text = "Impostazioni";
-        FormBorderStyle = FormBorderStyle.FixedDialog;
-        MaximizeBox = MinimizeBox = false;
+        FormBorderStyle = FormBorderStyle.Sizable;
+        MaximizeBox = false;
         ShowInTaskbar = false;
         StartPosition = FormStartPosition.CenterParent;
-        Padding = new Padding(10);
+        MinimizeBox = false;
         Font = SystemFonts.MessageBoxFont ?? Font;
 
-        // ---------- Generale ----------
-        var general = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Dock = DockStyle.Fill };
+        var general = NewPage();
+        var look = NewPage();
+        var full = NewPage();
+        var touch = NewPage();
+        var shortcuts = NewPage();
+        var security = NewPage();
+        var updates = NewPage();
+        var logs = NewPage();
 
         _theme.Items.AddRange(ThemeChoices.Select(t => (object)t.Text).ToArray());
         _theme.SelectedIndex = Math.Max(0, Array.FindIndex(ThemeChoices, t => t.Theme == settings.Theme));
-        general.Controls.Add(Group("Aspetto", Flow(new Label { Text = "Tema", AutoSize = true, Margin = new Padding(3, 7, 8, 3) }, _theme)));
+        look.Controls.Add(Group("Tema dei colori", Flow(Caption("Tema"), _theme),
+            Note("«Come Windows» segue la modalità chiara o scura del sistema.")));
 
         _touchMode.Items.AddRange(["Automatica (se c'è uno schermo touch)", "Sempre attiva", "Spenta"]);
         _touchMode.SelectedIndex = (int)TouchPolicy.Normalize(settings.TouchMode);
-        general.Controls.Add(Group("Modalità tocco", _touchMode,
+        look.Controls.Add(Group("Modalità tocco", _touchMode,
             Note("Righe, schede, menu e pulsanti più grandi; trascinando l'elenco col dito scorre; la X chiude le schede.")));
 
         _tray.Checked = settings.ShowTrayIcon;
@@ -71,9 +78,11 @@ public sealed class SettingsDialog : TouchForm
         _closeToTray.Enabled = _tray.Checked;
         _tray.CheckedChanged += (_, _) => _closeToTray.Enabled = _tray.Checked;
         _globalHotkey.Combo = GlobalHotkey.FromSettings(settings.GlobalHotkey);
-        general.Controls.Add(Group("Area di notifica e richiamo dell'app", _tray, _closeToTray,
-            Flow(new Label { Text = "Scorciatoia globale per richiamare l'app", AutoSize = true, Margin = new Padding(3, 7, 8, 3) }, _globalHotkey),
-            Note("Funziona anche da altri programmi (RegisterHotKey). Canc la disattiva.")));
+        general.Controls.Add(Group("Area di notifica", _tray, _closeToTray,
+            Note("L'icona accanto all'orologio apre il menu delle connessioni. Chiudendo la finestra l'app può restare lì in attesa.")));
+        general.Controls.Add(Group("Richiamo rapido dell'app",
+            Flow(Caption("Scorciatoia globale"), _globalHotkey),
+            Note("Porta RdpManager in primo piano anche da altri programmi. Canc la disattiva.")));
 
         _monitor.Items.Add("Principale");
         foreach (var s in MonitorLayout.Ordered(_screens))
@@ -82,19 +91,20 @@ public sealed class SettingsDialog : TouchForm
             ? MonitorLayout.Ordered(_screens).FindIndex(s => s.DeviceName.Equals(dev, StringComparison.OrdinalIgnoreCase))
             : -1;
         _monitor.SelectedIndex = preferred + 1;
-        general.Controls.Add(Group("Monitor per lo schermo intero", _monitor));
+        full.Controls.Add(Group("Monitor", _monitor,
+            Note("Su quale schermo si apre una sessione a schermo intero.")));
 
         _pinned.Checked = settings.SidebarMode == SidebarMode.Pinned;
         _autoHide.Checked = !_pinned.Checked;
-        general.Controls.Add(Group("Barra laterale della finestra", Flow(_pinned, _autoHide),
+        look.Controls.Add(Group("Barra laterale della finestra", _pinned, _autoHide,
             Note("A schermo intero vale la barra della scheda «Schermo intero».")));
 
         _manualOrder.Checked = settings.ConnectionOrder == ConnectionOrder.Manual;
-        general.Controls.Add(Group("Elenco", _manualOrder));
+        general.Controls.Add(Group("Elenco delle connessioni", _manualOrder));
 
         _sessionTouch.Items.AddRange(Enum.GetValues<SessionTouchMode>().Select(m => (object)SessionTouchModes.Describe(m)).ToArray());
         _sessionTouch.SelectedIndex = (int)settings.SessionTouch;
-        general.Controls.Add(Group("Dito dentro la sessione remota", _sessionTouch,
+        touch.Controls.Add(Group("Dito dentro la sessione remota", _sessionTouch,
             Note("Si cambia anche dalla barra della sessione («Tocco: …»). La modalità «remoto» vale dalla prossima connessione.")));
 
         var gestures = new TableLayoutPanel { ColumnCount = 2, AutoSize = true, Margin = Padding.Empty };
@@ -110,11 +120,10 @@ public sealed class SettingsDialog : TouchForm
         ShowGestures(settings.GestureMap);
         var resetGestures = new Button { Text = "Ripristina predefiniti", AutoSize = true };
         resetGestures.Click += (_, _) => ShowGestures(TouchGestureMap.Default);
-        general.Controls.Add(Group("Gesti a più dita", gestures, resetGestures,
+        touch.Controls.Add(Group("Gesti a più dita", gestures, resetGestures,
             Note("Valgono dentro la sessione remota (in modalità «mouse» o col clic destro armato) e, per le schede, anche nella finestra principale su uno schermo touch. Le azioni «scheda» e «barra» riguardano RdpManager, le altre il PC remoto.")));
 
         // ---------- Schermo intero ----------
-        var full = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Dock = DockStyle.Fill };
         var bar = settings.Bar;
         _barPosition.Items.AddRange(Enum.GetValues<BarPosition>().Select(p => (object)FullScreenBarSettings.Describe(p)).ToArray());
         _barPosition.SelectedIndex = (int)bar.Position;
@@ -129,7 +138,8 @@ public sealed class SettingsDialog : TouchForm
         full.Controls.Add(Group("Barra a schermo intero",
             Flow(Caption("Posizione"), _barPosition),
             Flow(Caption("Modalità"), _barMode),
-            Flow(Caption("Larghezza"), _barWidth, Caption("pixel (in basso: altezza); si cambia anche trascinando il bordo della barra")),
+            Flow(Caption("Larghezza"), _barWidth, Caption("pixel (in basso: altezza)")),
+            Note("Si cambia anche trascinando il bordo della barra."),
             Flow(Caption("Ritardo di comparsa"), _barDelay, Caption("millisecondi sul bordo")),
             Note("In alto non c'è niente: la parte alta dello schermo resta della sessione. Con la barra fissa la sessione si restringe e non viene coperta; a comparsa o nascosta la barra si apre sopra la sessione (anche con la scorciatoia della barra laterale).")));
 
@@ -142,19 +152,20 @@ public sealed class SettingsDialog : TouchForm
         down.Click += (_, _) => MoveSection(+1);
         var sectionButtons = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, Margin = Padding.Empty };
         sectionButtons.Controls.AddRange([up, down]);
-        full.Controls.Add(Group("Sezioni della barra (spuntate = mostrate, nell'ordine dell'elenco)",
+        full.Controls.Add(Group("Sezioni della barra",
+            Note("Spunta quelle da mostrare; l'ordine è quello dell'elenco (Su e Giù lo cambiano)."),
             Flow(_barSections, sectionButtons),
             Flow(Caption("Sessioni connesse"), _barStyle),
             Note("I pulsanti rapidi sono le stesse azioni delle scorciatoie. Sezioni vuote (nessun preferito, spazio di lavoro o testo rapido) non si mostrano.")));
 
         // ---------- Avvio e aggiornamenti ----------
-        var startup = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Dock = DockStyle.Fill };
         _reopen.Checked = settings.ReopenSessionsOnStartup;
-        startup.Controls.Add(Group("Avvio", _reopen));
+        general.Controls.Add(Group("Avvio", _reopen,
+            Note("Le sessioni aperte alla chiusura si riaprono da sole.")));
         _updAuto.Checked = settings.UpdateMode == UpdateMode.AutomaticWithConfirmation;
         _updNotify.Checked = settings.UpdateMode == UpdateMode.NotifyOnly;
         _updOff.Checked = settings.UpdateMode == UpdateMode.Off;
-        startup.Controls.Add(Group("Aggiornamenti", _updAuto, _updNotify, _updOff,
+        updates.Controls.Add(Group("Controllo degli aggiornamenti", _updAuto, _updNotify, _updOff,
             Note("Controllo all'avvio e ogni 24 ore. L'installer si usa solo se il suo SHA256 coincide con SHA256SUMS.txt della release; l'installazione chiede sempre conferma. La versione portatile apre la pagina della release.")));
         _history.Checked = settings.HistoryEnabled;
         _verboseLog.Checked = settings.VerboseLog;
@@ -178,11 +189,11 @@ public sealed class SettingsDialog : TouchForm
         };
         removePin.Click += (_, _) => { _pin = null; ShowPinState(); };
         ShowPinState();
-        startup.Controls.Add(Group("Blocco con PIN", Flow(_pinState, setPin, removePin),
+        security.Controls.Add(Group("Blocco con PIN", Flow(_pinState, setPin, removePin),
             Flow(new Label { Text = "Blocca dopo", AutoSize = true, Margin = new Padding(3, 7, 6, 3) }, _lockAfter,
                 new Label { Text = "minuti di inattività (0 = solo a mano)", AutoSize = true, Margin = new Padding(6, 7, 3, 3) }),
             Note("Si salva solo un'impronta del PIN (PBKDF2). Da bloccata RdpManager nasconde le sessioni, tiene le password cifrate e non apre sessioni nuove. Se dimentichi il PIN le connessioni restano, le password vanno reinserite.")));
-        startup.Controls.Add(Group("Cronologia e log", _history, _verboseLog,
+        logs.Controls.Add(Group("Cronologia e log", _history, _verboseLog,
             Note(@"Log a rotazione in %LOCALAPPDATA%\RdpManager\logs (5 file da 1 MB)."), openLogs));
 
         // ---------- Scorciatoie ----------
@@ -201,46 +212,121 @@ public sealed class SettingsDialog : TouchForm
             foreach (var (action, box) in _boxes)
                 box.Combo = ShortcutMap.Defaults[action];
         };
-        var shortcuts = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Dock = DockStyle.Fill };
-        shortcuts.Controls.Add(Group("Scorciatoie (valgono anche dentro la sessione remota)", keys,
-            Note("Clic su una casella e premi la combinazione (con Ctrl o Alt). Canc la disattiva."),
+        shortcuts.Controls.Add(Group("Combinazioni di tasti", keys,
+            Note("Valgono anche dentro la sessione remota. Clic su una casella e premi la combinazione (con Ctrl o Alt); Canc la disattiva."),
             Note("Funzionano con RegisterHotKey solo mentre RdpManager è in primo piano: nessun hook di tastiera (dalla 1.3). Se un altro programma usa già una combinazione, la barra di stato lo dice."),
             defaults));
 
-        var tabs = new TabControl { Dock = DockStyle.Fill };
-        tabs.TabPages.Add(Page("Generale", general));
-        tabs.TabPages.Add(Page("Schermo intero", full));
-        tabs.TabPages.Add(Page("Scorciatoie", shortcuts));
-        tabs.TabPages.Add(Page("Avvio, blocco e aggiornamenti", startup));
-        // Il TabControl non si adatta da solo al contenuto: la pagina più grande decide la dimensione (ArrangeForTouch);
-        // se non sta nello schermo, le pagine scorrono.
-        _pages = [general, full, shortcuts, startup];
-        _tabs = tabs;
+        _pageList =
+        [
+            new("Generale", "Avvio, elenco delle connessioni e area di notifica", general),
+            new("Aspetto", "Tema, tocco e barra laterale", look),
+            new("Schermo intero", "Monitor e barra delle sessioni", full),
+            new("Tocco e gesti", "Il dito dentro le sessioni remote", touch),
+            new("Scorciatoie", "Combinazioni di tasti", shortcuts),
+            new("Sicurezza", "Blocco dell'app con il PIN", security),
+            new("Aggiornamenti", "Come si aggiorna RdpManager", updates),
+            new("Cronologia e log", "Registri delle sessioni e dell'app", logs),
+        ];
 
-        var ok = new Button { Text = "OK", DialogResult = DialogResult.OK, AutoSize = true };
-        var cancel = new Button { Text = "Annulla", DialogResult = DialogResult.Cancel, AutoSize = true };
-        var buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, AutoSize = true, Dock = DockStyle.Bottom, Padding = new Padding(0, 10, 0, 0) };
+        var host = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
+        foreach (var page in _pageList)
+        {
+            page.Panel.Visible = false;
+            host.Controls.Add(page.Panel);
+        }
+        _host = host;
+        _title.Font = new Font(Font.FontFamily, Font.Size * 1.5f, FontStyle.Bold);
+        _subtitle.ForeColor = SystemColors.GrayText;
+        var header = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoSize = true, Dock = DockStyle.Top, Padding = new Padding(16, 12, 16, 4) };
+        header.Controls.AddRange([_title, _subtitle]);
+        _header = header;
+        var right = new Panel { Dock = DockStyle.Fill };
+        right.Controls.Add(host);
+        right.Controls.Add(header);
+
+        _nav.Dock = DockStyle.Left;
+        _nav.DrawMode = DrawMode.OwnerDrawFixed;
+        _nav.IntegralHeight = false;
+        _nav.BorderStyle = BorderStyle.None;
+        _nav.ItemHeight = Math.Max(_nav.ItemHeight, _nav.Font.Height * 2);
+        _nav.Width = 190;
+        _nav.Items.AddRange(_pageList.Select(p => (object)p.Title).ToArray());
+        _nav.DrawItem += DrawNavItem;
+        _nav.SelectedIndexChanged += (_, _) => ShowPage(_nav.SelectedIndex);
+
+        var ok = new Button { Text = "Salva", DialogResult = DialogResult.OK, AutoSize = true, MinimumSize = new Size(96, 0) };
+        var cancel = new Button { Text = "Annulla", DialogResult = DialogResult.Cancel, AutoSize = true, MinimumSize = new Size(96, 0) };
+        var buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, AutoSize = true, Dock = DockStyle.Bottom, Padding = new Padding(12, 10, 12, 10) };
         buttons.Controls.Add(cancel);
         buttons.Controls.Add(ok);
         CancelButton = cancel;
         ok.Click += OnOk;
 
-        Controls.Add(tabs);
+        Controls.Add(right);
+        Controls.Add(_nav);
         Controls.Add(buttons);
         _buttons = buttons;
+        _nav.SelectedIndex = 0;
         ThemeManager.Apply(this);
     }
 
-    private Control[] _pages = [];
-    private TabControl _tabs = null!;
+    private sealed record SettingsPage(string Title, string Subtitle, FlowLayoutPanel Panel);
+
+    private readonly ListBox _nav = new();
+    private readonly Label _title = new() { AutoSize = true };
+    private readonly Label _subtitle = new() { AutoSize = true };
+    private SettingsPage[] _pageList = [];
+    private Panel _host = null!;
+    private FlowLayoutPanel _header = null!;
     private FlowLayoutPanel _buttons = null!;
 
-    /// <summary>Misura voluta: quella della pagina più grande più l'intestazione e i pulsanti (poi ridotta allo schermo).</summary>
+    /// <summary>Sezione mostrata (indice nell'elenco di sinistra).</summary>
+    internal int SelectedSection => _nav.SelectedIndex;
+
+    internal IReadOnlyList<string> SectionTitles => _pageList.Select(p => p.Title).ToList();
+
+    internal void SelectSection(int index) => _nav.SelectedIndex = index;
+
+    /// <summary>Per le prove: pannello che scorre con la sezione mostrata.</summary>
+    internal Panel PageHost => _host;
+
+    private void ShowPage(int index)
+    {
+        if (index < 0 || index >= _pageList.Length)
+            return;
+        for (int i = 0; i < _pageList.Length; i++)
+            _pageList[i].Panel.Visible = i == index;
+        _title.Text = _pageList[index].Title;
+        _subtitle.Text = _pageList[index].Subtitle;
+        _host.AutoScrollPosition = Point.Empty;
+    }
+
+    private void DrawNavItem(object? sender, DrawItemEventArgs e)
+    {
+        if (e.Index < 0)
+            return;
+        var p = ThemeManager.Current;
+        bool selected = (e.State & DrawItemState.Selected) != 0;
+        using (var back = new SolidBrush(selected ? p.Highlight : _nav.BackColor))
+            e.Graphics.FillRectangle(back, e.Bounds);
+        int pad = Math.Max(8, e.Bounds.Height / 4);
+        TextRenderer.DrawText(e.Graphics, _nav.Items[e.Index].ToString(), _nav.Font,
+            new Rectangle(e.Bounds.X + pad, e.Bounds.Y, e.Bounds.Width - pad, e.Bounds.Height),
+            selected ? p.HighlightText : p.Text, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+    }
+
+    /// <summary>Misura voluta: la sezione più grande (ma non oltre un'altezza comoda: poi scorre) più elenco, titolo e pulsanti.</summary>
     protected override void ArrangeForTouch()
     {
-        int tabsHeight = _tabs.ItemSize.Height * Math.Max(1, _tabs.RowCount) + 16;
-        ClientSize = new Size(_pages.Max(p => p.PreferredSize.Width) + 24 + Padding.Horizontal,
-            _pages.Max(p => p.PreferredSize.Height) + tabsHeight + _buttons.GetPreferredSize(Size.Empty).Height + Padding.Vertical);
+        _nav.ItemHeight = Math.Max(_nav.Font.Height * 2, TouchUi.MinTarget(this));
+        int header = _header.GetPreferredSize(Size.Empty).Height;
+        int navHeight = _nav.ItemHeight * _pageList.Length + TouchUi.Px(this, 8);
+        int pageHeight = Math.Min(_pageList.Max(p => p.Panel.PreferredSize.Height), TouchUi.Px(this, 520));
+        int width = _nav.Width + _pageList.Max(p => p.Panel.PreferredSize.Width) + SystemInformation.VerticalScrollBarWidth;
+        int buttons = _buttons.GetPreferredSize(Size.Empty).Height;
+        ClientSize = new Size(width, Math.Max(header + pageHeight, navHeight) + buttons);
+        MinimumSize = new Size(Math.Min(Size.Width, TouchUi.Px(this, 520)), Math.Min(Size.Height, TouchUi.Px(this, 360)));
     }
 
     private static void OpenFolder(string dir)
@@ -288,13 +374,9 @@ public sealed class SettingsDialog : TouchForm
 
     private static Label Caption(string text) => new() { Text = text, AutoSize = true, Margin = new Padding(3, 7, 8, 3) };
 
-    private static TabPage Page(string title, Control content)
-    {
-        var page = new TabPage(title) { Padding = new Padding(6), AutoScroll = true };
-        content.Dock = DockStyle.Top; // si adatta al contenuto: se la pagina è più bassa, scorre
-        page.Controls.Add(content);
-        return page;
-    }
+    /// <summary>Una sezione: colonna di gruppi con margine interno uniforme; la pagina scorre se non sta nella finestra.</summary>
+    private static FlowLayoutPanel NewPage() =>
+        new() { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Padding = new Padding(16, 8, 16, 16), Location = Point.Empty };
 
     private void ShowGestures(TouchGestureMap map)
     {
@@ -320,17 +402,30 @@ public sealed class SettingsDialog : TouchForm
         return f;
     }
 
-    private static GroupBox Group(string title, params Control[] content)
+    /// <summary>Gruppo di opzioni: titolo in grassetto, contenuto rientrato, spazio uniforme sotto.</summary>
+    private static FlowLayoutPanel Group(string title, params Control[] content)
     {
-        var flow = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Dock = DockStyle.Fill };
-        flow.Controls.AddRange(content);
-        var box = new GroupBox { Text = title, AutoSize = true, Padding = new Padding(8), MinimumSize = new Size(440, 0) };
-        box.Controls.Add(flow);
+        var box = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Margin = new Padding(0, 0, 0, 18) };
+        box.Controls.Add(new Label
+        {
+            Text = title,
+            AutoSize = true,
+            Font = new Font(SystemFonts.MessageBoxFont ?? SystemFonts.DefaultFont, FontStyle.Bold),
+            Margin = new Padding(0, 0, 0, 6),
+        });
+        var inner = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Margin = new Padding(14, 0, 0, 0) };
+        foreach (var c in content)
+        {
+            if (c is Label { AutoSize: true } note && note.ForeColor == SystemColors.GrayText)
+                note.Margin = new Padding(3, 0, 3, 8); // la nota sta sotto l'opzione a cui si riferisce
+            inner.Controls.Add(c);
+        }
+        box.Controls.Add(inner);
         return box;
     }
 
     private static Label Note(string text) =>
-        new() { Text = text, AutoSize = true, ForeColor = SystemColors.GrayText, MaximumSize = new Size(420, 0) };
+        new() { Text = text, AutoSize = true, ForeColor = SystemColors.GrayText, MaximumSize = new Size(460, 0) };
 
     private void OnOk(object? sender, EventArgs e)
     {
