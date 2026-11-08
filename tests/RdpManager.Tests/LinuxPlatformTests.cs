@@ -113,15 +113,10 @@ public sealed class LinuxPlatformTests : IDisposable
     [Fact]
     public void AesGcm_ConPasswordProtector_FormatoBase64()
     {
-        var old = SecretStore.IsConfigured ? SecretStore.Current : null;
-        try
-        {
-            SecretStore.Current = FileStore();
-            var enc = PasswordProtector.Protect("ciao");
-            Assert.Equal("ciao", PasswordProtector.Unprotect(enc));
-            Assert.True(PasswordProtector.TryUnprotect(enc, out var p) && p == "ciao");
-        }
-        finally { if (old is not null) SecretStore.Current = old; }
+        // Senza toccare SecretStore.Current (è globale: cambiarlo qui farebbe fallire in parallelo le prove che usano le password).
+        var store = FileStore();
+        var enc = Convert.ToBase64String(store.Protect(Encoding.UTF8.GetBytes("ciao"), null));
+        Assert.Equal("ciao", Encoding.UTF8.GetString(store.Unprotect(Convert.FromBase64String(enc), null)));
     }
 
     [Fact]
