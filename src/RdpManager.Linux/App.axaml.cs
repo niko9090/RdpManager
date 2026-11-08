@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Styling;
+using Avalonia.Threading;
 using RdpManager.Core;
 using RdpManager.Linux.Dialogs;
 using RdpManager.Linux.Sessions;
@@ -18,7 +19,12 @@ public sealed class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var dialogs = new DialogService();
-            var viewModel = new MainWindowViewModel(new ConnectionStore(), new PlaceholderSessionHost(), dialogs);
+            MainWindowViewModel? viewModel = null;
+            var sessions = new FreeRdpSessionHost(
+                gatewayCredentials: c => viewModel?.Document.ResolveGatewayCredentials(c),
+                post: a => Dispatcher.UIThread.Post(a));
+            viewModel = new MainWindowViewModel(new ConnectionStore(), sessions, dialogs);
+            desktop.Exit += (_, _) => sessions.ShutdownAll(TimeSpan.FromSeconds(4));
             var window = new MainWindow { DataContext = viewModel };
             dialogs.Owner = window;
             ApplyTheme(viewModel.Document.Settings.Theme);

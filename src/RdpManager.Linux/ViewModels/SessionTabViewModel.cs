@@ -9,6 +9,7 @@ public sealed class SessionTabViewModel : ViewModelBase
     {
         Session = session;
         CloseCommand = new RelayCommand(() => close(this));
+        session.TitleChanged += (_, _) => OnPropertyChanged(nameof(Title));
     }
 
     public ISession Session { get; }

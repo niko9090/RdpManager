@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\RdpManager.Core\RdpManager.Core.csproj" />
+    <ProjectReference Include="..\RdpManager.Platform.Linux\RdpManager.Platform.Linux.csproj" />
   </ItemGroup>
 
   <ItemGroup>

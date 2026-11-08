@@ -8,6 +8,11 @@
   </Application.Styles>
 
   <Application.DataTemplates>
+    <!-- Scheda con una sessione FreeRDP. -->
+    <DataTemplate DataType="s:FreeRdpSession">
+      <s:FreeRdpSessionView />
+    </DataTemplate>
+
     <!-- Contenuto della scheda segnaposto (finché non c'è l'host FreeRDP). -->
     <DataTemplate DataType="s:PlaceholderSessionContent" x:DataType="s:PlaceholderSessionContent">
       <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8" MaxWidth="480">

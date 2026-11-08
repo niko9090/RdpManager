@@ -34,6 +34,9 @@ public interface ISession
     /// </summary>
     object Content { get; }
 
+    /// <summary>Il titolo della scheda è cambiato (per esempio «(disconnesso)»).</summary>
+    event EventHandler? TitleChanged { add { } remove { } }
+
     /// <summary>Chiude la sessione e libera le risorse.</summary>
     void Close();
 

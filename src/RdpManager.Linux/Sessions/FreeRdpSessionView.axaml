@@ -1,0 +1,28 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:s="using:RdpManager.Linux.Sessions"
+             x:Class="RdpManager.Linux.Sessions.FreeRdpSessionView"
+             x:DataType="s:FreeRdpSession">
+  <DockPanel>
+    <!-- Sessione incorporata terminata: la fascia sta sopra la superficie nativa, che non si può coprire. -->
+    <Border DockPanel.Dock="Top" IsVisible="{Binding ShowBanner}" Padding="10,6" Background="#33808080">
+      <DockPanel>
+        <Button DockPanel.Dock="Right" Content="Riconnetti" Command="{Binding ReconnectCommand}" IsVisible="{Binding CanReconnect}" />
+        <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,10,0" />
+      </DockPanel>
+    </Border>
+
+    <Grid>
+      <!-- Superficie X11 per la sessione incorporata (aggiunta da codice solo se c'è X11). -->
+      <Grid x:Name="SurfaceHost" IsVisible="{Binding ShowSurface}" />
+
+      <!-- Sessione in finestra separata (Wayland, SDL, più monitor). -->
+      <StackPanel IsVisible="{Binding ShowOverlay}" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8" MaxWidth="520">
+        <TextBlock Text="{Binding DisplayTitle}" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" />
+        <TextBlock Text="{Binding TargetText}" HorizontalAlignment="Center" Opacity="0.7" />
+        <TextBlock Text="{Binding Message}" TextWrapping="Wrap" TextAlignment="Center" />
+        <Button Content="Riconnetti" Command="{Binding ReconnectCommand}" IsVisible="{Binding CanReconnect}" HorizontalAlignment="Center" />
+      </StackPanel>
+    </Grid>
+  </DockPanel>
+</UserControl>
