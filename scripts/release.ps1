@@ -6,7 +6,7 @@
 #
 # Passi: controlli → <Version> nel csproj → build → test → pubblicazione + installer (build-installer.ps1)
 # → commit «Versione X.Y.Z» (se la versione è cambiata) → tag vX.Y.Z → push di main e del tag
-# → gh release create con l'installer, l'eseguibile portatile e SHA256SUMS.txt (serve all'aggiornamento con un clic).
+# → gh release create con l'installer, l'eseguibile portatile, i pacchetti Linux (.deb, .rpm, AppImage, costruiti in WSL) e SHA256SUMS.txt (serve all'aggiornamento con un clic).
 # Si ferma senza fare nulla se ci sono modifiche non salvate, se non si è su main o se il tag esiste già.
 
 param(
@@ -19,6 +19,7 @@ $root = Split-Path $PSScriptRoot -Parent
 Set-Location $root
 $repo = 'niko9090/RdpManager'
 $csprojPath = Join-Path $root 'src\RdpManager\RdpManager.csproj'
+$linuxCsprojPath = Join-Path $root 'src\RdpManager.Linux\RdpManager.Linux.csproj'
 
 # Note della release: la sezione «## X.Y.Z» di CHANGELOG.md (se c'è) seguita dalle istruzioni di installazione.
 function Get-ReleaseNotes([string]$ver) {
@@ -33,6 +34,7 @@ function Get-ReleaseNotes([string]$ver) {
     return $section +
            "**Installazione:** scarica ed esegui RdpManager-Setup-$ver.exe (per utente, non servono diritti di amministratore; si installa sopra la versione precedente).`n" +
            "RdpManager-$ver-win-x64.exe è la versione portatile, senza installazione.`n" +
+           "**Linux (x86_64):** rdpmanager_${ver}_amd64.deb (Ubuntu, Debian, Mint), rdpmanager-$ver-1.x86_64.rpm (Fedora, openSUSE) oppure RdpManager-$ver-x86_64.AppImage (chmod +x e avvio, senza installazione). Serve FreeRDP.`n" +
            "Le connessioni salvate in %APPDATA%\RdpManager restano anche aggiornando o disinstallando."
 }
 
@@ -81,6 +83,10 @@ if ($changed) {
     Write-Host "Versione: $current → $Version"
     $csproj = [regex]::Replace($csproj, '<Version>[^<]+</Version>', "<Version>$Version</Version>", 1)
     [IO.File]::WriteAllText($csprojPath, $csproj, (New-Object Text.UTF8Encoding($false)))
+    # Il programma Linux ha la propria <Version>: stessa versione, così i pacchetti .deb/.rpm/AppImage coincidono.
+    $linuxCsproj = [IO.File]::ReadAllText($linuxCsprojPath, [Text.Encoding]::UTF8)
+    $linuxCsproj = [regex]::Replace($linuxCsproj, '<Version>[^<]+</Version>', "<Version>$Version</Version>", 1)
+    [IO.File]::WriteAllText($linuxCsprojPath, $linuxCsproj, (New-Object Text.UTF8Encoding($false)))
 } else {
     Write-Host "Versione già $Version nel csproj"
 }
@@ -92,21 +98,23 @@ try {
     Run 'Pubblicazione e installer' { powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'build-installer.ps1') -ExpectedVersion $tag }
 }
 catch {
-    if ($changed) { git checkout -- $csprojPath }   # nessuna modifica lasciata a metà
+    if ($changed) { git checkout -- $csprojPath $linuxCsprojPath }   # nessuna modifica lasciata a metà
     throw
 }
 
 $setup = Join-Path $root "dist\RdpManager-Setup-$Version.exe"
 $portable = Join-Path $root "dist\RdpManager-$Version-win-x64.exe"
 $sums = Join-Path $root 'dist\SHA256SUMS.txt'
-foreach ($f in $setup, $portable, $sums) { if (-not (Test-Path $f)) { throw "Manca $f" } }
+$linux = @("rdpmanager_${Version}_amd64.deb", "rdpmanager-${Version}-1.x86_64.rpm", "RdpManager-${Version}-x86_64.AppImage") |
+    ForEach-Object { Join-Path $root "dist\$_" }
+foreach ($f in (@($setup, $portable, $sums) + $linux)) { if (-not (Test-Path $f)) { throw "Manca $f" } }
 
 # SHA256SUMS.txt deve descrivere proprio i file che si pubblicano: l'app rifiuta un installer con hash diverso.
 $expected = @{}
 foreach ($line in [IO.File]::ReadAllLines($sums)) {
     if ($line -match '^([0-9a-f]{64})  (.+)$') { $expected[$Matches[2]] = $Matches[1] }
 }
-foreach ($f in $setup, $portable) {
+foreach ($f in (@($setup, $portable) + $linux)) {
     $name = Split-Path $f -Leaf
     $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $f).Hash.ToLowerInvariant()
     if ($expected[$name] -ne $hash) { throw "SHA256SUMS.txt non corrisponde a $name" }
@@ -114,7 +122,7 @@ foreach ($f in $setup, $portable) {
 
 # ---------- commit, tag, push ----------
 if ($changed) {
-    Run 'Commit' { git commit -m "Versione $Version" -- $csprojPath }
+    Run 'Commit' { git commit -m "Versione $Version" -- $csprojPath $linuxCsprojPath }
 }
 Run "Tag $tag" { git tag -a $tag -m "RdpManager $Version" }
 Run 'Push di main' { git push origin main }
@@ -127,7 +135,7 @@ if (-not $Notes) {
 # Le note passano da un file UTF-8: come argomento, PowerShell 5.1 rovinerebbe a capo, virgolette e accenti.
 $notesFile = Join-Path $env:TEMP "RdpManager-note-$Version.md"
 [IO.File]::WriteAllText($notesFile, $Notes, (New-Object Text.UTF8Encoding($false)))
-Run "Release $tag" { gh release create $tag $setup $portable $sums --repo $repo --title "RdpManager $Version" --notes-file $notesFile --verify-tag }
+Run "Release $tag" { gh release create $tag $setup $portable $linux $sums --repo $repo --title "RdpManager $Version" --notes-file $notesFile --verify-tag }
 Remove-Item $notesFile -ErrorAction SilentlyContinue
 
 Write-Host ""

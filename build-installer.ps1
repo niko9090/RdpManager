@@ -4,7 +4,9 @@
 # Risultato in dist\:
 #   RdpManager-Setup-<versione>.exe          installer per utente (senza diritti di amministratore)
 #   RdpManager-<versione>-win-x64.exe        eseguibile portatile
-#   SHA256SUMS.txt                           SHA256 dei due file (formato sha256sum): l'aggiornamento con un
+#   rdpmanager_<versione>_amd64.deb, rdpmanager-<versione>-1.x86_64.rpm, RdpManager-<versione>-x86_64.AppImage
+#                                            pacchetti Linux (scripts\build-linux.ps1, dentro WSL); -SkipLinux li salta
+#   SHA256SUMS.txt                           SHA256 di tutti i file (formato sha256sum): l'aggiornamento con un
 #                                            clic dell'app lo usa per verificare l'installer prima di avviarlo
 #
 # Uso:   powershell -NoProfile -ExecutionPolicy Bypass -File build-installer.ps1
@@ -12,7 +14,8 @@
 # -ExpectedVersion (usato dal CI con il nome del tag) fa fallire lo script se non coincide.
 
 param(
-    [string]$ExpectedVersion = ''
+    [string]$ExpectedVersion = '',
+    [switch]$SkipLinux
 )
 
 $ErrorActionPreference = 'Stop'
@@ -63,9 +66,23 @@ if (-not (Test-Path $setup)) { throw "Installer non trovato: $setup" }
 
 # SHA256SUMS.txt: "<hash>  <nome>" con a capo LF, UTF-8 senza BOM (come sha256sum).
 $sums = Join-Path $dist 'SHA256SUMS.txt'
-$lines = foreach ($f in $setup, $portable) {
+$assets = @($setup, $portable)
+
+# Pacchetti Linux (.deb, .rpm, AppImage): si costruiscono dentro WSL con scripts\build-linux.ps1, stessa versione.
+if (-not $SkipLinux) {
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'scripts\build-linux.ps1') -Version $version
+    if ($LASTEXITCODE -ne 0) { throw "Pacchetti Linux non riusciti ($LASTEXITCODE)" }
+    $assets += @(
+        (Join-Path $dist "rdpmanager_${version}_amd64.deb"),
+        (Join-Path $dist "rdpmanager-${version}-1.x86_64.rpm"),
+        (Join-Path $dist "RdpManager-${version}-x86_64.AppImage")
+    )
+    foreach ($f in $assets) { if (-not (Test-Path $f)) { throw "File mancante: $f" } }
+}
+
+$lines = foreach ($f in $assets) {
     '{0}  {1}' -f (Get-FileHash -Algorithm SHA256 -LiteralPath $f).Hash.ToLowerInvariant(), (Split-Path $f -Leaf)
 }
 [IO.File]::WriteAllText($sums, (($lines -join "`n") + "`n"), (New-Object Text.UTF8Encoding($false)))
 
-Get-Item $setup, $portable, $sums | ForEach-Object { '{0}  ({1:N1} MB)' -f $_.FullName, ($_.Length / 1MB) }
+Get-Item ($assets + $sums) | ForEach-Object { '{0}  ({1:N1} MB)' -f $_.FullName, ($_.Length / 1MB) }
