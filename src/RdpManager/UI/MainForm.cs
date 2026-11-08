@@ -132,11 +132,16 @@ public sealed partial class MainForm : Form
             new(text, null, onClick) { ShortcutKeys = keys, ShortcutKeyDisplayString = keyText };
 
         var file = new ToolStripMenuItem("&File");
-        file.DropDownItems.Add(Item("&Importa file .rdp…", Keys.Control | Keys.I, (_, _) => ImportRdpFiles()));
-        file.DropDownItems.Add(Item("Importa connessioni (.rdp&m)…", Keys.None, (_, _) => ImportRdpm()));
-        file.DropDownItems.Add(Item("&Esporta connessioni (.rdpm)…", Keys.None, (_, _) => ExportRdpm()));
-        file.DropDownItems.Add(Item("Importa dalla cronologia di ms&tsc…", Keys.None, (_, _) => ImportMstscHistory()));
-        file.DropDownItems.Add(Item("Importa connessioni da C&SV…", Keys.None, (_, _) => ImportCsv()));
+        // Importare ed esportare stanno in due sottomenu: il menu File resta corto e leggibile.
+        var import = new ToolStripMenuItem("&Importa");
+        import.DropDownItems.Add(Item("Da file .&rdp…", Keys.Control | Keys.I, (_, _) => ImportRdpFiles()));
+        import.DropDownItems.Add(Item("Da file .rdp&m (backup di RdpManager)…", Keys.None, (_, _) => ImportRdpm()));
+        import.DropDownItems.Add(Item("Da file &CSV…", Keys.None, (_, _) => ImportCsv()));
+        import.DropDownItems.Add(Item("Dalla cronologia di ms&tsc…", Keys.None, (_, _) => ImportMstscHistory()));
+        var export = new ToolStripMenuItem("&Esporta");
+        export.DropDownItems.Add(Item("Tutte le connessioni in un file .rdp&m…", Keys.None, (_, _) => ExportRdpm()));
+        file.DropDownItems.Add(import);
+        file.DropDownItems.Add(export);
         file.DropDownItems.Add(new ToolStripSeparator());
         file.DropDownItems.Add(Item("Impo&stazioni…", Keys.Control | Keys.Oemcomma, (_, _) => ShowSettings(), "Ctrl+,"));
         _lockItem = Item("&Blocca RdpManager", Keys.None, (_, _) => LockApp());
@@ -195,6 +200,7 @@ public sealed partial class MainForm : Form
         session.DropDownItems.Add(Item("Scheda &precedente", Keys.None, (_, _) => CycleTab(-1), "Ctrl+Shift+Tab"));
         _nextSessionItem = Item("Sessione connessa successiva", Keys.None, (_, _) => ExecuteShortcut(ShortcutAction.NextSession));
         _previousSessionItem = Item("Sessione connessa precedente", Keys.None, (_, _) => ExecuteShortcut(ShortcutAction.PreviousSession));
+        session.DropDownItems.Add(new ToolStripSeparator());
         session.DropDownItems.Add(_nextSessionItem);
         session.DropDownItems.Add(_previousSessionItem);
 
