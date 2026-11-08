@@ -179,7 +179,11 @@ public sealed class ScServiceManager : IServiceManager
     }
 }
 
-/// <summary>Rilancia RdpManager.exe con UAC (verbo runas) per le operazioni che richiedono l'amministratore.</summary>
+/// <summary>
+/// Rilancia RdpManager.exe con UAC (verbo runas): ultima risorsa, solo per la prima registrazione del servizio, per rimuoverlo
+/// o se il servizio e la cartella d'ingresso (<see cref="VpnInbox"/>) non ci sono. Accendere, spegnere e cambiare configurazione
+/// con il servizio installato passano dai permessi dati all'installazione e non arrivano qui.
+/// </summary>
 public sealed class ProcessElevator(string exePath) : IVpnElevator
 {
     public int RunHelper(IReadOnlyList<string> args)

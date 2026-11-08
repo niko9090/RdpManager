@@ -26,7 +26,8 @@ public sealed partial class MainForm
         var exe = Environment.ProcessPath ?? Application.ExecutablePath;
         var programData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "RdpManager");
         return new WireGuardNtTunnel(new ProcessElevator(exe), new ScControl(), staging,
-            VpnPaths.InstalledHash(programData), VpnPaths.Status(programData));
+            VpnPaths.InstalledHash(programData), VpnPaths.Status(programData),
+            VpnPaths.InboxConf(programData, VpnDefaults.TunnelName));
     }
 
     /// <summary>

@@ -9,9 +9,10 @@ namespace RdpManager.Vpn;
 /// accendere e spegnere non chiedono più nulla. Con una configurazione diversa o senza servizio si passa di nuovo dall'assistente.
 /// </summary>
 /// <param name="installedHashFile">File con l'SHA-256 della configurazione installata (<see cref="VpnPaths.InstalledHash"/>); null = passa sempre dall'assistente.</param>
+/// <param name="inboxFile">Dove lasciare la nuova configurazione senza UAC (<see cref="VpnPaths.InboxConf"/>, cartella preparata dall'assistente): il servizio la installa al riavvio; null o non scrivibile = assistente.</param>
 /// <param name="statusFile">File di stato scritto dal servizio (<see cref="VpnPaths.Status"/>); null = nessun dettaglio.</param>
 public sealed class WireGuardNtTunnel(IVpnElevator elevator, IVpnServiceControl control, string stagingDirectory,
-    string? installedHashFile = null, string? statusFile = null) : IWireGuardTunnel
+    string? installedHashFile = null, string? statusFile = null, string? inboxFile = null) : IWireGuardTunnel
 {
     public const int ExitOk = 0;
     public const int ExitFailed = 2;
@@ -60,6 +61,9 @@ public sealed class WireGuardNtTunnel(IVpnElevator elevator, IVpnServiceControl 
 
         var text = config.ToConf();
         if (IsInstalledWith(text) && TryStartDirectly())
+            return;
+
+        if (TryReconfigureViaInbox(text))
             return;
 
         Directory.CreateDirectory(stagingDirectory);
@@ -111,6 +115,25 @@ public sealed class WireGuardNtTunnel(IVpnElevator elevator, IVpnServiceControl 
         {
             return false;
         }
+    }
+
+    /// <summary>Servizio già registrato e cartella d'ingresso scrivibile: configurazione nuova e riavvio, senza UAC.</summary>
+    private bool TryReconfigureViaInbox(string confText)
+    {
+        if (inboxFile is null || !control.Exists(ServiceName) || !Directory.Exists(Path.GetDirectoryName(inboxFile)))
+            return false;
+        try
+        {
+            File.WriteAllText(inboxFile, confText);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+        if (TryStartDirectly() && IsInstalledWith(confText))
+            return true;
+        TryDelete(inboxFile); // il servizio non l'ha presa: non lasciare la chiave in chiaro, si passa dall'assistente
+        return false;
     }
 
     private bool TryStartDirectly()

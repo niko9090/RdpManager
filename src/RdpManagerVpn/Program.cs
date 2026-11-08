@@ -22,7 +22,8 @@ internal static class Program
         if (args.Length > 0 && args[0].Equals("--servizio", StringComparison.OrdinalIgnoreCase))
             return ClientServiceHost.Run(programData, exeDir);
 
-        // «--installa-servizio» e «--rimuovi [--tutto]»: servono l'amministratore, si rilanciano con UAC se mancano i diritti.
+        // «--installa-servizio» e «--rimuovi [--tutto]»: servono l'amministratore. L'installer li lancia già elevato (nessun UAC);
+        // il rilancio con UAC resta solo come ultima risorsa (versione portatile, servizio mancante).
         if (args.Length > 0 && (args[0].Equals(InstallArg, StringComparison.OrdinalIgnoreCase) || args[0].Equals(RemoveArg, StringComparison.OrdinalIgnoreCase)))
             return RunAdminCommand(args, exePath, programData);
 
