@@ -7,7 +7,7 @@ namespace RdpManager.Core;
 /// </summary>
 public static class GlobalHotkey
 {
-    public const string DefaultText = "Ctrl+Alt+Maiusc+R";
+    public const string DefaultText = HotkeyRules.DefaultText;
 
     // Valori di fsModifiers di RegisterHotKey.
     public const uint ModAlt = 0x0001, ModControl = 0x0002, ModShift = 0x0004, ModNoRepeat = 0x4000;

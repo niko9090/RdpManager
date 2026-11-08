@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Nucleo indipendente da Windows: modelli, archivio, sincronizzazione, CSV/.rdp, configurazione WireGuard, aggiornamenti.
+    Niente Windows Forms, niente DPAPI/registro: le parti legate al sistema stanno dietro interfacce (ISecretStore)
+    implementate in RdpManager. Compila anche per linux-x64.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>RdpManager.Core</RootNamespace>
+    <AssemblyName>RdpManager.Core</AssemblyName>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="RdpManager" />
+    <InternalsVisibleTo Include="RdpManagerVpn" />
+    <InternalsVisibleTo Include="RdpManager.Tests" />
+  </ItemGroup>
+
+</Project>

@@ -13,6 +13,7 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        RdpManager.Core.PlatformInit.Register();
         var exePath = Environment.ProcessPath ?? Application.ExecutablePath;
         var exeDir = Path.GetDirectoryName(exePath)!;
         var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);

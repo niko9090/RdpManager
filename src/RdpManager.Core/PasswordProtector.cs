@@ -3,7 +3,7 @@ using System.Text;
 
 namespace RdpManager.Core;
 
-/// <summary>Cifratura delle password con DPAPI, ambito utente Windows corrente.</summary>
+/// <summary>Cifratura delle password tramite <see cref="ISecretStore"/> (su Windows DPAPI, ambito utente corrente).</summary>
 public static class PasswordProtector
 {
     private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("RdpManager/connections/v1");
@@ -11,7 +11,7 @@ public static class PasswordProtector
     public static string Protect(string plainText)
     {
         ArgumentNullException.ThrowIfNull(plainText);
-        var data = ProtectedData.Protect(Encoding.UTF8.GetBytes(plainText), Entropy, DataProtectionScope.CurrentUser);
+        var data = SecretStore.Current.Protect(Encoding.UTF8.GetBytes(plainText), Entropy);
         return Convert.ToBase64String(data);
     }
 
@@ -19,7 +19,7 @@ public static class PasswordProtector
     public static string Unprotect(string protectedBase64)
     {
         ArgumentNullException.ThrowIfNull(protectedBase64);
-        var data = ProtectedData.Unprotect(Convert.FromBase64String(protectedBase64), Entropy, DataProtectionScope.CurrentUser);
+        var data = SecretStore.Current.Unprotect(Convert.FromBase64String(protectedBase64), Entropy);
         return Encoding.UTF8.GetString(data);
     }
 
@@ -42,7 +42,7 @@ public static class PasswordProtector
     /// <summary>Formato "password 51:b:" dei file .rdp: DPAPI senza entropia su UTF-16, in esadecimale.</summary>
     public static string ProtectForRdpFile(string plainText)
     {
-        var data = ProtectedData.Protect(Encoding.Unicode.GetBytes(plainText), null, DataProtectionScope.CurrentUser);
+        var data = SecretStore.Current.Protect(Encoding.Unicode.GetBytes(plainText), null);
         return Convert.ToHexString(data);
     }
 
@@ -52,7 +52,7 @@ public static class PasswordProtector
             return null;
         try
         {
-            var data = ProtectedData.Unprotect(Convert.FromHexString(hex.Trim()), null, DataProtectionScope.CurrentUser);
+            var data = SecretStore.Current.Unprotect(Convert.FromHexString(hex.Trim()), null);
             return Encoding.Unicode.GetString(data).TrimEnd('\0');
         }
         catch (Exception ex) when (ex is CryptographicException or FormatException)
