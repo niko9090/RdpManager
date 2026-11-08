@@ -655,6 +655,8 @@ internal sealed class FullScreenSideBar : Panel
         protected override void OnSizeChanged(EventArgs e)
         {
             base.OnSizeChanged(e);
+            if (ShortcutText is null)
+                return; // ridimensionato dal costruttore base, prima che la scorciatoia sia impostata
             int h = CurrentLayout().Height;
             if (Height != h)
                 Height = h;
