@@ -22,6 +22,9 @@ public sealed class VpnHelper(IServiceManager services, string programDataDirect
     /// <summary>Restringe i permessi del file ai soli amministratori/SYSTEM (sostituibile nelle prove).</summary>
     public Action<string> Restrict { get; init; } = VpnFiles.RestrictToAdministrators;
 
+    /// <summary>Prepara la cartella d'ingresso per i cambi di configurazione senza UAC (sostituibile nelle prove).</summary>
+    public Action<string> PrepareInbox { get; init; } = VpnInbox.Prepare;
+
     public static bool IsHelperMode(string[] args) => args.Length > 0 && args[0].Equals(Argument, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>SHA-256 (esadecimale) del testo della configurazione, per riconoscere se il servizio installato è ancora quello giusto.</summary>
@@ -56,6 +59,7 @@ public sealed class VpnHelper(IServiceManager services, string programDataDirect
             return WireGuardNtTunnel.ExitFailed;
 
         Directory.CreateDirectory(VpnPaths.Directory(programDataDirectory));
+        PrepareInbox(programDataDirectory);
         var target = VpnPaths.Conf(programDataDirectory, VpnDefaults.TunnelName);
         var hashFile = VpnPaths.InstalledHash(programDataDirectory);
         if (File.Exists(target))
