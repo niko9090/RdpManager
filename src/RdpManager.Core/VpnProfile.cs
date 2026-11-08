@@ -15,8 +15,7 @@ public sealed class VpnProfile
     public string Dns { get; set; } = "";
     public string PcName { get; set; } = "";
 
-    public static string DefaultPath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RdpManager", "vpn.json");
+    public static string DefaultPath => Path.Combine(AppPaths.ConfigFolder, "vpn.json");
 
     public bool HasKey => PrivateKeyProtected.Length > 0;
 

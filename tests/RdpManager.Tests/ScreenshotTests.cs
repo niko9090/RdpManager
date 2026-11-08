@@ -123,8 +123,7 @@ public sealed class ScreenshotTests : IDisposable
                 using (var settings = new SettingsDialog(form.Document.Settings.Clone()) { StartPosition = FormStartPosition.Manual, Location = new Point(80, 80) })
                 {
                     settings.Show();
-                    var tabs = settings.Controls.OfType<TabControl>().First();
-                    tabs.SelectedIndex = 2;
+                    settings.SelectSection(6);
                     Pump(400);
                     Save(settings, Path.Combine(outDir, "8-impostazioni-avvio-aggiornamenti.png"));
                 }

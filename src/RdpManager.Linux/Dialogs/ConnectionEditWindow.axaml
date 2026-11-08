@@ -1,0 +1,59 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:RdpManager.Linux.ViewModels"
+        x:Class="RdpManager.Linux.Dialogs.ConnectionEditWindow"
+        x:DataType="vm:ConnectionEditViewModel"
+        Title="{Binding WindowTitle}" Width="520" Height="640" CanResize="True"
+        WindowStartupLocation="CenterOwner">
+
+  <DockPanel Margin="14">
+    <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,10,0,0">
+      <TextBlock Text="{Binding Error}" Foreground="OrangeRed" TextWrapping="Wrap" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+        <Button Content="Annulla" Click="OnCancel" IsCancel="True" />
+        <Button Content="Salva" Click="OnSave" IsDefault="True" Classes="accent" />
+      </StackPanel>
+    </StackPanel>
+
+    <ScrollViewer>
+      <StackPanel Spacing="8" Margin="0,0,10,0">
+        <TextBlock Text="Nome" /><TextBox Text="{Binding Name}" Watermark="Nome mostrato nell'elenco" />
+        <TextBlock Text="Computer (nome o indirizzo)" /><TextBox Text="{Binding Host}" />
+        <TextBlock Text="Porta" /><TextBox Text="{Binding Port}" Width="120" HorizontalAlignment="Left" />
+        <TextBlock Text="Cartella" /><AutoCompleteBox Text="{Binding Group}" ItemsSource="{Binding Groups}" Watermark="Vuota = nessuna cartella (usa / per le sottocartelle)" />
+        <TextBlock Text="Etichetta" /><TextBox Text="{Binding Label}" Watermark="Per esempio PROD" />
+
+        <Separator />
+        <TextBlock Text="Credenziali" FontWeight="SemiBold" />
+        <TextBlock Text="Profilo" /><ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding Profile}" HorizontalAlignment="Stretch" />
+        <TextBlock Text="Utente" /><TextBox Text="{Binding Username}" />
+        <TextBlock Text="Dominio" /><TextBox Text="{Binding Domain}" />
+        <TextBlock Text="Password" /><TextBox Text="{Binding Password}" PasswordChar="●" Watermark="Vuota = non cambiare quella salvata" />
+
+        <Separator />
+        <TextBlock Text="Schermo e dispositivi" FontWeight="SemiBold" />
+        <ComboBox ItemsSource="{Binding ResolutionChoices}" SelectedItem="{Binding Resolution}" HorizontalAlignment="Stretch" />
+        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding FixedResolution}">
+          <TextBox Text="{Binding DesktopWidth}" Width="100" Watermark="Larghezza" />
+          <TextBlock Text="×" VerticalAlignment="Center" />
+          <TextBox Text="{Binding DesktopHeight}" Width="100" Watermark="Altezza" />
+        </StackPanel>
+        <TextBlock Text="Audio" /><ComboBox ItemsSource="{Binding AudioChoices}" SelectedItem="{Binding Audio}" HorizontalAlignment="Stretch" />
+        <TextBlock Text="Qualità" /><ComboBox ItemsSource="{Binding QualityChoices}" SelectedItem="{Binding Quality}" HorizontalAlignment="Stretch" />
+        <CheckBox Content="Condividi gli appunti" IsChecked="{Binding RedirectClipboard}" />
+        <CheckBox Content="Condividi le unità" IsChecked="{Binding RedirectDrives}" />
+        <CheckBox Content="Condividi le stampanti" IsChecked="{Binding RedirectPrinters}" />
+        <CheckBox Content="Condividi il microfono" IsChecked="{Binding RedirectMicrophone}" />
+
+        <Separator />
+        <TextBlock Text="Rete" FontWeight="SemiBold" />
+        <CheckBox Content="Riconnetti automaticamente" IsChecked="{Binding AutoReconnect}" />
+        <CheckBox Content="Tieni sveglia la sessione" IsChecked="{Binding KeepAlive}" />
+        <CheckBox Content="Passa da un Remote Desktop Gateway" IsChecked="{Binding UseGateway}" />
+        <TextBox Text="{Binding GatewayHost}" Watermark="Host del gateway (anche host:porta)" IsVisible="{Binding UseGateway}" />
+        <TextBlock Text="Indirizzo MAC (per accendere il computer)" /><TextBox Text="{Binding MacAddress}" Watermark="AA:BB:CC:DD:EE:FF" />
+        <CheckBox Content="Preferita" IsChecked="{Binding IsFavorite}" />
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</Window>

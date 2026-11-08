@@ -12,8 +12,7 @@ public sealed record ClientConfig(string ServerUrl, string RegistrationCode, str
     public const string FileName = "rdpmanager-config.json";
 
     /// <summary>Cartella dei dati dell'app (<c>%APPDATA%\RdpManager</c>).</summary>
-    public static string DataFolder => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RdpManager");
+    public static string DataFolder => AppPaths.ConfigFolder;
 
     /// <exception cref="FormatException">Il testo non è un file di configurazione valido.</exception>
     public static ClientConfig Parse(string json)

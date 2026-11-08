@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    RdpManager per Linux: interfaccia Avalonia sopra il nucleo RdpManager.Core.
+    Dipende solo dal Core (mai da src/RdpManager, che è Windows Forms). I viewmodel non usano controlli Avalonia,
+    così le prove (tests/RdpManager.Linux.Tests) girano anche su Windows.
+    Le sessioni FreeRDP non sono qui: stanno dietro ISessionHost (oggi un segnaposto).
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>RdpManager.Linux</RootNamespace>
+    <AssemblyName>RdpManager.Linux</AssemblyName>
+    <Version>1.11.2</Version>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.6" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.6" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.6" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RdpManager.Core\RdpManager.Core.csproj" />
+    <ProjectReference Include="..\RdpManager.Platform.Linux\RdpManager.Platform.Linux.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="RdpManager.Linux.Tests" />
+  </ItemGroup>
+
+</Project>

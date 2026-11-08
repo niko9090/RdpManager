@@ -406,6 +406,37 @@ public sealed class TouchUiTests : IDisposable
         });
     }
 
+    [Fact]
+    public void SettingsDialog_HasSectionNavigation_AndKeepsSaveButtonsVisibleOnSmallScreens()
+    {
+        OnStaThread(() =>
+        {
+            using var s = new SettingsDialog(new AppSettings { GlobalHotkey = "" });
+            // Schermo basso (400 logici): le sezioni lunghe scorrono, i pulsanti restano in vista.
+            TouchUi.WorkAreaForTests = new Rectangle(0, 0, TouchMetrics.Scale(911, s.DeviceDpi), TouchMetrics.Scale(400, s.DeviceDpi));
+            s.StartPosition = FormStartPosition.Manual;
+            s.Show();
+            Pump(150);
+            Assert.True(TouchUi.WorkAreaForTests.Value.Contains(s.Bounds));
+            Assert.Contains("Sicurezza", s.SectionTitles);
+            Assert.Contains("Aggiornamenti", s.SectionTitles);
+            var save = All(s).OfType<Button>().Single(b => b.Text == "Salva");
+            var cancel = All(s).OfType<Button>().Single(b => b.Text == "Annulla");
+            for (int i = 0; i < s.SectionTitles.Count; i++)
+            {
+                s.SelectSection(i);
+                Pump(30);
+                Assert.Equal(i, s.SelectedSection);
+                foreach (var b in new[] { save, cancel })
+                    Assert.True(s.ClientRectangle.Contains(s.PointToClient(b.PointToScreen(new Point(b.Width / 2, b.Height / 2)))), $"{b.Text} fuori vista nella sezione {s.SectionTitles[i]}");
+            }
+            s.SelectSection(3); // Tocco e gesti: la più lunga
+            Pump(30);
+            Assert.True(s.PageHost.DisplayRectangle.Height > s.PageHost.ClientSize.Height, "la sezione dovrebbe scorrere");
+            s.Close();
+        });
+    }
+
     // ---------- finestra principale ----------
 
     [Fact]

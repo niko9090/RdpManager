@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=RdpManager
+GenericName=Gestore di connessioni Desktop remoto
+Comment=Gestisce e apre le connessioni Desktop remoto (RDP) in schede
+Exec=rdpmanager %F
+Icon=rdpmanager
+Terminal=false
+Categories=Network;RemoteAccess;
+Keywords=rdp;remote;desktop;freerdp;
+StartupWMClass=RdpManager.Linux

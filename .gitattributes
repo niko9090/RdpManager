@@ -2,3 +2,8 @@ server/**/*.sh text eol=lf
 server/**/*.yml text eol=lf
 server/**/*.conf text eol=lf
 server/**/*.modello text eol=lf
+
+# File dei pacchetti Linux: sempre LF (un .desktop o uno script con CR non funziona su Linux)
+packaging/linux/*.sh text eol=lf
+packaging/linux/*.desktop text eol=lf
+packaging/linux/*.png binary

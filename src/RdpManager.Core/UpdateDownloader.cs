@@ -87,8 +87,7 @@ public static class UpdateDownloader
     public const long MaxInstallerBytes = 500L * 1024 * 1024;
 
     /// <summary>%LOCALAPPDATA%\RdpManager\updates: qui si scarica e si verifica l'installer.</summary>
-    public static string DefaultFolder => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RdpManager", "updates");
+    public static string DefaultFolder => Path.Combine(AppPaths.DataFolder, "updates");
 
     /// <summary>
     /// Toglie dalla cartella degli aggiornamenti tutto tranne <paramref name="keep"/> (file vecchi, scaricamenti
