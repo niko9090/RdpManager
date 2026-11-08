@@ -96,14 +96,14 @@ public sealed partial class MainForm
             _fsHandle = new Button
             {
                 FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(40, 90, 160), ForeColor = Color.White, TabStop = false,
-                UseMnemonic = false, UseVisualStyleBackColor = false, Font = new Font(Font.FontFamily, 14f, FontStyle.Bold),
+                UseMnemonic = false, UseVisualStyleBackColor = false, Font = new Font(Font.FontFamily, 18f, FontStyle.Bold),
             };
             _fsHandle.FlatAppearance.BorderSize = 0;
             _fsHandle.Click += (_, _) => ShowFullScreenBarFromHandle();
             _tips.SetToolTip(_fsHandle, "Mostra la barra");
             _root.Controls.Add(_fsHandle);
         }
-        int depth = TouchUi.Px(this, TouchMetrics.SessionTarget), length = TouchUi.Px(this, 120);
+        int depth = TouchUi.Px(this, TouchMetrics.SessionTarget), length = TouchUi.Px(this, 160);
         var area = _root.ClientRectangle;
         var position = _doc.Settings.Bar.Position;
         _fsHandle.Text = position switch { BarPosition.Right => "‹", BarPosition.Bottom => "˄", _ => "›" };
