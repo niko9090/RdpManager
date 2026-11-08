@@ -30,9 +30,9 @@ internal sealed class FullScreenSideBar : Panel
     private static readonly Color HeaderFore = Color.FromArgb(150, 160, 180);
     private const int SectionWidthBottom = 230;
     private static readonly Font InitialsFont = new(Control.DefaultFont.FontFamily, 16f, FontStyle.Bold);
-    private static readonly Font HeaderFont = new(SystemFonts.MessageBoxFont ?? Control.DefaultFont, 10.5f, FontStyle.Bold);
-    private static readonly Font ItemFont = new(SystemFonts.MessageBoxFont ?? Control.DefaultFont, 10.5f);
-    private static readonly Font SelectedFont = new(SystemFonts.MessageBoxFont ?? Control.DefaultFont, 10.5f, FontStyle.Bold);
+    private static readonly Font HeaderFont = new((SystemFonts.MessageBoxFont ?? Control.DefaultFont).FontFamily, 10.5f, FontStyle.Bold);
+    private static readonly Font ItemFont = new((SystemFonts.MessageBoxFont ?? Control.DefaultFont).FontFamily, 10.5f);
+    private static readonly Font SelectedFont = new((SystemFonts.MessageBoxFont ?? Control.DefaultFont).FontFamily, 10.5f, FontStyle.Bold);
     private static readonly Font GlyphFont = new("Segoe UI Symbol", 13f);
     private static readonly Color Accent = Color.FromArgb(90, 150, 230);
     private const string HideGlyph = "✕", FavoriteGlyph = "★", WorkspaceGlyph = "▤", TextGlyph = "✎";
