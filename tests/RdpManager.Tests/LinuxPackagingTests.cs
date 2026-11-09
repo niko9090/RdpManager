@@ -25,9 +25,10 @@ public class LinuxPackagingTests
     [Fact]
     public void LinuxVersionMatchesWindowsInstallerVersion()
     {
-        var windows = VersionOf("src/RdpManager/RdpManager.csproj");
-        Assert.Matches(@"^\d+\.\d+\.\d+$", windows);
-        Assert.Equal(windows, VersionOf("src/RdpManager.Linux/RdpManager.Linux.csproj"));
+        // Versione unica in src/Directory.Build.props: i csproj di Windows e Linux non ne hanno una propria.
+        Assert.Matches(@"^\d+\.\d+\.\d+$", VersionOf("src/Directory.Build.props"));
+        Assert.Equal("", VersionOf("src/RdpManager/RdpManager.csproj"));
+        Assert.Equal("", VersionOf("src/RdpManager.Linux/RdpManager.Linux.csproj"));
     }
 
     [Fact]

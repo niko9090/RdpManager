@@ -10,7 +10,7 @@
 #                                            clic dell'app lo usa per verificare l'installer prima di avviarlo
 #
 # Uso:   powershell -NoProfile -ExecutionPolicy Bypass -File build-installer.ps1
-# La versione si legge da <Version> in src\RdpManager\RdpManager.csproj.
+# La versione si legge da <Version> in src\Directory.Build.props.
 # -ExpectedVersion (usato dal CI con il nome del tag) fa fallire lo script se non coincide.
 
 param(
@@ -20,7 +20,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
-$project = Join-Path $root 'src\RdpManager\RdpManager.csproj'
+$project = Join-Path $root 'src\Directory.Build.props'
 
 [xml]$csproj = Get-Content -Raw $project
 $version = ($csproj.Project.PropertyGroup | ForEach-Object { $_.Version } | Where-Object { $_ }) | Select-Object -First 1

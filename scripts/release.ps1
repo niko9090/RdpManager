@@ -4,7 +4,7 @@
 #   powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 -Version 1.1.0
 #   (facoltativo) -Notes "Novità di questa versione"; altrimenti la sezione «## X.Y.Z» di CHANGELOG.md
 #
-# Passi: controlli → <Version> nel csproj → build → test → pubblicazione + installer (build-installer.ps1)
+# Passi: controlli → <Version> in src\Directory.Build.props → build → test → pubblicazione + installer (build-installer.ps1)
 # → commit «Versione X.Y.Z» (se la versione è cambiata) → tag vX.Y.Z → push di main e del tag
 # → gh release create con l'installer, l'eseguibile portatile, i pacchetti Linux (.deb, .rpm, AppImage, costruiti in WSL) e SHA256SUMS.txt (serve all'aggiornamento con un clic).
 # Si ferma senza fare nulla se ci sono modifiche non salvate, se non si è su main o se il tag esiste già.
@@ -18,8 +18,8 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 Set-Location $root
 $repo = 'niko9090/RdpManager'
-$csprojPath = Join-Path $root 'src\RdpManager\RdpManager.csproj'
-$linuxCsprojPath = Join-Path $root 'src\RdpManager.Linux\RdpManager.Linux.csproj'
+# Versione unica per Windows, Linux e Core: src\Directory.Build.props (RdpManagerVpn ha la propria nel suo csproj).
+$csprojPath = Join-Path $root 'src\Directory.Build.props'
 
 # Note della release: la sezione «## X.Y.Z» di CHANGELOG.md (se c'è) seguita dalle istruzioni di installazione.
 function Get-ReleaseNotes([string]$ver) {
@@ -83,10 +83,6 @@ if ($changed) {
     Write-Host "Versione: $current → $Version"
     $csproj = [regex]::Replace($csproj, '<Version>[^<]+</Version>', "<Version>$Version</Version>", 1)
     [IO.File]::WriteAllText($csprojPath, $csproj, (New-Object Text.UTF8Encoding($false)))
-    # Il programma Linux ha la propria <Version>: stessa versione, così i pacchetti .deb/.rpm/AppImage coincidono.
-    $linuxCsproj = [IO.File]::ReadAllText($linuxCsprojPath, [Text.Encoding]::UTF8)
-    $linuxCsproj = [regex]::Replace($linuxCsproj, '<Version>[^<]+</Version>', "<Version>$Version</Version>", 1)
-    [IO.File]::WriteAllText($linuxCsprojPath, $linuxCsproj, (New-Object Text.UTF8Encoding($false)))
 } else {
     Write-Host "Versione già $Version nel csproj"
 }
@@ -98,7 +94,7 @@ try {
     Run 'Pubblicazione e installer' { powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'build-installer.ps1') -ExpectedVersion $tag }
 }
 catch {
-    if ($changed) { git checkout -- $csprojPath $linuxCsprojPath }   # nessuna modifica lasciata a metà
+    if ($changed) { git checkout -- $csprojPath }   # nessuna modifica lasciata a metà
     throw
 }
 
@@ -122,7 +118,7 @@ foreach ($f in (@($setup, $portable) + $linux)) {
 
 # ---------- commit, tag, push ----------
 if ($changed) {
-    Run 'Commit' { git commit -m "Versione $Version" -- $csprojPath $linuxCsprojPath }
+    Run 'Commit' { git commit -m "Versione $Version" -- $csprojPath }
 }
 Run "Tag $tag" { git tag -a $tag -m "RdpManager $Version" }
 Run 'Push di main' { git push origin main }

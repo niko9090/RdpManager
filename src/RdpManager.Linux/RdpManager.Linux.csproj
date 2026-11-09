@@ -13,7 +13,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>RdpManager.Linux</RootNamespace>
     <AssemblyName>RdpManager.Linux</AssemblyName>
-    <Version>1.12.1</Version>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
