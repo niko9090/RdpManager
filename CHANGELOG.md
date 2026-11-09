@@ -1,5 +1,11 @@
 # Novità di RdpManager
 
+## 1.12.2 (2026-11-09)
+
+**Versione corretta**
+- Il programma mostrava la versione 1.0.0 dopo l'aggiornamento e continuava a proporre di aggiornare: corretto.
+- Il numero di versione ora sta in un solo posto.
+
 ## 1.12.1 (2026-11-08)
 
 **VPN senza conferma di amministratore**
