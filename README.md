@@ -118,8 +118,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 -Version
 Lo script, in ordine:
 1. si ferma se ci sono modifiche non salvate, se non si è sul ramo `main`, se il ramo è indietro
    rispetto a GitHub o se il tag `v1.2.0` (o la release) esiste già;
-2. scrive la versione in `<Version>` di `src/RdpManager/RdpManager.csproj` (l'unico punto in cui
-   sta: app, installer e controllo aggiornamenti la leggono da lì);
+2. scrive la versione in `<Version>` di `src/Directory.Build.props` (l'unico punto in cui
+   sta: app Windows e Linux, Core, installer e controllo aggiornamenti la leggono da lì; RdpManagerVpn ha la sua);
 3. compila ed esegue tutti i test;
 4. pubblica a cartella e compila l'installer con `build-installer.ps1` → `dist\` (più l'exe portatile), insieme a
    `SHA256SUMS.txt` (SHA256 dei due file, formato di `sha256sum`), e controlla che corrisponda;

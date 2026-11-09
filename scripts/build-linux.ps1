@@ -9,7 +9,7 @@
 # Se mancano, lo script prova a installarli in WSL come root (apt-get). appimagetool si scarica in artifacts\tools.
 #
 # Uso:   powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-linux.ps1 -Version 1.12.1
-# Senza -Version la versione si legge da <Version> in src\RdpManager\RdpManager.csproj (la stessa fonte dell'installer Windows).
+# Senza -Version la versione si legge da <Version> in src\Directory.Build.props (la stessa fonte dell'installer Windows).
 
 param(
     [string]$Version = '',
@@ -20,7 +20,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 
 if (-not $Version) {
-    $text = [IO.File]::ReadAllText((Join-Path $root 'src\RdpManager\RdpManager.csproj'), [Text.Encoding]::UTF8)
+    $text = [IO.File]::ReadAllText((Join-Path $root 'src\Directory.Build.props'), [Text.Encoding]::UTF8)
     $Version = [regex]::Match($text, '<Version>([^<]+)</Version>').Groups[1].Value.Trim()
 }
 if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw "Versione non valida: «$Version»" }
