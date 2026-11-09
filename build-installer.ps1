@@ -20,11 +20,12 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
-$project = Join-Path $root 'src\Directory.Build.props'
+$props = Join-Path $root 'src\Directory.Build.props'
+$project = Join-Path $root 'src\RdpManager\RdpManager.csproj'
 
-[xml]$csproj = Get-Content -Raw $project
+[xml]$csproj = Get-Content -Raw $props
 $version = ($csproj.Project.PropertyGroup | ForEach-Object { $_.Version } | Where-Object { $_ }) | Select-Object -First 1
-if (-not $version) { throw "Versione non trovata in $project" }
+if (-not $version) { throw "Versione non trovata in $props" }
 $version = $version.Trim()
 if ($ExpectedVersion -and ($ExpectedVersion.TrimStart('v') -ne $version)) {
     throw "Il tag ($ExpectedVersion) non coincide con la versione del progetto ($version): aggiornare <Version> nel csproj."
