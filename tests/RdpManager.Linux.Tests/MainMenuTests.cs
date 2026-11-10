@@ -32,14 +32,16 @@ public class MainMenuTests
     }
 
     [Fact]
-    public void I_comandi_segnaposto_dei_blocchi_sono_disabilitati()
+    public void Nessun_comando_e_piu_un_segnaposto()
     {
-        using var data = new TempData();
-        var vm = Seed.Main(data);
-        // I comandi del blocco A ora sono veri (vedi BlockATests); restano segnaposto solo quelli del blocco B.
-        string[] placeholders = [nameof(vm.VpnCommand), nameof(vm.FullScreenCommand), nameof(vm.CheckUpdatesCommand)];
-        foreach (var name in placeholders)
-            Assert.False(((RelayCommand)typeof(MainWindowViewModel).GetProperty(name)!.GetValue(vm)!).CanExecute(null), name);
+        // I blocchi A e B sono entrambi dentro: nessuna voce del menu deve restare legata a Placeholder().
+        var root = Path.GetDirectoryName(SettingsViewModelTests.RepoFile("src/RdpManager.Linux/Menus/MainMenu.axaml"))!;
+        var src = Path.GetFullPath(Path.Combine(root, ".."));
+        var users = Directory.GetFiles(src, "*.cs", SearchOption.AllDirectories)
+            .Where(f => !f.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar))
+            .Where(f => File.ReadAllText(f).Contains("Placeholder()") && !File.ReadAllText(f).Contains("static RelayCommand Placeholder()"))
+            .ToList();
+        Assert.Empty(users);
     }
 
     [Fact]

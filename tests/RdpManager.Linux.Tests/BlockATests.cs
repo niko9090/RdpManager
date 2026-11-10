@@ -1144,7 +1144,11 @@ public class BlockAWiringTests
         Assert.Contains("WindowBehaviors.BackgroundWork", axaml);
         Assert.Contains("IsLocked", axaml);
         Assert.Contains("Ho dimenticato il PIN", axaml);
-        Assert.Contains("Ctrl+Alt+Space", axaml);
+        // Ctrl+Alt+Spazio e Ctrl+Alt+L stanno nella ShortcutMap configurabile del blocco B, non più fra i tasti fissi.
+        var map = new RdpManager.Linux.Features.ShortcutMap();
+        Assert.Equal("Ctrl+Alt+Spazio", map[RdpManager.Core.ShortcutAction.QuickSearch].ToString());
+        Assert.Equal("Ctrl+Alt+L", map[RdpManager.Core.ShortcutAction.Lock].ToString());
+        Assert.DoesNotContain("Ctrl+Alt+L\"", axaml);
         Assert.Contains("<KeyBinding Gesture=\"Escape\"", axaml);
     }
 

@@ -3,9 +3,19 @@
              xmlns:vm="using:RdpManager.Linux.ViewModels.Settings"
              x:Class="RdpManager.Linux.Dialogs.Settings.PaginaVassoio"
              x:DataType="vm:VassoioPageViewModel">
-  <!-- Pagina Impostazioni «Vassoio» (blocco B). -->
+  <!-- Pagina Impostazioni «Area di notifica» (blocco B). -->
   <StackPanel Spacing="10">
     <TextBlock Classes="section" Margin="0,0,0,4" Text="Area di notifica" />
-    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding Notice}" />
+    <CheckBox Content="Mostra l'icona nell'area di notifica" IsChecked="{Binding ShowTrayIcon}" />
+    <CheckBox Content="Chiudendo la finestra resta nell'area di notifica" IsChecked="{Binding CloseToTray}" IsEnabled="{Binding CloseToTrayEnabled}" />
+    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding TrayNote}" />
+
+    <TextBlock Classes="section" Text="Richiamo rapido" />
+    <Grid ColumnDefinitions="170,*">
+      <TextBlock Classes="label" Text="Scorciatoia globale" />
+      <TextBox Grid.Column="1" Text="{Binding GlobalHotkey}" Watermark="Ctrl+Alt+Maiusc+R (vuoto = disattivata)" IsEnabled="{Binding HotkeyAvailable}" />
+    </Grid>
+    <TextBlock Classes="error" Text="{Binding HotkeyError}" />
+    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding HotkeyNote}" />
   </StackPanel>
 </UserControl>

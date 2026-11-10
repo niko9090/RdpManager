@@ -25,10 +25,10 @@ public sealed class SettingsViewModel : ViewModelBase
             new ElencoPageViewModel(settings),
             new PinPageViewModel(settings, dialogs),
             // Blocco B
-            new VassoioPageViewModel(),
-            new MonitorPageViewModel(),
-            new ToccoPageViewModel(),
-            new ScorciatoiePageViewModel(),
+            new VassoioPageViewModel(settings),
+            new MonitorPageViewModel(settings),
+            new ToccoPageViewModel(settings),
+            new ScorciatoiePageViewModel(settings),
             new AggiornamentiPageViewModel(settings),
         ];
         _selectedPage = Pages[0];

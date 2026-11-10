@@ -1,0 +1,36 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:f="using:RdpManager.Linux.Features"
+        x:Class="RdpManager.Linux.Dialogs.AccountWindow"
+        x:DataType="f:AccountViewModel"
+        Title="Account e sincronizzazione" Width="540" SizeToContent="Height" MinWidth="420"
+        WindowStartupLocation="CenterOwner" CanResize="False">
+  <ScrollViewer>
+    <StackPanel Margin="20" Spacing="8">
+      <TextBlock Text="{Binding Explanation}" TextWrapping="Wrap" Classes="muted" />
+
+      <TextBlock Classes="label" Margin="0,8,0,0" Text="{Binding ServerLabel}" />
+      <TextBox Text="{Binding ServerUrl}" IsEnabled="{Binding CanEditFields}" Watermark="https://vpn.example.com:8443" />
+
+      <TextBlock Classes="label" Margin="0,8,0,0" Text="Nome utente" />
+      <TextBox Text="{Binding Username}" IsEnabled="{Binding CanEditFields}" />
+
+      <StackPanel IsVisible="{Binding SignedOut}" Spacing="8">
+        <TextBlock Classes="label" Margin="0,8,0,0" Text="Password dell'account" />
+        <TextBox Text="{Binding Password}" PasswordChar="●" IsEnabled="{Binding !Busy}" />
+      </StackPanel>
+
+      <WrapPanel Margin="0,10,0,0">
+        <Button Classes="accent" Content="Accedi" Command="{Binding SignInCommand}" IsVisible="{Binding SignedOut}" Margin="0,0,6,6" />
+        <Button Content="Registrati" Command="{Binding RegisterCommand}" IsVisible="{Binding SignedOut}" Margin="0,0,6,6" />
+        <Button Content="Importa configurazione…" Command="{Binding ImportConfigCommand}" IsVisible="{Binding SignedOut}" Margin="0,0,6,6" />
+        <Button Classes="accent" Content="Sincronizza ora" Command="{Binding SyncNowCommand}" IsVisible="{Binding SignedIn}" Margin="0,0,6,6" />
+        <Button Content="Esci dall'account" Command="{Binding SignOutCommand}" IsVisible="{Binding SignedIn}" Margin="0,0,6,6" />
+      </WrapPanel>
+
+      <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Margin="0,8,0,0" />
+
+      <Button Content="Chiudi" Click="OnClose" IsCancel="True" HorizontalAlignment="Right" MinWidth="96" Margin="0,8,0,0" />
+    </StackPanel>
+  </ScrollViewer>
+</Window>

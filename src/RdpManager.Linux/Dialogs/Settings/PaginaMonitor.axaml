@@ -3,9 +3,17 @@
              xmlns:vm="using:RdpManager.Linux.ViewModels.Settings"
              x:Class="RdpManager.Linux.Dialogs.Settings.PaginaMonitor"
              x:DataType="vm:MonitorPageViewModel">
-  <!-- Pagina Impostazioni «Monitor» (blocco B). -->
+  <!-- Pagina Impostazioni «Monitor» (blocco B): monitor, barra laterale, barra a schermo intero. -->
   <StackPanel Spacing="10">
     <TextBlock Classes="section" Margin="0,0,0,4" Text="Monitor" />
-    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding Notice}" />
+    <Grid ColumnDefinitions="170,*"><TextBlock Classes="label" Text="Monitor preferito" /><ComboBox Grid.Column="1" ItemsSource="{Binding MonitorChoices}" SelectedItem="{Binding Monitor}" HorizontalAlignment="Stretch" /></Grid>
+    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding Note}" />
+
+    <TextBlock Classes="section" Text="Barra laterale" />
+    <Grid ColumnDefinitions="170,*"><TextBlock Classes="label" Text="Barra laterale" /><ComboBox Grid.Column="1" ItemsSource="{x:Static vm:MonitorPageViewModel.SidebarChoices}" SelectedItem="{Binding Sidebar}" HorizontalAlignment="Stretch" /></Grid>
+
+    <TextBlock Classes="section" Text="Barra a schermo intero" />
+    <Grid ColumnDefinitions="170,*"><TextBlock Classes="label" Text="Posizione" /><ComboBox Grid.Column="1" ItemsSource="{x:Static vm:MonitorPageViewModel.BarPositionChoices}" SelectedItem="{Binding BarPositionChoice}" HorizontalAlignment="Stretch" /></Grid>
+    <Grid ColumnDefinitions="170,*"><TextBlock Classes="label" Text="Comportamento" /><ComboBox Grid.Column="1" ItemsSource="{x:Static vm:MonitorPageViewModel.BarModeChoices}" SelectedItem="{Binding BarModeChoice}" HorizontalAlignment="Stretch" /></Grid>
   </StackPanel>
 </UserControl>

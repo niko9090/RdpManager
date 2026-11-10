@@ -6,6 +6,18 @@
   <!-- Pagina Impostazioni «Scorciatoie» (blocco B). -->
   <StackPanel Spacing="10">
     <TextBlock Classes="section" Margin="0,0,0,4" Text="Scorciatoie" />
-    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding Notice}" />
+    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding Note}" />
+    <ItemsControl ItemsSource="{Binding Entries}">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:ShortcutEntry">
+          <Grid ColumnDefinitions="260,*" Margin="0,3">
+            <TextBlock Classes="label" Text="{Binding Description}" />
+            <TextBox Grid.Column="1" Text="{Binding Text}" Watermark="(disattivata)" />
+          </Grid>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+    <TextBlock Classes="error" Text="{Binding Problems}" />
+    <Button Content="Ripristina i valori predefiniti" Command="{Binding ResetCommand}" HorizontalAlignment="Left" />
   </StackPanel>
 </UserControl>

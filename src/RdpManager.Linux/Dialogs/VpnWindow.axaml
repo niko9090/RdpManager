@@ -1,0 +1,41 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:f="using:RdpManager.Linux.Features"
+        x:Class="RdpManager.Linux.Dialogs.VpnWindow"
+        x:DataType="f:VpnViewModel"
+        Title="VPN (WireGuard)" Width="560" Height="720" MinWidth="440" MinHeight="420"
+        WindowStartupLocation="CenterOwner">
+  <ScrollViewer>
+    <StackPanel Margin="20" Spacing="6">
+      <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding BackendNote}" />
+
+      <TextBlock Classes="label" Margin="0,8,0,0" Text="Nome di questo PC (nel commento del frammento)" />
+      <TextBox Text="{Binding PcName}" />
+      <TextBlock Classes="label" Margin="0,8,0,0" Text="Indirizzo di questo PC nel tunnel" />
+      <TextBox Text="{Binding Address}" Watermark="10.66.0.2/32" />
+      <TextBlock Classes="label" Margin="0,8,0,0" Text="Endpoint del server" />
+      <TextBox Text="{Binding Endpoint}" />
+      <TextBlock Classes="label" Margin="0,8,0,0" Text="Chiave pubblica del server (dal Synology)" />
+      <TextBox Text="{Binding ServerPublicKey}" />
+
+      <WrapPanel Margin="0,8,0,0">
+        <Button Content="Crea chiavi" Command="{Binding GenerateKeysCommand}" Margin="0,0,6,6" />
+        <Button Content="Ottieni dal server" Command="{Binding ProvisionCommand}" IsVisible="{Binding CanProvision}" Margin="0,0,6,6"
+                ToolTip.Tip="Chiede al server l'indirizzo e la chiave: serve aver fatto l'accesso all'account" />
+      </WrapPanel>
+
+      <TextBlock Classes="label" Margin="0,8,0,0" Text="Chiave pubblica di questo PC" />
+      <TextBox Text="{Binding PublicKey}" IsReadOnly="True" />
+      <TextBlock Classes="label" Margin="0,8,0,0" Text="Da aggiungere alla configurazione WireGuard del server" />
+      <TextBox Text="{Binding Fragment}" IsReadOnly="True" AcceptsReturn="True" Height="110" FontFamily="monospace" />
+      <Button Content="Copia il frammento" Command="{Binding CopyFragmentCommand}" HorizontalAlignment="Left" />
+
+      <TextBlock Classes="label" Margin="0,12,0,0" Text="Stato del tunnel" />
+      <TextBlock Text="{Binding Status}" FontWeight="SemiBold" />
+      <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+      <Button Classes="accent" Content="{Binding ToggleText}" Command="{Binding ToggleCommand}" HorizontalAlignment="Left" />
+
+      <Button Content="Chiudi" Click="OnClose" IsCancel="True" HorizontalAlignment="Right" MinWidth="96" Margin="0,8,0,0" />
+    </StackPanel>
+  </ScrollViewer>
+</Window>
