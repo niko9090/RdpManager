@@ -5,7 +5,11 @@ using RdpManager.Linux.Sessions;
 
 namespace RdpManager.Linux.ViewModels;
 
-public sealed class MainWindowViewModel : ViewModelBase
+/// <summary>
+/// Modello della finestra principale. Diviso in tre file: questo (albero, sessioni, salvataggio),
+/// <c>MainWindowViewModel.A.cs</c> (comandi del blocco A) e <c>MainWindowViewModel.B.cs</c> (comandi del blocco B).
+/// </summary>
+public sealed partial class MainWindowViewModel : ViewModelBase
 {
     private readonly ConnectionStore _store;
     private readonly ISessionHost _sessions;
@@ -34,6 +38,9 @@ public sealed class MainWindowViewModel : ViewModelBase
         ProfilesCommand = new RelayCommand(() => Run(ShowProfilesAsync));
         SettingsCommand = new RelayCommand(() => Run(ShowSettingsAsync));
         ClearSearchCommand = new RelayCommand(() => SearchText = "");
+        SearchCommand = new RelayCommand(() => FocusSearchRequested?.Invoke(this, EventArgs.Empty));
+        CloseCurrentTabCommand = new RelayCommand(() => { if (SelectedTab is { } t) CloseTab(t); }, () => SelectedTab is not null);
+        ExitCommand = new RelayCommand(() => ExitRequested?.Invoke(this, EventArgs.Empty));
 
         Reload();
     }
@@ -54,6 +61,18 @@ public sealed class MainWindowViewModel : ViewModelBase
     public RelayCommand ProfilesCommand { get; }
     public RelayCommand SettingsCommand { get; }
     public RelayCommand ClearSearchCommand { get; }
+    public RelayCommand SearchCommand { get; }
+    public RelayCommand CloseCurrentTabCommand { get; }
+    public RelayCommand ExitCommand { get; }
+
+    /// <summary>Il menu chiede di portare il cursore nel campo di ricerca.</summary>
+    public event EventHandler? FocusSearchRequested;
+
+    /// <summary>Il menu chiede di chiudere l'applicazione.</summary>
+    public event EventHandler? ExitRequested;
+
+    /// <summary>Comando di una voce di menu non ancora realizzata su Linux: resta disabilitato finché il blocco non lo sostituisce.</summary>
+    internal static RelayCommand Placeholder() => new(() => { }, () => false);
 
     public string SearchText
     {
@@ -78,7 +97,15 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
-    public SessionTabViewModel? SelectedTab { get => _selectedTab; set => Set(ref _selectedTab, value); }
+    public SessionTabViewModel? SelectedTab
+    {
+        get => _selectedTab;
+        set
+        {
+            if (Set(ref _selectedTab, value))
+                CloseCurrentTabCommand.RaiseCanExecuteChanged();
+        }
+    }
 
     public bool HasTabs => Tabs.Count > 0;
 

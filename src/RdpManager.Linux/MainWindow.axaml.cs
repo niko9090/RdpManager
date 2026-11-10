@@ -12,6 +12,13 @@ public sealed partial class MainWindow : Window
         ConnectionTree.DoubleTapped += (_, _) => (DataContext as MainWindowViewModel)?.ConnectSelected();
         ConnectionTree.KeyDown += OnTreeKeyDown;
         KeyDown += OnWindowKeyDown;
+        DataContextChanged += (_, _) =>
+        {
+            if (DataContext is not MainWindowViewModel vm)
+                return;
+            vm.ExitRequested += (_, _) => Close();
+            vm.FocusSearchRequested += (_, _) => { SearchBox.Focus(); SearchBox.SelectAll(); };
+        };
     }
 
     private void OnTreeKeyDown(object? sender, KeyEventArgs e)

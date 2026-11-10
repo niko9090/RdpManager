@@ -1,46 +1,50 @@
 using RdpManager.Core;
+using RdpManager.Linux.ViewModels.Settings;
 
 namespace RdpManager.Linux.ViewModels;
 
-/// <summary>Impostazioni di base (quelle condivise con l'app Windows nello stesso file dati).</summary>
+/// <summary>
+/// Impostazioni: un elenco di pagine, ciascuna con il proprio modello (cartella <c>ViewModels/Settings</c>) e la propria vista
+/// (cartella <c>Dialogs/Settings</c>). Per aggiungere una pagina: nuovo modello, nuova vista, una riga in <see cref="Pages"/>.
+/// </summary>
 public sealed class SettingsViewModel : ViewModelBase
 {
-    private readonly AppSettings _settings;
-    private ChoiceItem<AppTheme> _theme;
-    private ChoiceItem<UpdateMode> _update;
-    private ChoiceItem<ConnectionOrder> _order;
-    private bool _history, _verbose;
+    private SettingsPageViewModel _selectedPage;
 
     public SettingsViewModel(AppSettings settings, string dataFilePath)
     {
-        _settings = settings;
         DataFilePath = dataFilePath;
-        _theme = Choices.Pick(Choices.Theme, settings.Theme);
-        _update = Choices.Pick(Choices.Update, settings.UpdateMode);
-        _order = Choices.Pick(Choices.Order, settings.ConnectionOrder);
-        _history = settings.HistoryEnabled;
-        _verbose = settings.VerboseLog;
+        Pages =
+        [
+            // Blocco A
+            new AspettoPageViewModel(settings),
+            new AvvioPageViewModel(settings, dataFilePath),
+            new ElencoPageViewModel(settings),
+            new PinPageViewModel(),
+            // Blocco B
+            new VassoioPageViewModel(),
+            new MonitorPageViewModel(),
+            new ToccoPageViewModel(),
+            new ScorciatoiePageViewModel(),
+            new AggiornamentiPageViewModel(settings),
+        ];
+        _selectedPage = Pages[0];
     }
 
     public string DataFilePath { get; }
 
-    public IReadOnlyList<ChoiceItem<AppTheme>> ThemeChoices => Choices.Theme;
-    public IReadOnlyList<ChoiceItem<UpdateMode>> UpdateChoices => Choices.Update;
-    public IReadOnlyList<ChoiceItem<ConnectionOrder>> OrderChoices => Choices.Order;
+    public IReadOnlyList<SettingsPageViewModel> Pages { get; }
 
-    public ChoiceItem<AppTheme> Theme { get => _theme; set => Set(ref _theme, value); }
-    public ChoiceItem<UpdateMode> Update { get => _update; set => Set(ref _update, value); }
-    public ChoiceItem<ConnectionOrder> Order { get => _order; set => Set(ref _order, value); }
-    public bool HistoryEnabled { get => _history; set => Set(ref _history, value); }
-    public bool VerboseLog { get => _verbose; set => Set(ref _verbose, value); }
+    public SettingsPageViewModel SelectedPage
+    {
+        get => _selectedPage;
+        set { if (value is not null) Set(ref _selectedPage, value); }
+    }
 
     /// <summary>Scrive i valori scelti sulle impostazioni.</summary>
     public void Apply()
     {
-        _settings.Theme = Theme.Value;
-        _settings.UpdateMode = Update.Value;
-        _settings.ConnectionOrder = Order.Value;
-        _settings.HistoryEnabled = HistoryEnabled;
-        _settings.VerboseLog = VerboseLog;
+        foreach (var page in Pages)
+            page.Apply();
     }
 }

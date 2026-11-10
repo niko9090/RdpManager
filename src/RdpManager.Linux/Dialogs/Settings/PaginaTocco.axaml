@@ -1,0 +1,11 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:RdpManager.Linux.ViewModels.Settings"
+             x:Class="RdpManager.Linux.Dialogs.Settings.PaginaTocco"
+             x:DataType="vm:ToccoPageViewModel">
+  <!-- Pagina Impostazioni «Tocco» (blocco B). -->
+  <StackPanel Spacing="10">
+    <TextBlock Classes="section" Margin="0,0,0,4" Text="Tocco" />
+    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding Notice}" />
+  </StackPanel>
+</UserControl>
