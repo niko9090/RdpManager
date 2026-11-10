@@ -419,4 +419,52 @@ public class RegistrationTests
             await Register(s, "utente" + i);
         Assert.Equal((HttpStatusCode)429, (await Register(s, "utente-ancora")).StatusCode);
     }
+
+    // Dietro il proxy Caddy (sul NAS) ogni richiesta arriva dallo stesso gateway Docker: il limite deve valere per il
+    // cliente vero (X-Forwarded-For, aggiunto da Caddy), non per tutto il server. Altrimenti 10 registrazioni in 15
+    // minuti, di chiunque, bloccano tutti gli altri.
+    private static Task<HttpResponseMessage> RegisterVia(TestServer s, string user, string forwardedFor)
+    {
+        var req = new HttpRequestMessage(HttpMethod.Post, "/v1/register")
+        {
+            Content = JsonContent.Create(new { username = user, password = TestServer.Secret(user, "frase segreta lunga"), registrationCode = (string?)null }),
+        };
+        req.Headers.TryAddWithoutValidation("X-Forwarded-For", forwardedFor);
+        return s.Http.SendAsync(req);
+    }
+
+    [Fact]
+    public async Task Il_limite_e_per_cliente_non_per_tutto_il_server()
+    {
+        await using var s = new TestServer(o => o.OpenRegistration = true);
+        for (int i = 0; i < 10; i++)
+            Assert.Equal(HttpStatusCode.Created, (await RegisterVia(s, "uno-" + i, "203.0.113.10")).StatusCode);
+        Assert.Equal((HttpStatusCode)429, (await RegisterVia(s, "a-extra", "203.0.113.10")).StatusCode);
+        // Un altro cliente non risente dei tentativi del primo.
+        Assert.Equal(HttpStatusCode.Created, (await RegisterVia(s, "b-altro", "198.51.100.7")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Conta_l_ultimo_indirizzo_di_X_Forwarded_For_non_il_primo()
+    {
+        // Il primo valore lo scrive il cliente (si puo' falsificare); l'ultimo lo aggiunge il proxy.
+        await using var s = new TestServer(o => o.OpenRegistration = true);
+        for (int i = 0; i < 10; i++)
+            Assert.Equal(HttpStatusCode.Created, (await RegisterVia(s, "due-" + i, $"10.1.1.{i}, 203.0.113.20")).StatusCode);
+        Assert.Equal((HttpStatusCode)429, (await RegisterVia(s, "c-extra", "9.9.9.9, 203.0.113.20")).StatusCode);
+    }
+
+    [Fact]
+    public void Indirizzo_del_cliente_si_legge_da_X_Forwarded_For_solo_dal_proxy_fidato()
+    {
+        // Dal proxy (loopback o rete Docker) conta l'ultimo valore di X-Forwarded-For.
+        Assert.Equal("203.0.113.10", SyncApp.ClientIp(IPAddress.Loopback, "203.0.113.10"));
+        Assert.Equal("203.0.113.10", SyncApp.ClientIp(IPAddress.Parse("172.18.0.1"), "9.9.9.9, 203.0.113.10"));
+        Assert.Equal("127.0.0.1", SyncApp.ClientIp(IPAddress.Loopback, null));
+        Assert.Equal("127.0.0.1", SyncApp.ClientIp(IPAddress.Loopback, "non-un-indirizzo"));
+        // Da un PC in VPN (o da chiunque non sia il proxy) l'intestazione si ignora: conta la connessione.
+        Assert.Equal("10.66.0.5", SyncApp.ClientIp(IPAddress.Parse("10.66.0.5"), "1.2.3.4"));
+        Assert.Equal("82.134.248.36", SyncApp.ClientIp(IPAddress.Parse("82.134.248.36"), "1.2.3.4"));
+        Assert.Equal("?", SyncApp.ClientIp(null, "1.2.3.4"));
+    }
 }

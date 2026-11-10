@@ -1,3 +1,4 @@
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -284,7 +285,36 @@ public static class SyncApp
 
     private static bool ValidSecret(string? s) => s is { Length: >= MinSecretLength and <= MaxSecretLength };
 
-    private static string Ip(HttpContext ctx) => ctx.Connection.RemoteIpAddress?.ToString() ?? "?";
+    private static string Ip(HttpContext ctx) =>
+        ClientIp(ctx.Connection.RemoteIpAddress, ctx.Request.Headers["X-Forwarded-For"].ToString());
+
+    /// <summary>
+    /// Indirizzo del cliente per i limiti di tentativi. Sul NAS il server sta dietro Caddy: la connessione arriva sempre
+    /// dal gateway Docker, quindi senza questo tutti i clienti sarebbero «lo stesso indirizzo». Si usa l'ULTIMO valore di
+    /// X-Forwarded-For (lo aggiunge il proxy; il primo lo scrive il cliente) e solo se la connessione viene da loopback o
+    /// dalla rete Docker (172.16.0.0/12). Da qualunque altro indirizzo (es. un PC in VPN, 10.66.0.x) conta la connessione.
+    /// </summary>
+    public static string ClientIp(IPAddress? remote, string? forwardedFor)
+    {
+        if (remote is null)
+            return "?";
+        if (remote.IsIPv4MappedToIPv6)
+            remote = remote.MapToIPv4();
+        if (!IsTrustedProxy(remote) || string.IsNullOrWhiteSpace(forwardedFor))
+            return remote.ToString();
+        var last = forwardedFor.Split(',')[^1].Trim();
+        return IPAddress.TryParse(last, out var client) ? client.ToString() : remote.ToString();
+    }
+
+    private static bool IsTrustedProxy(IPAddress ip)
+    {
+        if (IPAddress.IsLoopback(ip))
+            return true;
+        if (ip.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork)
+            return false;
+        var b = ip.GetAddressBytes();
+        return b[0] == 172 && b[1] >= 16 && b[1] <= 31;
+    }
 
     private static bool SecretEquals(string a, string b) =>
         CryptographicOperations.FixedTimeEquals(SHA256.HashData(Encoding.UTF8.GetBytes(a)), SHA256.HashData(Encoding.UTF8.GetBytes(b)));
