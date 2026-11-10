@@ -65,7 +65,10 @@ public sealed class CertificateWarningTests : IDisposable
     {
         var store = new ConnectionStore(Path.Combine(_dir, "connections.json"));
         store.Save(new ConnectionsDocument { Connections = connections.ToList() });
-        var form = new MainForm(store) { StartPosition = FormStartPosition.Manual, Location = new Point(60, 60), Size = new Size(1100, 700) };
+        // 1100x700 come su un desktop normale, ma mai più grande dell'area utile (su 640x480 la finestra sbordava e l'avviso con lei).
+        var area = Screen.PrimaryScreen!.WorkingArea;
+        var size = new Size(Math.Min(1100, area.Width - 40), Math.Min(700, area.Height - 40));
+        var form = new MainForm(store) { StartPosition = FormStartPosition.Manual, Location = new Point(area.Left + 20, area.Top + 20), Size = size };
         form.ConfigureNewSession = v =>
         {
             v.AllowCredentialPrompt = false;
