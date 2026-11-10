@@ -7,8 +7,7 @@ namespace RdpManager.Linux.Features;
 /// FreeRDP, senza terminale, non può chiedere se fidarsi di un certificato: con «/cert:tofu» accetta la prima volta e
 /// fallisce se poi il certificato cambia. Qui si riconosce quel fallimento e si chiede all'utente; se accetta, la sessione
 /// riparte con «/cert:ignore» (solo per quella sessione).
-/// Collegamento con il blocco A: quando <c>FreeRdpCommandBuilder</c> avrà il parametro <c>CertificatePolicy</c>, in
-/// <c>FreeRdpSession.BuildCommand</c> si passa la politica «ignora» al posto di <see cref="AcceptUntrusted"/>.
+/// La politica «ignora» si passa con <c>FreeRdpLaunchContext.CertificatePolicy</c> (vedi <c>FreeRdpSession.BuildCommand</c>).
 /// </summary>
 public static class CertificateTrust
 {
@@ -40,18 +39,6 @@ public static class CertificateTrust
         var text = $"Il certificato del server «{host}» non è quello già conosciuto o non è affidabile. "
                    + "Potrebbe essere stato rinnovato dall'amministratore, ma potrebbe anche essere un tentativo di intercettare la connessione.";
         return detail.Length > 0 ? text + "\n\nDettaglio: " + detail : text;
-    }
-
-    /// <summary>Lo stesso comando con il certificato accettato senza controllo (solo per la sessione in corso).</summary>
-    public static FreeRdpCommand AcceptUntrusted(FreeRdpCommand command)
-    {
-        var args = command.Arguments.Select(a => a switch
-        {
-            "/cert:tofu" => "/cert:ignore",
-            "/cert-tofu" => "/cert-ignore",
-            _ => a,
-        }).ToList();
-        return command with { Arguments = args };
     }
 
     /// <summary>Codici d'uscita di FreeRDP per cui ha senso ritentare: rete, DNS, TLS di trasporto, errori sconosciuti.</summary>

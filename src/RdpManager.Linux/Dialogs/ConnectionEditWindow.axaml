@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:RdpManager.Linux.ViewModels"
         x:Class="RdpManager.Linux.Dialogs.ConnectionEditWindow"
+        xmlns:d="using:RdpManager.Linux.Dialogs"
         x:DataType="vm:ConnectionEditViewModel"
         Title="{Binding WindowTitle}" Width="560" Height="680" MinWidth="380" MinHeight="420" CanResize="True"
         WindowStartupLocation="CenterOwner">
@@ -25,7 +26,7 @@
         </Grid>
         <Grid ColumnDefinitions="170,*">
           <TextBlock Classes="label" Text="Computer" />
-          <TextBox Grid.Column="1" Text="{Binding Host}" Watermark="Nome o indirizzo" />
+          <TextBox Grid.Column="1" Text="{Binding Host}" Watermark="nome-pc, indirizzo IP o nome:porta" />
         </Grid>
         <Grid ColumnDefinitions="170,*">
           <TextBlock Classes="label" Text="Porta" />
@@ -37,7 +38,16 @@
         </Grid>
         <Grid ColumnDefinitions="170,*">
           <TextBlock Classes="label" Text="Etichetta" />
-          <TextBox Grid.Column="1" Text="{Binding Label}" Watermark="Per esempio PROD" />
+          <TextBox Grid.Column="1" Text="{Binding Label}" Watermark="Per esempio PROD" MaxLength="12" />
+        </Grid>
+        <Grid ColumnDefinitions="170,*">
+          <TextBlock Classes="label" Text="Colore dell'etichetta" />
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+            <TextBox Text="{Binding Color}" Watermark="#RRGGBB (vuoto = nessuno)" Width="200" />
+            <Border Width="28" Height="28" CornerRadius="4" BorderThickness="1" VerticalAlignment="Center"
+                    BorderBrush="{DynamicResource AppBorderBrush}"
+                    Background="{Binding ColorPreview, Converter={x:Static d:HexBrushConverter.Instance}}" />
+          </StackPanel>
         </Grid>
         <Grid ColumnDefinitions="170,*"><CheckBox Grid.Column="1" Content="Preferita" IsChecked="{Binding IsFavorite}" /></Grid>
         <TextBlock Classes="section" Text="Credenziali" />
@@ -47,15 +57,20 @@
         </Grid>
         <Grid ColumnDefinitions="170,*">
           <TextBlock Classes="label" Text="Utente" />
-          <TextBox Grid.Column="1" Text="{Binding Username}" />
+          <TextBox Grid.Column="1" Text="{Binding Username}" IsEnabled="{Binding OwnCredentials}" />
         </Grid>
         <Grid ColumnDefinitions="170,*">
           <TextBlock Classes="label" Text="Dominio" />
-          <TextBox Grid.Column="1" Text="{Binding Domain}" />
+          <TextBox Grid.Column="1" Text="{Binding Domain}" IsEnabled="{Binding OwnCredentials}" />
         </Grid>
-        <Grid ColumnDefinitions="170,*">
+        <Grid ColumnDefinitions="170,*,Auto">
           <TextBlock Classes="label" Text="Password" />
-          <TextBox Grid.Column="1" Text="{Binding Password}" PasswordChar="●" Watermark="Vuota = non cambiare quella salvata" />
+          <TextBox Grid.Column="1" Text="{Binding Password}" PasswordChar="●" RevealPassword="{Binding ShowPassword}"
+                   Watermark="{Binding PasswordHint}" IsEnabled="{Binding OwnCredentials}" />
+          <CheckBox Grid.Column="2" Content="Mostra" IsChecked="{Binding ShowPassword}" IsEnabled="{Binding OwnCredentials}" Margin="8,0,0,0" />
+        </Grid>
+        <Grid ColumnDefinitions="170,*" IsVisible="{Binding PasswordWarning, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <TextBlock Grid.Column="1" Classes="error" Text="{Binding PasswordWarning}" />
         </Grid>
         <TextBlock Classes="section" Text="Schermo e dispositivi" />
         <Grid ColumnDefinitions="170,*">
@@ -69,6 +84,10 @@
             <TextBox Text="{Binding DesktopHeight}" Width="110" Watermark="Altezza" />
           </StackPanel>
         </Grid>
+        <Grid ColumnDefinitions="170,*"><CheckBox Grid.Column="1" Content="Usa la risoluzione della cartella" IsChecked="{Binding InheritFolderResolution}"
+                                                  ToolTip.Tip="Se la cartella ha una risoluzione impostata («Impostazioni della cartella…»), vale quella al posto di questa." /></Grid>
+        <Grid ColumnDefinitions="170,*"><CheckBox Grid.Column="1" Content="Usa tutti i monitor" IsChecked="{Binding UseAllMonitors}"
+                                                  ToolTip.Tip="A schermo intero la sessione occupa tutti i monitor come un unico desktop." /></Grid>
         <Grid ColumnDefinitions="170,*">
           <TextBlock Classes="label" Text="Audio" />
           <ComboBox Grid.Column="1" ItemsSource="{Binding AudioChoices}" SelectedItem="{Binding Audio}" HorizontalAlignment="Stretch" />
@@ -83,11 +102,19 @@
         <Grid ColumnDefinitions="170,*"><CheckBox Grid.Column="1" Content="Condividi il microfono" IsChecked="{Binding RedirectMicrophone}" /></Grid>
         <TextBlock Classes="section" Text="Rete" />
         <Grid ColumnDefinitions="170,*"><CheckBox Grid.Column="1" Content="Riconnetti automaticamente" IsChecked="{Binding AutoReconnect}" /></Grid>
+        <Grid ColumnDefinitions="170,*" IsVisible="{Binding AutoReconnect}">
+          <TextBlock Classes="label" Text="Tentativi al massimo" />
+          <TextBox Grid.Column="1" Text="{Binding AutoReconnectMaxAttempts}" Width="80" HorizontalAlignment="Left" />
+        </Grid>
         <Grid ColumnDefinitions="170,*"><CheckBox Grid.Column="1" Content="Tieni sveglia la sessione" IsChecked="{Binding KeepAlive}" /></Grid>
         <Grid ColumnDefinitions="170,*"><CheckBox Grid.Column="1" Content="Passa da un Remote Desktop Gateway" IsChecked="{Binding UseGateway}" /></Grid>
         <Grid ColumnDefinitions="170,*" IsVisible="{Binding UseGateway}">
           <TextBlock Classes="label" Text="Gateway" />
           <TextBox Grid.Column="1" Text="{Binding GatewayHost}" Watermark="Host del gateway (anche host:porta)" />
+        </Grid>
+        <Grid ColumnDefinitions="170,*" IsVisible="{Binding UseGateway}">
+          <TextBlock Classes="label" Text="Credenziali del gateway" />
+          <ComboBox Grid.Column="1" ItemsSource="{Binding GatewayProfiles}" SelectedItem="{Binding GatewayProfile}" HorizontalAlignment="Stretch" />
         </Grid>
         <Grid ColumnDefinitions="170,*">
           <TextBlock Classes="label" Text="Indirizzo MAC" />

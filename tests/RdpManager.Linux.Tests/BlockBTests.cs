@@ -120,13 +120,11 @@ public class CertificateTrustTests
     }
 
     [Fact]
-    public void Accettare_cambia_tofu_in_ignore_e_non_tocca_altro()
+    public void Accettare_usa_la_politica_ignore_del_costruttore_dei_comandi()
     {
-        var cmd = new FreeRdpCommand("xfreerdp3", ["/v:pc", "/cert:tofu", "/u:me"], ["x"]);
-        var accepted = CertificateTrust.AcceptUntrusted(cmd);
-        Assert.Equal(["/v:pc", "/cert:ignore", "/u:me"], accepted.Arguments);
-        Assert.Equal(cmd.StdinLines, accepted.StdinLines);
-        Assert.Equal("/cert-ignore", CertificateTrust.AcceptUntrusted(cmd with { Arguments = ["/cert-tofu"] }).Arguments[0]);
+        Assert.Equal("/cert:ignore", FreeRdpCommandBuilder.CertificateArgument(CertificatePolicy.Ignore, true));
+        Assert.Equal("/cert-ignore", FreeRdpCommandBuilder.CertificateArgument(CertificatePolicy.Ignore, false));
+        Assert.Equal("/cert:tofu", FreeRdpCommandBuilder.CertificateArgument(CertificatePolicy.Tofu, true));
     }
 
     [Fact]

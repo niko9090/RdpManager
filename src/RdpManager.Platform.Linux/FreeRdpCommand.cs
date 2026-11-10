@@ -66,9 +66,25 @@ public static class FreeRdpLocator
         + "Poi riapri la connessione.";
 }
 
+/// <summary>Cosa fare quando il certificato del server non è già noto.</summary>
+public enum CertificatePolicy
+{
+    /// <summary>«Fidati al primo uso»: accetta la prima volta e fallisce se in seguito il certificato cambia (predefinito).</summary>
+    Tofu,
+
+    /// <summary>Accetta qualunque certificato (dopo che l'utente ha scelto «fidati» nell'avviso).</summary>
+    Ignore,
+
+    /// <summary>Rifiuta i certificati non noti (per mostrare l'avviso «fidati / rifiuta» all'utente).</summary>
+    Deny,
+}
+
 /// <summary>Cosa serve al costruttore degli argomenti oltre alla connessione.</summary>
 public sealed record FreeRdpLaunchContext
 {
+    /// <summary>Come trattare il certificato del server (l'avviso certificato dell'interfaccia lo cambia).</summary>
+    public CertificatePolicy CertificatePolicy { get; init; } = CertificatePolicy.Tofu;
+
     /// <summary>Handle X11 della finestra della scheda (per /parent-window); null = finestra separata.</summary>
     public long? ParentWindow { get; init; }
 
@@ -122,8 +138,8 @@ public static class FreeRdpCommandBuilder
         if (c.Domain.Length > 0)
             args.Add("/d:" + c.Domain);
 
-        // Certificato: «fidati al primo uso», perché senza terminale FreeRDP non può chiedere nulla.
-        args.Add(client.IsVersion3 ? "/cert:tofu" : "/cert-tofu");
+        // Certificato: senza terminale FreeRDP non può chiedere nulla, quindi la scelta arriva da fuori (predefinito «fidati al primo uso»).
+        args.Add(CertificateArgument(ctx.CertificatePolicy, client.IsVersion3));
 
         // Schermo.
         var resizable = c.ResolutionMode == ResolutionMode.FitToWindow;
@@ -170,6 +186,11 @@ public static class FreeRdpCommandBuilder
             _ => "/network:auto",
         });
 
+        // «Tieni sveglia la sessione»: FreeRDP non ha l'intervallo di keep-alive di mstsc; i PDU di heartbeat
+        // (+heartbeat, presente anche in FreeRDP 2) tengono viva la sessione.
+        if (KeepAlive.IntervalFor(c) > 0)
+            args.Add("+heartbeat");
+
         if (c.AutoReconnect)
         {
             args.Add("+auto-reconnect");
@@ -208,6 +229,14 @@ public static class FreeRdpCommandBuilder
 
         return new FreeRdpCommand(client.Executable, args, stdin);
     }
+
+    /// <summary>L'argomento di FreeRDP per la politica del certificato (la forma cambia fra FreeRDP 2 e 3).</summary>
+    public static string CertificateArgument(CertificatePolicy policy, bool isVersion3) => policy switch
+    {
+        CertificatePolicy.Ignore => isVersion3 ? "/cert:ignore" : "/cert-ignore",
+        CertificatePolicy.Deny => isVersion3 ? "/cert:deny" : "/cert-deny",
+        _ => isVersion3 ? "/cert:tofu" : "/cert-tofu",
+    };
 
     private static void AddSize(List<string> args, RdpConnection c, FreeRdpLaunchContext ctx, bool resizable)
     {

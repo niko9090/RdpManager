@@ -3,9 +3,20 @@
              xmlns:vm="using:RdpManager.Linux.ViewModels.Settings"
              x:Class="RdpManager.Linux.Dialogs.Settings.PaginaPin"
              x:DataType="vm:PinPageViewModel">
-  <!-- Pagina Impostazioni «Pin» (blocco A). -->
+  <!-- Pagina Impostazioni «PIN» (blocco A). -->
   <StackPanel Spacing="10">
-    <TextBlock Classes="section" Margin="0,0,0,4" Text="PIN" />
-    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding Notice}" />
+    <TextBlock Classes="section" Margin="0,0,0,4" Text="Blocco con PIN" />
+    <StackPanel Orientation="Horizontal" Spacing="8">
+      <TextBlock Text="{Binding PinState}" VerticalAlignment="Center" MinWidth="220" />
+      <Button Content="Imposta PIN…" Command="{Binding SetPinCommand}" />
+      <Button Content="Togli PIN" Command="{Binding RemovePinCommand}" />
+    </StackPanel>
+    <StackPanel Orientation="Horizontal" Spacing="8">
+      <TextBlock Text="Blocca dopo" VerticalAlignment="Center" />
+      <TextBox Text="{Binding LockAfterMinutes}" Width="90" />
+      <TextBlock Text="minuti di inattività (0 = solo a mano)" VerticalAlignment="Center" />
+    </StackPanel>
+    <TextBlock Classes="error" Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding Note}" />
   </StackPanel>
 </UserControl>

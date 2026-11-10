@@ -279,8 +279,9 @@ public sealed class FreeRdpSession : ViewModelBase, ISession
     /// <summary>Il comando di FreeRDP; con il certificato accettato dall'utente per questa sessione (vedi <see cref="CertificateTrust"/>).</summary>
     private FreeRdpCommand BuildCommand()
     {
-        var command = FreeRdpCommandBuilder.Build(_connection, _client, _context);
-        return _acceptCertificate ? CertificateTrust.AcceptUntrusted(command) : command;
+        // Certificato accettato dall'utente: solo per questa sessione la politica passa a «ignora».
+        var context = _acceptCertificate ? _context with { CertificatePolicy = CertificatePolicy.Ignore } : _context;
+        return FreeRdpCommandBuilder.Build(_connection, _client, context);
     }
 
     private void OnProcessExited(FreeRdpProcess process, int exitCode, string error)
