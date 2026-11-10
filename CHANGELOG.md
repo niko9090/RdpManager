@@ -1,5 +1,13 @@
 # Novità di RdpManager
 
+## 1.12.3 (2026-11-10)
+
+**Correzioni**
+- Chiudere le schede o lo schermo intero non fa più chiudere il programma di colpo. Se capita un errore imprevisto, viene scritto in crash.log e il programma resta aperto.
+- All'avvio non compare più l'errore della VPN quando il servizio di sincronizzazione viene chiuso.
+- Sul server rdpm-sync il limite dei tentativi di registrazione ora conta separatamente per ogni client.
+- Se scrivi l'indirizzo del server senza https:// o http://, il programma usa https:// da solo.
+
 ## 1.12.2 (2026-11-09)
 
 **Versione corretta**
