@@ -80,7 +80,10 @@ say "certificato: $CERT_DIR"
 
 # 6b. Porte sul router via UPnP (TCP 8443 e UDP 51820): se il router non lo permette, avvisa e prosegue
 LANIP=$(ip -4 route get 1.1.1.1 | sed -n 's/.* src \([0-9.]*\).*/\1/p' | head -1)
-$DOCKER run --rm --net host alpine sh -c "apk add -q miniupnpc >/dev/null 2>&1 && upnpc -a $LANIP 8443 8443 TCP && upnpc -a $LANIP 51820 51820 UDP" 2>&1 | grep -E 'redirected|failed|error|No IGD' \
+# Il FRITZ!Box rifiuta il lease 0 (err 502): serve un lease finito, e un contenitore sempre attivo lo rinnova ogni 20 minuti.
+$DOCKER rm -f rdpm-upnp >/dev/null 2>&1
+$DOCKER run -d --name rdpm-upnp --restart unless-stopped --net host alpine sh -c "apk add -q miniupnpc >/dev/null 2>&1; while true; do upnpc -e rdpm -a $LANIP 8443 8443 TCP 3600; upnpc -e rdpm-wg -a $LANIP 51820 51820 UDP 3600; sleep 1200; done" >/dev/null \
+  && say "UPnP: 8443/TCP e 51820/UDP rinnovati ogni 20 minuti (contenitore rdpm-upnp)" \
   || say "ATTENZIONE: UPnP del router non disponibile: inoltra a mano TCP 8443 e UDP 51820 verso $LANIP"
 
 # 7. Verifiche
