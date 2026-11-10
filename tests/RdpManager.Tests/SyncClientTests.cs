@@ -66,7 +66,9 @@ public class SyncCryptoTests
     }
 
     [Theory]
-    [InlineData("10.66.0.1:8787", "http://10.66.0.1:8787/")]
+    [InlineData("10.66.0.1:8787", "https://10.66.0.1:8787/")]
+    [InlineData("host:8443", "https://host:8443/")]
+    [InlineData("syncnetpro.com:8443", "https://syncnetpro.com:8443/")]
     [InlineData(" http://nas.local:8787/ ", "http://nas.local:8787/")]
     [InlineData("https://sync.example.com/base/", "https://sync.example.com/base/")]
     public void Indirizzo_del_server_normalizzato(string input, string expected) =>
