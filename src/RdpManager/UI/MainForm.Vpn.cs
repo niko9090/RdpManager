@@ -38,7 +38,7 @@ public sealed partial class MainForm
     {
         try
         {
-            if (!_sync.SignedIn || _shutdownCts.IsCancellationRequested || !VpnProvisioning.NeedsProvisioning(VpnProfile.Load()))
+            if (IsDisposed || !_sync.SignedIn || _shutdownCts.IsCancellationRequested || !VpnProvisioning.NeedsProvisioning(VpnProfile.Load()))
                 return "";
             var profile = await VpnProvisioning.EnsureAsync(_sync, ct: _shutdownCts.Token);
             if (profile is null)
@@ -53,6 +53,10 @@ public sealed partial class MainForm
         catch (SyncServerException ex) when (ex.Code == "vpn_disabled")
         {
             return ""; // il server non offre la VPN automatica: niente avviso a ogni avvio
+        }
+        catch (OperationCanceledException) when (IsDisposed || _shutdownCts.IsCancellationRequested)
+        {
+            return ""; // il programma si sta chiudendo: non è un errore della VPN
         }
         catch (Exception ex) when (ex is SyncServerException or SyncUnreachableException or Vpn.VpnException
                                        or ArgumentException or InvalidOperationException or FormatException or OperationCanceledException)

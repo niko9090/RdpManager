@@ -96,7 +96,11 @@ public sealed class SyncService : IDisposable
 
     private readonly string _statePath;
     private readonly int _iterations;
+    // Il semaforo non si elimina mai: non ha risorse da liberare (non si usa AvailableWaitHandle) e una chiamata ancora in corso
+    // alla chiusura, nel suo finally, farebbe Release su un semaforo eliminato («Cannot access a disposed object»).
+    // La chiusura si segnala con _lifetime: chi aspetta o arriva dopo riceve OperationCanceledException.
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly CancellationTokenSource _lifetime = new();
     private SyncHttp? _http;
     private string? _httpUrl;
     private byte[]? _key;
@@ -154,7 +158,7 @@ public sealed class SyncService : IDisposable
     {
         if (!SignedIn || !PasswordProtector.TryUnprotect(State.ProtectedPassword, out var password) || password is null)
             throw new InvalidOperationException("Per la VPN serve prima l'accesso all'account.");
-        await _gate.WaitAsync(ct);
+        await EnterAsync(ct);
         try
         {
             var http = Http(State.ServerUrl);
@@ -198,7 +202,7 @@ public sealed class SyncService : IDisposable
         var (auth, key) = await Task.Run(() => SyncCrypto.Derive(username, password, _iterations), ct);
         var token = await Http(url).LoginAsync(username, auth, Device, ct);
 
-        await _gate.WaitAsync(ct);
+        await EnterAsync(ct);
         try
         {
             bool sameAccount = State.ServerUrl == url && SyncCrypto.NormalizeUser(State.Username) == SyncCrypto.NormalizeUser(username);
@@ -238,7 +242,7 @@ public sealed class SyncService : IDisposable
         if (PasswordProtector.TryUnprotect(State.ProtectedToken, out var t))
             token = t;
         var url = State.ServerUrl;
-        await _gate.WaitAsync();
+        await EnterAsync(CancellationToken.None);
         try
         {
             State.ProtectedPassword = null;
@@ -291,7 +295,7 @@ public sealed class SyncService : IDisposable
     {
         if (!SignedIn)
             return new SyncOutcome(SyncStatus.NotSignedIn, "Nessun account di sincronizzazione.");
-        await _gate.WaitAsync(ct);
+        await EnterAsync(ct);
         try
         {
             return await RunAsync(access, ct);
@@ -450,10 +454,18 @@ public sealed class SyncService : IDisposable
             _ => "Tutto aggiornato.",
         };
 
+    private async Task EnterAsync(CancellationToken ct)
+    {
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, _lifetime.Token);
+        await _gate.WaitAsync(linked.Token);
+    }
+
     public void Dispose()
     {
+        if (_lifetime.IsCancellationRequested)
+            return;
+        _lifetime.Cancel();
         _http?.Dispose();
-        _gate.Dispose();
         if (_key is not null)
             CryptographicOperations.ZeroMemory(_key);
     }
