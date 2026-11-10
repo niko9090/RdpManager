@@ -40,6 +40,27 @@
         <MenuItem Header="_Accendi (Wake-on-LAN)" Command="{Binding WakeCommand}" />
         <MenuItem Header="_Preferita" Command="{Binding FavoriteCommand}" InputGesture="Ctrl+Shift+F" />
         <MenuItem Header="_Verifica raggiungibilità" Command="{Binding CheckReachabilityCommand}" />
+        <MenuItem Header="Sposta in una cartella…" Command="{Binding MoveToFolderCommand}" />
+        <MenuItem Header="Assegna un profilo di credenziali…" Command="{Binding AssignProfileCommand}" />
+        <Separator />
+        <MenuItem Header="Pre_feriti" ItemsSource="{Binding FavoriteItems}" IsEnabled="{Binding HasFavorites}">
+          <MenuItem.ItemContainerTheme>
+            <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:CompileBindings="False">
+              <Setter Property="Header" Value="{Binding Title}" />
+              <Setter Property="Command" Value="{Binding Command}" />
+              <Setter Property="ToolTip.Tip" Value="{Binding ToolTip}" />
+            </ControlTheme>
+          </MenuItem.ItemContainerTheme>
+        </MenuItem>
+        <MenuItem Header="_Recenti" ItemsSource="{Binding RecentItems}" IsEnabled="{Binding HasRecents}">
+          <MenuItem.ItemContainerTheme>
+            <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:CompileBindings="False">
+              <Setter Property="Header" Value="{Binding Title}" />
+              <Setter Property="Command" Value="{Binding Command}" />
+              <Setter Property="ToolTip.Tip" Value="{Binding ToolTip}" />
+            </ControlTheme>
+          </MenuItem.ItemContainerTheme>
+        </MenuItem>
         <Separator />
         <MenuItem Header="Pro_fili di credenziali…" Command="{Binding ProfilesCommand}" />
         <MenuItem Header="Cronolo_gia…" Command="{Binding HistoryCommand}" InputGesture="Ctrl+H" />

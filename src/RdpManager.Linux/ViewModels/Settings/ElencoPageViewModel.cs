@@ -2,23 +2,27 @@ using RdpManager.Core;
 
 namespace RdpManager.Linux.ViewModels.Settings;
 
-/// <summary>Pagina «Elenco» delle Impostazioni (blocco A).</summary>
+/// <summary>Pagina «Elenco» delle Impostazioni (blocco A): come si ordinano le connessioni.</summary>
 public sealed class ElencoPageViewModel : SettingsPageViewModel
 {
     private readonly AppSettings _settings;
-    private ChoiceItem<ConnectionOrder> _order;
+    private bool _manual;
 
     public ElencoPageViewModel(AppSettings settings)
     {
         _settings = settings;
-        _order = Choices.Pick(Choices.Order, settings.ConnectionOrder);
+        _manual = settings.ConnectionOrder == ConnectionOrder.Manual;
     }
 
     public override string Title => "Elenco";
 
-    public IReadOnlyList<ChoiceItem<ConnectionOrder>> OrderChoices => Choices.Order;
+    /// <summary>«Ordine delle connessioni scelto trascinandole (altrimenti per nome)».</summary>
+    public bool ManualOrder { get => _manual; set => Set(ref _manual, value); }
 
-    public ChoiceItem<ConnectionOrder> Order { get => _order; set => Set(ref _order, value); }
+    public string Note => "Con l'ordine manuale si trascinano le connessioni nell'elenco per cambiarne la posizione o spostarle in un'altra cartella. " +
+                          "Anche «Visualizza › Ordina le connessioni per nome» torna all'ordine alfabetico.";
 
-    public override void Apply() => _settings.ConnectionOrder = Order.Value;
+    public ConnectionOrder Order => ManualOrder ? ConnectionOrder.Manual : ConnectionOrder.Alphabetical;
+
+    public override void Apply() => _settings.ConnectionOrder = Order;
 }

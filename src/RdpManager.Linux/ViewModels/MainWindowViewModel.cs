@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Text.Json;
 using RdpManager.Core;
+using RdpManager.Linux.Services;
 using RdpManager.Linux.Sessions;
 
 namespace RdpManager.Linux.ViewModels;
@@ -14,6 +15,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     private readonly ConnectionStore _store;
     private readonly ISessionHost _sessions;
     private readonly IDialogService _dialogs;
+    private readonly IShellService _shell;
     private readonly HashSet<string> _expanded = new(StringComparer.CurrentCultureIgnoreCase);
     private string _searchText = "";
     private string _status = "";
@@ -22,18 +24,20 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     private bool _canSave = true;
     private bool _treeFiltered;
 
-    public MainWindowViewModel(ConnectionStore store, ISessionHost sessions, IDialogService dialogs)
+    /// <param name="shell">Apre cartelle e pagine web (null = <c>xdg-open</c>); le prove ne passano uno finto.</param>
+    public MainWindowViewModel(ConnectionStore store, ISessionHost sessions, IDialogService dialogs, IShellService? shell = null)
     {
         _store = store;
         _sessions = sessions;
         _dialogs = dialogs;
+        _shell = shell ?? new XdgShellService();
 
         NewConnectionCommand = new RelayCommand(() => Run(NewConnectionAsync));
         NewFolderCommand = new RelayCommand(() => Run(NewFolderAsync));
-        EditCommand = new RelayCommand(() => Run(EditSelectedAsync), () => SelectedNode is not null);
-        DuplicateCommand = new RelayCommand(DuplicateSelected, () => SelectedNode?.Connection is not null);
-        DeleteCommand = new RelayCommand(() => Run(DeleteSelectedAsync), () => SelectedNode is not null);
-        ConnectCommand = new RelayCommand(ConnectSelected, () => SelectedNode?.Connection is not null);
+        EditCommand = new RelayCommand(() => Run(EditSelectedAsync), () => SelectedNode is not null && !HasMultiSelection);
+        DuplicateCommand = new RelayCommand(DuplicateSelected, () => SelectedNode?.Connection is not null && !HasMultiSelection);
+        DeleteCommand = new RelayCommand(() => Run(DeleteSelectedAsync), () => SelectedNode is not null || HasMultiSelection);
+        ConnectCommand = new RelayCommand(ConnectSelected, () => SelectedNode?.Connection is not null || HasMultiSelection);
         FavoriteCommand = new RelayCommand(ToggleFavorite, () => SelectedNode?.Connection is not null);
         ProfilesCommand = new RelayCommand(() => Run(ShowProfilesAsync));
         SettingsCommand = new RelayCommand(() => Run(ShowSettingsAsync));
@@ -41,8 +45,10 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         SearchCommand = new RelayCommand(() => FocusSearchRequested?.Invoke(this, EventArgs.Empty));
         CloseCurrentTabCommand = new RelayCommand(() => { if (SelectedTab is { } t) CloseTab(t); }, () => SelectedTab is not null);
         ExitCommand = new RelayCommand(() => ExitRequested?.Invoke(this, EventArgs.Empty));
+        InitBlockA();
 
         Reload();
+        StartLockedIfNeeded();
     }
 
     public ConnectionsDocument Document { get; private set; } = new();
@@ -89,12 +95,18 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         {
             if (!Set(ref _selectedNode, value))
                 return;
-            EditCommand.RaiseCanExecuteChanged();
-            DuplicateCommand.RaiseCanExecuteChanged();
-            DeleteCommand.RaiseCanExecuteChanged();
-            ConnectCommand.RaiseCanExecuteChanged();
-            FavoriteCommand.RaiseCanExecuteChanged();
+            RaiseSelectionCommands();
         }
+    }
+
+    private void RaiseSelectionCommands()
+    {
+        EditCommand.RaiseCanExecuteChanged();
+        DuplicateCommand.RaiseCanExecuteChanged();
+        DeleteCommand.RaiseCanExecuteChanged();
+        ConnectCommand.RaiseCanExecuteChanged();
+        FavoriteCommand.RaiseCanExecuteChanged();
+        RaiseBlockASelectionCommands();
     }
 
     public SessionTabViewModel? SelectedTab
@@ -164,10 +176,11 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         }
 
         int visible = 0;
-        foreach (var c in Document.InDisplayOrder(Document.Connections.Where(c => c.Matches(query))))
+        foreach (var c in Document.InDisplayOrder(Document.Connections.Where(c => MatchesSearch(c, query))))
         {
             visible++;
             var node = TreeNodeViewModel.ForConnection(c);
+            node.Reachability = _reach.GetValueOrDefault(c.Id);
             (c.Group.Length > 0 && folders.TryGetValue(c.Group, out var f) ? f.Children : (ICollection<TreeNodeViewModel>)roots).Add(node);
         }
         VisibleConnectionCount = visible;
@@ -180,9 +193,19 @@ public sealed partial class MainWindowViewModel : ViewModelBase
             Roots.Add(n);
 
         SelectedNode = selectedKey is null ? null : Flatten(Roots).FirstOrDefault(n => n.Key == selectedKey);
+        KeepSelectionAfterRebuild();
         OnPropertyChanged(nameof(VisibleConnectionCount));
         OnPropertyChanged(nameof(NoResults));
+        RefreshQuickLists();
     }
+
+    /// <summary>
+    /// Ricerca nell'albero (#11): tutte le parole devono comparire in nome, host, utente, dominio, cartella o etichetta
+    /// (come in Windows), oppure somigliare a nome, host, etichetta o cartella anche con un refuso (<see cref="FuzzySearch"/>).
+    /// </summary>
+    internal static bool MatchesSearch(RdpConnection c, string query) =>
+        query.Length == 0 || c.Matches(query)
+        || FuzzySearch.Score(query, [c.DisplayName, c.Host, c.Label, c.Group, c.Username]) > 0;
 
     /// <summary>Toglie le cartelle senza risultati; vero se la cartella va rimossa.</summary>
     private static bool Prune(TreeNodeViewModel folder)
@@ -234,7 +257,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
 
     public async Task EditSelectedAsync()
     {
-        if (SelectedNode is not { } node)
+        if (SelectedNode is not { } node || HasMultiSelection)
             return;
         if (node.Connection is { } c)
         {
@@ -274,6 +297,11 @@ public sealed partial class MainWindowViewModel : ViewModelBase
 
     public async Task DeleteSelectedAsync()
     {
+        if (HasMultiSelection)
+        {
+            await DeleteGroupAsync();
+            return;
+        }
         if (SelectedNode is not { } node)
             return;
         if (node.Connection is { } c)
@@ -315,12 +343,13 @@ public sealed partial class MainWindowViewModel : ViewModelBase
 
     public async Task ShowSettingsAsync()
     {
-        var settings = new SettingsViewModel(Document.Settings, _store.FilePath);
+        var settings = new SettingsViewModel(Document.Settings, _store.FilePath, _shell, _dialogs);
         if (!await _dialogs.ShowSettingsAsync(settings))
             return;
         settings.Apply();
         Save();
         RebuildTree();
+        LogSetup.ApplySettings(Document.Settings);
         SettingsChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -331,12 +360,17 @@ public sealed partial class MainWindowViewModel : ViewModelBase
 
     public void ConnectSelected()
     {
-        if (SelectedNode?.Connection is { } c)
+        if (HasMultiSelection)
+            ConnectGroup();
+        else if (SelectedNode?.Connection is { } c)
             Connect(c);
     }
 
     public void Connect(RdpConnection connection)
     {
+        // Da bloccata l'app non apre sessioni nuove.
+        if (IsLocked)
+            return;
         var resolved = Document.WithResolvedCredentials(connection);
         var session = _sessions.Open(resolved);
         var tab = new SessionTabViewModel(session, CloseTab);
@@ -349,12 +383,15 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         {
             Document.MarkConnected(connection.Id, DateTime.UtcNow);
             Save();
+            RecordHistoryStart(connection, session);
+            RefreshQuickLists();
         }
         StatusMessage = _sessions.IsAvailable ? $"Connessione a «{connection.DisplayName}» aperta." : _sessions.UnavailableReason ?? "";
     }
 
     private void CloseTab(SessionTabViewModel tab)
     {
+        MarkClosedByUser(tab.Session);
         tab.Session.Close();
         RemoveTab(tab); // se la sessione non ha segnalato la chiusura
     }

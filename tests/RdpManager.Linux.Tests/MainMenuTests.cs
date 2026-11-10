@@ -36,8 +36,8 @@ public class MainMenuTests
     {
         using var data = new TempData();
         var vm = Seed.Main(data);
-        string[] placeholders = [nameof(vm.ImportRdpCommand), nameof(vm.HistoryCommand), nameof(vm.AboutCommand),
-            nameof(vm.VpnCommand), nameof(vm.FullScreenCommand), nameof(vm.CheckUpdatesCommand)];
+        // I comandi del blocco A ora sono veri (vedi BlockATests); restano segnaposto solo quelli del blocco B.
+        string[] placeholders = [nameof(vm.VpnCommand), nameof(vm.FullScreenCommand), nameof(vm.CheckUpdatesCommand)];
         foreach (var name in placeholders)
             Assert.False(((RelayCommand)typeof(MainWindowViewModel).GetProperty(name)!.GetValue(vm)!).CanExecute(null), name);
     }

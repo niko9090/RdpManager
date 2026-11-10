@@ -5,7 +5,8 @@
              x:DataType="vm:ElencoPageViewModel">
   <!-- Pagina Impostazioni «Elenco» (blocco A). -->
   <StackPanel Spacing="10">
-    <TextBlock Classes="section" Margin="0,0,0,4" Text="Elenco" />
-    <Grid ColumnDefinitions="170,*"><TextBlock Classes="label" Text="Ordine delle connessioni" /><ComboBox Grid.Column="1" ItemsSource="{Binding OrderChoices}" SelectedItem="{Binding Order}" HorizontalAlignment="Stretch" /></Grid>
+    <TextBlock Classes="section" Margin="0,0,0,4" Text="Elenco delle connessioni" />
+    <CheckBox Content="Ordine delle connessioni scelto trascinandole (altrimenti per nome)" IsChecked="{Binding ManualOrder}" />
+    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding Note}" />
   </StackPanel>
 </UserControl>

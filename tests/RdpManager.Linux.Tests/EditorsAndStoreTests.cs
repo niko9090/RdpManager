@@ -132,7 +132,7 @@ public class SettingsViewModelTests
         var settings = new AppSettings();
         var vm = new SettingsViewModel(settings, "/x/connections.json");
         Page<AspettoPageViewModel>(vm).Theme = Choices.Pick(Choices.Theme, AppTheme.Dark);
-        Page<ElencoPageViewModel>(vm).Order = Choices.Pick(Choices.Order, ConnectionOrder.Manual);
+        Page<ElencoPageViewModel>(vm).ManualOrder = true;
         Page<AggiornamentiPageViewModel>(vm).Update = Choices.Pick(Choices.Update, UpdateMode.Off);
         Page<AvvioPageViewModel>(vm).HistoryEnabled = false;
         Page<AvvioPageViewModel>(vm).VerboseLog = true;
