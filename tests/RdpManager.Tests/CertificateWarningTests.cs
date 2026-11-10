@@ -150,7 +150,7 @@ public sealed class CertificateWarningTests : IDisposable
             Assert.Equal(form.Handle, dialog.Owner);
             Assert.False(dialog.OwnerMinimized, "quando l'avviso è visibile la finestra non deve essere minimizzata");
             Assert.False(dialog.OwnerEnabled, "l'avviso è modale: la proprietaria è disabilitata finché non si risponde");
-            Assert.True(dialog.OnScreen, $"l'avviso deve stare dentro lo schermo, era in {dialog.Bounds}");
+            Assert.True(dialog.OnScreen, $"l'avviso deve stare dentro lo schermo, era in {dialog.Bounds}, finestra {form.Bounds}, area {Screen.FromControl(form).WorkingArea}");
             Assert.Contains(dialog.Texts, t => t.Contains("certificato", StringComparison.OrdinalIgnoreCase));
             Log($"primo piano: {form.LastAttentionResult}, avviso in primo piano={dialog.ForegroundIsDialog}");
             if (form.LastAttentionResult == WindowAttention.Result.Foreground)
