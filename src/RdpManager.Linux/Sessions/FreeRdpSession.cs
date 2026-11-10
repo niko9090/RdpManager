@@ -1,4 +1,5 @@
 using RdpManager.Core;
+using RdpManager.Linux.Features;
 using RdpManager.Linux.ViewModels;
 using RdpManager.Platform.Linux;
 
@@ -27,6 +28,10 @@ public sealed class FreeRdpSession : ViewModelBase, ISession
     private bool _started;
     private bool _detached;
     private string _message = "";
+    private int _generation;
+    private int _attempts;
+    private bool _acceptCertificate;
+    private DateTime _startedAt;
 
     public FreeRdpSession(
         RdpConnection connection,
@@ -60,6 +65,18 @@ public sealed class FreeRdpSession : ViewModelBase, ISession
     }
 
     public object Content => this;
+
+    /// <summary>Chiede all'utente se fidarsi di un certificato non verificato (avviso certificato); null = non si chiede e la sessione finisce.</summary>
+    public Func<CertificatePrompt, Task<bool>>? CertificateDecider { get; set; }
+
+    /// <summary>Handle X11 della superficie in cui la sessione è incorporata (per la foto); null se in finestra separata.</summary>
+    public long? SurfaceXid { get; private set; }
+
+    /// <summary>La sessione è collegata (processo in esecuzione): conta per il passaggio fra schede.</summary>
+    public bool IsConnected => _isRunning;
+
+    /// <summary>La sessione sta in una finestra separata di FreeRDP (non nella scheda).</summary>
+    public bool IsDetachedWindow => _detached;
 
     public event EventHandler? Closed;
 
@@ -136,6 +153,7 @@ public sealed class FreeRdpSession : ViewModelBase, ISession
         if (_started || _closed)
             return;
         IsEmbedded = true;
+        SurfaceXid = xid;
         Launch(new FreeRdpLaunchContext { ParentWindow = xid, AvailableWidth = width, AvailableHeight = height, DrivePath = HomePath() });
     }
 
@@ -145,6 +163,7 @@ public sealed class FreeRdpSession : ViewModelBase, ISession
         if (_started || _closed)
             return;
         IsEmbedded = false;
+        SurfaceXid = null;
         _detached = true;
         Launch(new FreeRdpLaunchContext { AvailableWidth = width, AvailableHeight = height, DrivePath = HomePath() });
     }
@@ -153,7 +172,34 @@ public sealed class FreeRdpSession : ViewModelBase, ISession
     {
         if (_isRunning || _starting || _closed)
             return;
+        _attempts = 0;
         Launch(_context);
+    }
+
+    /// <summary>
+    /// La scheda cambia sede (finestra staccata o riagganciata): la sessione si ferma e riparte nella nuova superficie,
+    /// quando la nuova vista la chiede. La sessione remota si riapre (come una riconnessione).
+    /// </summary>
+    public void Rehost()
+    {
+        if (_closed)
+            return;
+        _generation++;
+        var process = _process;
+        _process = null;
+        if (process is not null)
+            _ = process.StopAsync().ContinueWith(_ => process.Dispose(), TaskScheduler.Default);
+        _started = false;
+        _starting = false;
+        _detached = false;
+        _isEmbedded = false;
+        SurfaceXid = null;
+        _attempts = 0;
+        IsRunning = false;
+        Message = "";
+        Title = _connection.DisplayName;
+        RaiseView();
+        ReconnectCommand.RaiseCanExecuteChanged();
     }
 
     private static string? HomePath() => Environment.GetEnvironmentVariable("HOME");
@@ -163,8 +209,9 @@ public sealed class FreeRdpSession : ViewModelBase, ISession
         _context = context with { Gateway = _gateway };
         _started = true;
         _starting = true;
+        _startedAt = DateTime.UtcNow;
         Title = _connection.DisplayName;
-        Message = IsEmbedded ? "Connessione in corso…" : "Sessione aperta in una finestra separata.";
+        Message = IsEmbedded ? "Connessione in corso…" : DisplayServer.SessionNote(DisplayServer.Current, false) ?? "Sessione aperta in una finestra separata.";
         RaiseView();
         ReconnectCommand.RaiseCanExecuteChanged();
         _ = StartAsync();
@@ -172,6 +219,7 @@ public sealed class FreeRdpSession : ViewModelBase, ISession
 
     private async Task StartAsync()
     {
+        var generation = _generation;
         try
         {
             var vpnError = await _prepareVpn(_cts.Token).ConfigureAwait(false);
@@ -180,14 +228,14 @@ public sealed class FreeRdpSession : ViewModelBase, ISession
                 _post(() => Ended(vpnError));
                 return;
             }
-            if (_closed)
+            if (_closed || generation != _generation)
                 return;
-            var command = FreeRdpCommandBuilder.Build(_connection, _client, _context);
+            var command = BuildCommand();
             var process = FreeRdpProcess.Start(command);
-            process.Exited += (code, err) => _post(() => OnProcessExited(process, code, err));
+            process.Exited += (code, err) => _post(() => { if (generation == _generation) OnProcessExited(process, code, err); });
             _post(() =>
             {
-                if (_closed)
+                if (_closed || generation != _generation)
                 {
                     _ = process.StopAsync();
                     return;
@@ -197,7 +245,8 @@ public sealed class FreeRdpSession : ViewModelBase, ISession
                 IsRunning = !process.HasExited;
                 if (process.HasExited)
                     return;
-                Message = IsEmbedded ? "" : "Sessione aperta in una finestra separata. Chiudendo la scheda si chiude anche la finestra.";
+                Message = IsEmbedded ? "" : (DisplayServer.SessionNote(DisplayServer.Current, false) ?? "Sessione aperta in una finestra separata.")
+                    + " Chiudendo la scheda si chiude anche la finestra.";
                 RaiseView();
             });
         }
@@ -210,16 +259,84 @@ public sealed class FreeRdpSession : ViewModelBase, ISession
         }
     }
 
+    /// <summary>Il comando di FreeRDP; con il certificato accettato dall'utente per questa sessione (vedi <see cref="CertificateTrust"/>).</summary>
+    private FreeRdpCommand BuildCommand()
+    {
+        var command = FreeRdpCommandBuilder.Build(_connection, _client, _context);
+        return _acceptCertificate ? CertificateTrust.AcceptUntrusted(command) : command;
+    }
+
     private void OnProcessExited(FreeRdpProcess process, int exitCode, string error)
     {
         if (_closed || !ReferenceEquals(_process, process) && _process is not null)
             return;
         _process = null;
+        if (exitCode != 0 && CertificateTrust.IsCertificateProblem(exitCode, error) && CertificateDecider is not null)
+        {
+            _ = AskCertificateAsync(error);
+            return;
+        }
+        if (DateTime.UtcNow - _startedAt > TimeSpan.FromSeconds(15))
+            _attempts = 0; // la sessione era stata stabile: il conteggio riparte
+        if (exitCode != 0 && CertificateTrust.IsRetryableExit(exitCode, error) && ReconnectPolicy.CanRetry(_connection, _attempts))
+        {
+            ScheduleRetry();
+            return;
+        }
         var detail = LastLine(error);
         var message = exitCode == 0
             ? "La sessione è terminata."
             : "La sessione si è chiusa (codice " + exitCode + ")." + (detail.Length > 0 ? "\n" + detail : "");
         Ended(message);
+    }
+
+    private async Task AskCertificateAsync(string error)
+    {
+        var accept = false;
+        try
+        {
+            IsRunning = false;
+            Message = "In attesa di una tua decisione sul certificato del server…";
+            accept = await CertificateDecider!(new CertificatePrompt(_connection.Host, CertificateTrust.Describe(_connection.Host, error)));
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or OperationCanceledException)
+        {
+        }
+        if (_closed)
+            return;
+        if (!accept)
+        {
+            Ended("Connessione annullata: certificato del server non accettato.");
+            return;
+        }
+        _acceptCertificate = true;
+        Launch(_context);
+    }
+
+    private void ScheduleRetry()
+    {
+        var attempt = ++_attempts;
+        var max = Math.Clamp(_connection.AutoReconnectMaxAttempts, 0, ReconnectPolicy.MaxAllowedAttempts);
+        var delay = ReconnectPolicy.DelayBefore(attempt);
+        IsRunning = false;
+        Message = $"Connessione persa: nuovo tentativo {attempt} di {max} fra {(int)delay.TotalSeconds} secondi…";
+        var generation = _generation;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(delay, _cts.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            _post(() =>
+            {
+                if (!_closed && generation == _generation && !_isRunning && !_starting)
+                    Launch(_context);
+            });
+        });
     }
 
     private void Ended(string message)

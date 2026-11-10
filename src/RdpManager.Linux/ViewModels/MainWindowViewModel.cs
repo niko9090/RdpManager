@@ -372,6 +372,9 @@ public sealed partial class MainWindowViewModel : ViewModelBase
 
     // --- Salvataggio ---
 
+    /// <summary>Dopo ogni salvataggio riuscito (la sincronizzazione automatica del blocco B si aggancia qui).</summary>
+    partial void AfterSave();
+
     /// <summary>Salva il documento; falso (con messaggio nella barra di stato) se non è possibile o non riesce.</summary>
     public bool Save()
     {
@@ -383,6 +386,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         try
         {
             _store.Save(Document);
+            AfterSave();
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
