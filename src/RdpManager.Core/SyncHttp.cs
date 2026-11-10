@@ -40,18 +40,45 @@ public sealed class SyncHttp : IDisposable
         _http = new HttpClient { BaseAddress = new Uri(NormalizeUrl(baseUrl)), Timeout = timeout ?? TimeSpan.FromSeconds(20) };
     }
 
-    /// <summary>Aggiunge «https://» se manca lo schema (un «http://» esplicito resta) e toglie la barra finale. Lancia ArgumentException se non è un indirizzo.</summary>
+    /// <summary>Rende buono l'indirizzo scritto a mano: senza schema aggiunge «https://» (solo per IP e nomi di rete
+    /// locale «http://»), «http://» verso le porte HTTPS (443, 8443) diventa «https://», toglie le barre finali e un
+    /// «/api» o «/v1» in fondo. Lancia ArgumentException se non è un indirizzo.</summary>
     public static string NormalizeUrl(string? url)
     {
         var text = (url ?? "").Trim();
         if (text.Length == 0)
             throw new ArgumentException("Indica l'indirizzo del server.");
         if (!text.Contains("://", StringComparison.Ordinal))
-            text = "https://" + text; // il server reale è solo HTTPS; «http://» esplicito resta (test locali)
+            text = (IsLocalHostText(text) ? "http://" : "https://") + text; // il server reale è solo HTTPS; IP e nomi locali restano http
         if (!Uri.TryCreate(text, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https") || uri.Host.Length == 0)
-            throw new ArgumentException("L'indirizzo del server non è valido (esempio: https://vpn.example.com:8443).");
-        return uri.GetLeftPart(UriPartial.Path).TrimEnd('/') + "/";
+            throw new ArgumentException("L'indirizzo del server non è valido (esempio: https://sync.example.com:8443).");
+        var scheme = uri.Scheme;
+        // Caddy sulla 8443 parla solo HTTPS: con «http://» risponde 400 «Client sent an HTTP request to an HTTPS server».
+        if (scheme == "http" && uri.Port is 443 or 8443)
+            scheme = "https";
+        var path = uri.AbsolutePath.TrimEnd('/');
+        foreach (var suffix in new[] { "/api", "/v1" })
+            if (path.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+                path = path[..^suffix.Length].TrimEnd('/');
+        var defaultPort = scheme == "https" ? 443 : 80;
+        var port = uri.Port == defaultPort ? "" : ":" + uri.Port;
+        return $"{scheme}://{uri.Host}{port}{path}/";
     }
+
+    private static bool IsLocalHostText(string text)
+    {
+        var host = text.Split('/', 2)[0];
+        if (host.StartsWith('['))
+            return true;
+        host = host.Split(':', 2)[0];
+        return IPAddress.TryParse(host, out _) || !host.Contains('.') || host.EndsWith(".local", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Messaggio chiaro per un 400 senza il formato del server (di solito risponde il proxy, non rdpm-sync).</summary>
+    public static string BadRequestMessage(string body) =>
+        body.Contains("HTTP request to an HTTPS server", StringComparison.OrdinalIgnoreCase)
+            ? "L'indirizzo usa «http://» ma il server vuole una connessione protetta: scrivi «https://» davanti (esempio: https://syncnetpro.com:8443)."
+            : "Il server ha rifiutato la richiesta (errore 400): controlla l'indirizzo (senza «/api» o altro in fondo) e che il programma sia aggiornato.";
 
     private async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
     {
@@ -84,9 +111,11 @@ public sealed class SyncHttp : IDisposable
     {
         string code = "error", message = $"Errore del server ({(int)r.StatusCode}).";
         int? retry = null;
+        string raw = "";
         try
         {
-            var body = await r.Content.ReadFromJsonAsync<JsonElement>(ct);
+            raw = await r.Content.ReadAsStringAsync(ct);
+            var body = JsonDocument.Parse(raw).RootElement;
             if (body.TryGetProperty("error", out var c) && c.GetString() is { } cs)
                 code = cs;
             if (body.TryGetProperty("message", out var m) && m.GetString() is { } ms)
@@ -97,6 +126,11 @@ public sealed class SyncHttp : IDisposable
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or NotSupportedException)
         {
             // corpo non JSON: resta il messaggio generico
+        }
+        if (code == "error" && r.StatusCode == HttpStatusCode.BadRequest)
+        {
+            code = "bad_request";
+            message = BadRequestMessage(raw);
         }
         return new SyncServerException(r.StatusCode, code, message, retry);
     }
