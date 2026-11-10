@@ -350,6 +350,42 @@ public sealed class RdpSessionView : UserControl
         Disconnect();
     }
 
+    /// <summary>Vero se la chiusura con attesa (<see cref="CloseGracefully"/>) è già partita.</summary>
+    public bool IsClosingGracefully { get; private set; }
+
+    /// <summary>
+    /// Chiude la sessione senza bloccare: se è connessa chiede la disconnessione e aspetta (con un timer, al massimo
+    /// <paramref name="timeout"/>) che il controllo la confermi; solo allora lo elimina. Eliminare un controllo RDP
+    /// ancora connesso, o dentro l'evento della sua stessa disconnessione, può restare appeso o far cadere il programma.
+    /// <paramref name="afterDispose"/> parte a eliminazione avvenuta.
+    /// </summary>
+    public void CloseGracefully(TimeSpan timeout, Action? afterDispose = null)
+    {
+        if (IsDisposed || IsClosingGracefully)
+            return;
+        IsClosingGracefully = true;
+        if (State is not (SessionState.Connected or SessionState.Connecting))
+        {
+            Dispose();
+            afterDispose?.Invoke();
+            return;
+        }
+        DisconnectForShutdown();
+        var until = DateTime.UtcNow + timeout;
+        var timer = new System.Windows.Forms.Timer { Interval = 50 };
+        timer.Tick += (_, _) =>
+        {
+            if (!IsDisposed && State is SessionState.Connected or SessionState.Connecting && DateTime.UtcNow < until)
+                return;
+            timer.Stop();
+            timer.Dispose();
+            if (!IsDisposed)
+                Dispose();
+            afterDispose?.Invoke();
+        };
+        timer.Start();
+    }
+
     /// <summary>La chiusura dell'app è stata annullata: la riconnessione automatica torna attiva.</summary>
     public void CancelShutdown() => _closing = false;
 
@@ -804,6 +840,8 @@ public sealed class RdpSessionView : UserControl
 
     private void OnDisconnected(int reason)
     {
+        if (IsDisposed)
+            return;
         LastDisconnectReason = reason;
         LastExtendedDisconnectReason = null;
         AuthenticationWarningVisible = false;
@@ -850,6 +888,8 @@ public sealed class RdpSessionView : UserControl
 
     private void SetState(SessionState state, string text)
     {
+        if (IsDisposed)
+            return; // evento arrivato dopo la chiusura della scheda
         if (state == SessionState.Connected)
             LastDisconnectReason = LastExtendedDisconnectReason = null; // il codice di una disconnessione passata non vale più
         State = state;

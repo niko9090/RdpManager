@@ -34,11 +34,13 @@ internal static class Program
         AppLog.Default = new AppLog(AppLog.DefaultDirectory);
         AppLog.Default.Info($"Avvio di RdpManager {AppInfo.VersionText} ({(InstallLocation.IsPortable(Application.ExecutablePath) ? "portatile" : "installato")})");
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
-        Application.ThreadException += (_, e) =>
-        {
-            AppLog.Default?.Error("Errore imprevisto", e.Exception);
-            MessageBox.Show("Errore imprevisto:\n" + e.Exception.Message, "RdpManager", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        };
+        // Rete di sicurezza: ogni eccezione non gestita (interfaccia, altri thread, attività) va in crash.log con lo stack
+        // completo; l'interfaccia continua e l'utente è avvisato (al più ogni 30 secondi, mai finestre a raffica).
+        var crash = CrashLog.Default = new CrashLog(AppLog.DefaultDirectory);
+        crash.Attach(ex => MessageBox.Show(
+            "Si è verificato un errore imprevisto, ma RdpManager continua a funzionare.\n\n" + ex.Message +
+            "\n\nI dettagli sono in " + crash.CurrentPath, "RdpManager", MessageBoxButtons.OK, MessageBoxIcon.Warning));
+        Application.ThreadException += (_, e) => crash.UiHandler(e.Exception);
         Application.ApplicationExit += (_, _) => AppLog.Default?.Info("Uscita da RdpManager");
         // «--dati <file>»: un elenco di connessioni diverso da quello predefinito (prove, PC condivisi).
         int i = Array.FindIndex(args, a => a.Equals("--dati", StringComparison.OrdinalIgnoreCase));
