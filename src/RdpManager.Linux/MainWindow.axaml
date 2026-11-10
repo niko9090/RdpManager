@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:RdpManager.Linux.ViewModels"
         xmlns:l="using:RdpManager.Linux"
+        xmlns:menus="using:RdpManager.Linux.Menus"
         x:Class="RdpManager.Linux.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="RdpManager" Width="1100" Height="700" MinWidth="560" MinHeight="420">
@@ -12,6 +13,9 @@
       <TextBlock Text="{Binding StatusMessage}" TextTrimming="CharacterEllipsis" MinHeight="20"
                  FontSize="12" Classes="muted" VerticalAlignment="Center" />
     </Border>
+
+    <!-- Barra di menu -->
+    <menus:MainMenu DockPanel.Dock="Top" />
 
     <!-- Barra comandi -->
     <Border DockPanel.Dock="Top" Classes="bar" BorderThickness="0,0,0,1">
