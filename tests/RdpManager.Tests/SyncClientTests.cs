@@ -66,13 +66,26 @@ public class SyncCryptoTests
     }
 
     [Theory]
-    [InlineData("10.66.0.1:8787", "https://10.66.0.1:8787/")]
+    [InlineData("10.66.0.1:8787", "http://10.66.0.1:8787/")] // dentro la VPN il server parla http
     [InlineData("host:8443", "https://host:8443/")]
     [InlineData("syncnetpro.com:8443", "https://syncnetpro.com:8443/")]
     [InlineData(" http://nas.local:8787/ ", "http://nas.local:8787/")]
     [InlineData("https://sync.example.com/base/", "https://sync.example.com/base/")]
+    [InlineData("syncnetpro.com:8443", "https://syncnetpro.com:8443/")]
+    [InlineData("http://syncnetpro.com:8443", "https://syncnetpro.com:8443/")]
+    [InlineData("https://syncnetpro.com:8443//", "https://syncnetpro.com:8443/")]
+    [InlineData("https://syncnetpro.com:8443/api", "https://syncnetpro.com:8443/")]
+    [InlineData("HTTPS://SyncNetPro.com:8443/v1/", "https://syncnetpro.com:8443/")]
+    [InlineData("https://syncnetpro.com", "https://syncnetpro.com/")]
     public void Indirizzo_del_server_normalizzato(string input, string expected) =>
         Assert.Equal(expected, SyncHttp.NormalizeUrl(input));
+
+    [Fact]
+    public void Il_400_del_proxy_https_spiega_cosa_scrivere()
+    {
+        Assert.Contains("https://", SyncHttp.BadRequestMessage("Client sent an HTTP request to an HTTPS server."));
+        Assert.Contains("400", SyncHttp.BadRequestMessage(""));
+    }
 
     [Theory]
     [InlineData("")]
