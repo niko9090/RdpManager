@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
+using RdpManager.Core;
 
 namespace RdpManager.Rdp;
 
@@ -92,20 +93,33 @@ public sealed class RdpClientHost : AxHost
         return null;
     }
 
+    /// <summary>
+    /// Eventi del controllo: arrivano da codice nativo, dentro una chiamata COM. Un'eccezione dei gestori (controlli già
+    /// eliminati, finestra chiusa mentre la sessione cade) non deve attraversare quel confine: si registra e basta.
+    /// Dopo l'eliminazione del controllo gli eventi in ritardo si ignorano.
+    /// </summary>
+    internal static void RaiseSafely(RdpClientHost owner, string name, Action raise)
+    {
+        if (owner.IsDisposed || owner.Disposing)
+            return;
+        try { raise(); }
+        catch (Exception ex) { AppLog.Default?.Error($"Errore nell'evento {name} del controllo RDP", ex); CrashLog.Default?.Write($"Evento {name} del controllo RDP", ex); }
+    }
+
     [ComVisible(true)]
     [ClassInterface(ClassInterfaceType.None)]
     public sealed class EventSink(RdpClientHost owner) : IMsTscAxEvents
     {
-        public void OnConnecting() => owner.Connecting?.Invoke(owner, EventArgs.Empty);
-        public void OnConnected() => owner.Connected?.Invoke(owner, EventArgs.Empty);
-        public void OnLoginComplete() => owner.LoginComplete?.Invoke(owner, EventArgs.Empty);
-        public void OnDisconnected(int discReason) => owner.Disconnected?.Invoke(owner, discReason);
-        public void OnEnterFullScreenMode() => owner.EnterFullScreen?.Invoke(owner, EventArgs.Empty);
-        public void OnLeaveFullScreenMode() => owner.LeaveFullScreen?.Invoke(owner, EventArgs.Empty);
-        public void OnFatalError(int errorCode) => owner.FatalError?.Invoke(owner, errorCode);
-        public void OnWarning(int warningCode) => owner.Warning?.Invoke(owner, warningCode);
-        public void OnLogonError(int lError) => owner.LogonError?.Invoke(owner, lError);
-        public void OnAuthenticationWarningDisplayed() => owner.AuthenticationWarningDisplayed?.Invoke(owner, EventArgs.Empty);
-        public void OnAuthenticationWarningDismissed() => owner.AuthenticationWarningDismissed?.Invoke(owner, EventArgs.Empty);
+        public void OnConnecting() => RaiseSafely(owner, nameof(OnConnecting), () => owner.Connecting?.Invoke(owner, EventArgs.Empty));
+        public void OnConnected() => RaiseSafely(owner, nameof(OnConnected), () => owner.Connected?.Invoke(owner, EventArgs.Empty));
+        public void OnLoginComplete() => RaiseSafely(owner, nameof(OnLoginComplete), () => owner.LoginComplete?.Invoke(owner, EventArgs.Empty));
+        public void OnDisconnected(int discReason) => RaiseSafely(owner, nameof(OnDisconnected), () => owner.Disconnected?.Invoke(owner, discReason));
+        public void OnEnterFullScreenMode() => RaiseSafely(owner, nameof(OnEnterFullScreenMode), () => owner.EnterFullScreen?.Invoke(owner, EventArgs.Empty));
+        public void OnLeaveFullScreenMode() => RaiseSafely(owner, nameof(OnLeaveFullScreenMode), () => owner.LeaveFullScreen?.Invoke(owner, EventArgs.Empty));
+        public void OnFatalError(int errorCode) => RaiseSafely(owner, nameof(OnFatalError), () => owner.FatalError?.Invoke(owner, errorCode));
+        public void OnWarning(int warningCode) => RaiseSafely(owner, nameof(OnWarning), () => owner.Warning?.Invoke(owner, warningCode));
+        public void OnLogonError(int lError) => RaiseSafely(owner, nameof(OnLogonError), () => owner.LogonError?.Invoke(owner, lError));
+        public void OnAuthenticationWarningDisplayed() => RaiseSafely(owner, nameof(OnAuthenticationWarningDisplayed), () => owner.AuthenticationWarningDisplayed?.Invoke(owner, EventArgs.Empty));
+        public void OnAuthenticationWarningDismissed() => RaiseSafely(owner, nameof(OnAuthenticationWarningDismissed), () => owner.AuthenticationWarningDismissed?.Invoke(owner, EventArgs.Empty));
     }
 }

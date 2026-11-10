@@ -239,7 +239,7 @@ public sealed partial class MainForm
     {
         if (view.IsDetached)
         {
-            _detached.First(d => d.View == view).Activate();
+            _detached.FirstOrDefault(d => d.View == view)?.Activate();
             return;
         }
         if (IsSplit && !IsSplitView(view))
@@ -320,20 +320,29 @@ public sealed partial class MainForm
         EndHistory(view, "Sessione chiusa in RdpManager");
         if (view.IsDetached)
         {
-            var form = _detached.First(d => d.View == view);
-            _detached.Remove(form);
-            form.ReleaseView();
-            form.Close();
+            if (_detached.FirstOrDefault(d => d.View == view) is { } form)
+            {
+                _detached.Remove(form);
+                form.ReleaseView();
+                form.Close();
+            }
         }
         else if (view.Parent is TabPage page)
         {
             int index = _tabs.TabPages.IndexOf(page);
+            // Prima la vista esce dalla scheda: eliminare la scheda eliminerebbe subito anche il controllo RDP, ancora connesso.
+            page.Controls.Remove(view);
             _tabs.TabPages.Remove(page);
             page.Dispose();
             if (_tabs.TabCount > 0)
                 _tabs.SelectedIndex = Math.Min(index, _tabs.TabCount - 1);
         }
-        view.Dispose();
+        else
+        {
+            view.Parent?.Controls.Remove(view);
+        }
+        // Il controllo RDP si elimina solo a disconnessione avvenuta (o scaduta l'attesa), mai dentro il suo stesso evento.
+        view.CloseGracefully(TimeSpan.FromSeconds(3));
         ShowHintIfEmpty();
         UpdateStatus();
         UpdateTreeStates();
@@ -344,7 +353,10 @@ public sealed partial class MainForm
     {
         if (view.IsDetached)
         {
-            ReattachFromForm(_detached.First(d => d.View == view), closeForm: true);
+            if (_detached.FirstOrDefault(d => d.View == view) is { } detachedForm)
+                ReattachFromForm(detachedForm, closeForm: true);
+            else
+                view.SetDetached(false);
             return;
         }
         if (IsSplitView(view))
