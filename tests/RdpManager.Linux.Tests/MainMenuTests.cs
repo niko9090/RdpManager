@@ -36,8 +36,7 @@ public class MainMenuTests
     {
         using var data = new TempData();
         var vm = Seed.Main(data);
-        string[] placeholders = [nameof(vm.ImportRdpCommand), nameof(vm.HistoryCommand), nameof(vm.AboutCommand),
-            nameof(vm.VpnCommand), nameof(vm.FullScreenCommand), nameof(vm.CheckUpdatesCommand)];
+        string[] placeholders = [nameof(vm.ImportRdpCommand), nameof(vm.HistoryCommand), nameof(vm.AboutCommand)];
         foreach (var name in placeholders)
             Assert.False(((RelayCommand)typeof(MainWindowViewModel).GetProperty(name)!.GetValue(vm)!).CanExecute(null), name);
     }

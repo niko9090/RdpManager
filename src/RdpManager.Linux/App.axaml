@@ -132,6 +132,28 @@
     <Style Selector="Path.icon.muted">
       <Setter Property="Fill" Value="{DynamicResource AppMutedBrush}" />
     </Style>
+
+    <!-- Modalità tocco (#47): la finestra principale prende la classe «touch» e righe, schede, menu e pulsanti si ingrandiscono. -->
+    <Style Selector="Window.touch Button">
+      <Setter Property="MinHeight" Value="52" />
+      <Setter Property="MinWidth" Value="52" />
+    </Style>
+    <Style Selector="Window.touch TreeViewItem">
+      <Setter Property="MinHeight" Value="52" />
+    </Style>
+    <Style Selector="Window.touch ListBoxItem">
+      <Setter Property="MinHeight" Value="52" />
+    </Style>
+    <Style Selector="Window.touch TabItem">
+      <Setter Property="MinHeight" Value="52" />
+    </Style>
+    <Style Selector="Window.touch MenuItem">
+      <Setter Property="MinHeight" Value="48" />
+      <Setter Property="FontSize" Value="16" />
+    </Style>
+    <Style Selector="Window.touch TextBox">
+      <Setter Property="MinHeight" Value="52" />
+    </Style>
   </Application.Styles>
 
   <Application.DataTemplates>

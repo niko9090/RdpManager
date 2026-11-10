@@ -3,22 +3,23 @@
         xmlns:vm="using:RdpManager.Linux.ViewModels"
         xmlns:l="using:RdpManager.Linux"
         xmlns:menus="using:RdpManager.Linux.Menus"
+        xmlns:sessions="using:RdpManager.Linux.Sessions"
         x:Class="RdpManager.Linux.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="RdpManager" Width="1100" Height="700" MinWidth="560" MinHeight="420">
 
   <DockPanel Background="{DynamicResource AppSurfaceBrush}">
     <!-- Barra di stato -->
-    <Border DockPanel.Dock="Bottom" Classes="bar" Padding="14,6" BorderThickness="0,1,0,0">
+    <Border DockPanel.Dock="Bottom" Classes="bar" Padding="14,6" BorderThickness="0,1,0,0" IsVisible="{Binding ChromeVisible}">
       <TextBlock Text="{Binding StatusMessage}" TextTrimming="CharacterEllipsis" MinHeight="20"
                  FontSize="12" Classes="muted" VerticalAlignment="Center" />
     </Border>
 
     <!-- Barra di menu -->
-    <menus:MainMenu DockPanel.Dock="Top" />
+    <menus:MainMenu DockPanel.Dock="Top" IsVisible="{Binding ChromeVisible}" />
 
     <!-- Barra comandi -->
-    <Border DockPanel.Dock="Top" Classes="bar" BorderThickness="0,0,0,1">
+    <Border DockPanel.Dock="Top" Classes="bar" BorderThickness="0,0,0,1" IsVisible="{Binding ChromeVisible}">
       <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
         <StackPanel Orientation="Horizontal" Spacing="4" Margin="10,6">
           <Button Classes="accent" Content="Nuova connessione" Command="{Binding NewConnectionCommand}" />
@@ -35,9 +36,9 @@
       </ScrollViewer>
     </Border>
 
-    <Grid ColumnDefinitions="300,Auto,*">
-      <!-- Barra laterale: ricerca e albero delle connessioni -->
-      <Border Grid.Column="0" MinWidth="200" Background="{DynamicResource AppSidebarBrush}">
+    <Grid x:Name="MainGrid" ColumnDefinitions="300,Auto,*">
+      <!-- Barra laterale: ricerca e albero delle connessioni (fissa, oppure a comparsa dal bordo sinistro) -->
+      <Border x:Name="SidebarPanel" Grid.Column="0" MinWidth="200" Background="{DynamicResource AppSidebarBrush}">
         <DockPanel Margin="10">
           <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
             <TextBox Name="SearchBox" Text="{Binding SearchText}" Watermark="Cerca connessioni…" />
@@ -75,11 +76,23 @@
         </DockPanel>
       </Border>
 
-      <GridSplitter Grid.Column="1" Width="4" Background="{DynamicResource AppBorderBrush}" ResizeDirection="Columns" />
+      <!-- Bordo sensibile: con la barra a comparsa, avvicinando il mouse la barra si apre. -->
+      <Border x:Name="SidebarEdge" Grid.Column="0" Width="6" HorizontalAlignment="Left" Background="Transparent" IsVisible="False" ZIndex="5" />
 
-      <!-- Area a schede per le sessioni -->
+      <GridSplitter x:Name="SidebarSplitter" Grid.Column="1" Width="4" Background="{DynamicResource AppBorderBrush}" ResizeDirection="Columns" />
+
+      <!-- Area a schede per le sessioni: la riga delle schede qui, le viste delle sessioni in SessionHost -->
       <Grid Grid.Column="2">
-        <TabControl ItemsSource="{Binding Tabs}" SelectedItem="{Binding SelectedTab}" IsVisible="{Binding HasTabs}" Padding="0">
+        <DockPanel IsVisible="{Binding HasTabs}">
+        <TabControl x:Name="TabStrip" DockPanel.Dock="Top" ItemsSource="{Binding Tabs}" SelectedItem="{Binding SelectedTab}" Padding="0">
+          <TabControl.ContextMenu>
+            <ContextMenu>
+              <MenuItem Header="_Riconnetti" Command="{Binding ReconnectCommand}" InputGesture="F5" />
+              <MenuItem Header="S_tacca in una finestra" Command="{Binding DetachTabCommand}" InputGesture="Ctrl+Shift+D" />
+              <Separator />
+              <MenuItem Header="C_hiudi scheda" Command="{Binding CloseCurrentTabCommand}" InputGesture="Ctrl+F4" />
+            </ContextMenu>
+          </TabControl.ContextMenu>
           <TabControl.ItemTemplate>
             <DataTemplate x:DataType="vm:SessionTabViewModel">
               <StackPanel Orientation="Horizontal" Spacing="6">
@@ -92,10 +105,12 @@
           </TabControl.ItemTemplate>
           <TabControl.ContentTemplate>
             <DataTemplate x:DataType="vm:SessionTabViewModel">
-              <ContentControl Content="{Binding Content}" />
+              <Panel />
             </DataTemplate>
           </TabControl.ContentTemplate>
         </TabControl>
+        <sessions:SessionHostPanel x:Name="SessionHost" />
+        </DockPanel>
 
         <!-- Stato vuoto -->
         <StackPanel IsVisible="{Binding !HasTabs}" HorizontalAlignment="Center" VerticalAlignment="Center"

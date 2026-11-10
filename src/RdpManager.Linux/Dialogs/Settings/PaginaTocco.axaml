@@ -6,6 +6,20 @@
   <!-- Pagina Impostazioni «Tocco» (blocco B). -->
   <StackPanel Spacing="10">
     <TextBlock Classes="section" Margin="0,0,0,4" Text="Tocco" />
-    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding Notice}" />
+    <Grid ColumnDefinitions="170,*"><TextBlock Classes="label" Text="Modalità tocco" /><ComboBox Grid.Column="1" ItemsSource="{x:Static vm:ToccoPageViewModel.ModeChoices}" SelectedItem="{Binding Mode}" HorizontalAlignment="Stretch" /></Grid>
+    <Grid ColumnDefinitions="170,*"><TextBlock Classes="label" Text="Dito nella sessione" /><ComboBox Grid.Column="1" ItemsSource="{x:Static vm:ToccoPageViewModel.SessionChoices}" SelectedItem="{Binding SessionMode}" HorizontalAlignment="Stretch" /></Grid>
+    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding Note}" />
+
+    <TextBlock Classes="section" Text="Gesti a più dita" />
+    <ItemsControl ItemsSource="{Binding Gestures}">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:GestureSettingItem">
+          <Grid ColumnDefinitions="220,*" Margin="0,3">
+            <TextBlock Classes="label" Text="{Binding Name}" />
+            <ComboBox Grid.Column="1" ItemsSource="{Binding Choices}" SelectedItem="{Binding Action}" HorizontalAlignment="Stretch" />
+          </Grid>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
   </StackPanel>
 </UserControl>

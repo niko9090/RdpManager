@@ -119,6 +119,9 @@ public sealed partial class MainWindowViewModel
     private RelayCommand AsyncCmd(Func<Task> action, Func<bool>? can = null, [CallerMemberName] string name = "") =>
         Cmd(() => Run(action), can, name);
 
+    /// <summary>Una riga nella barra di stato (anche da un altro thread).</summary>
+    public void ShowNotice(string text) => Notice(text);
+
     private void Notice(string text) => Ui.Invoke(() => { StatusMessage = text; return 0; });
 
     private FreeRdpSession? SelectedSession => SelectedTab?.Session as FreeRdpSession;
@@ -329,6 +332,22 @@ public sealed partial class MainWindowViewModel
         RaiseLayout();
         StatusMessage = _sidebarPinned ? "Barra laterale fissa." : "Barra laterale a comparsa: avvicina il mouse al bordo sinistro.";
     });
+
+    /// <summary>Il PC ha uno schermo touch (lo rileva l'interfaccia all'avvio).</summary>
+    public bool HasTouchScreen { get; set; }
+
+    /// <summary>Un dito ha toccato la finestra: con la modalità tocco «Automatica» l'interfaccia si ingrandisce.</summary>
+    public void NoteTouchSeen()
+    {
+        if (_touchSeen)
+            return;
+        _touchSeen = true;
+        OnPropertyChanged(nameof(TouchActive));
+        LayoutChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Modalità tocco in vigore (#47): impostazione «Tocco», con «Automatica» che guarda lo schermo e i tocchi visti.</summary>
+    public bool TouchActive => TouchPolicy.IsActive(Document.Settings.TouchMode, HasTouchScreen || _touchSeen);
 
     public bool IsSplit => _splitLeft is not null && _splitRight is not null;
 

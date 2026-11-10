@@ -34,6 +34,9 @@ public sealed class FreeRdpSessionHost : ISessionHost
         _post = post ?? (a => a());
     }
 
+    /// <summary>Come chiedere all'utente se fidarsi di un certificato non verificato (avviso certificato); null = non si chiede.</summary>
+    public Func<Features.CertificatePrompt, Task<bool>>? CertificateDecider { get; set; }
+
     public bool IsAvailable => FreeRdpLocator.Find(false, _isInstalled) is not null;
 
     public string? UnavailableReason => IsAvailable ? null : FreeRdpLocator.NotInstalledMessage();
@@ -44,7 +47,10 @@ public sealed class FreeRdpSessionHost : ISessionHost
         if (client is null)
             return new MissingFreeRdpSession(connection, FreeRdpLocator.NotInstalledMessage());
 
-        var session = new FreeRdpSession(connection, client, _gatewayCredentials(connection), ct => PrepareVpnAsync(connection, ct), _post);
+        var session = new FreeRdpSession(connection, client, _gatewayCredentials(connection), ct => PrepareVpnAsync(connection, ct), _post)
+        {
+            CertificateDecider = CertificateDecider,
+        };
         lock (_sessions)
             _sessions.Add(session);
         session.Closed += (_, _) =>
