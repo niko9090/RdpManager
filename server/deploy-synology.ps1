@@ -44,8 +44,9 @@ try {
     if ($LASTEXITCODE) { throw 'scp fallito' }
     ssh -o BatchMode=yes $Alias 'tar -xf /tmp/rdpm-deploy.tar -C /tmp/rdpm-deploy && rm /tmp/rdpm-deploy.tar'
     # Il codice di registrazione (se c'e' in config/locale.json) passa come variabile d'ambiente, non come file.
-    $codice = if ($cfg.CodiceRegistrazione -match '^[A-Za-z0-9._-]+$') { " DEPLOY_REG_CODE=$($cfg.CodiceRegistrazione)" } else { '' }
-    if ($cfg.CodiceRegistrazione -and -not $codice) { throw 'codiceRegistrazione: usa solo lettere, cifre e . _ -' }
+    # Passa in base64, cosi' simboli come ! non danno problemi nella shell.
+    if ($cfg.CodiceRegistrazione -match "[\s|&\\']") { throw 'codiceRegistrazione: niente spazi ne i simboli | & \ e apice' }
+    $codice = if ($cfg.CodiceRegistrazione) { ' DEPLOY_REG_CODE_B64=' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($cfg.CodiceRegistrazione)) } else { '' }
     $remote = "sudo -n env DEPLOY_HOST=$PublicHost$codiceDEPLOY_LAN=$($cfg.ReteLan) DEPLOY_BASE=$($cfg.CartellaNas) DEPLOY_PORT_VPN=$($cfg.PortaVpn) bash /tmp/rdpm-deploy.sh; rc=`$?; rm -f /tmp/rdpm-deploy.sh; exit `$rc"
     ssh -o BatchMode=yes $Alias $remote
     if ($LASTEXITCODE) { throw 'deploy fallito sul Synology' }

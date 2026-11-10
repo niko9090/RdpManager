@@ -122,7 +122,7 @@ internal sealed class SyncAccountDialog : TouchForm
         SyncServerException { Code: "invalid_credentials" } => "Utente o password sbagliati.",
         SyncServerException { Code: "too_many_attempts", RetryAfterSeconds: { } s } =>
             $"Troppi tentativi sbagliati: riprova fra {Math.Max(1, (s + 59) / 60)} minuti.",
-        SyncServerException { Code: "invalid_registration_code" } => "Codice di registrazione sbagliato.",
+        SyncServerException { Code: "invalid_registration_code" } => "La password del server non è giusta. Controlla di averla scritta uguale (maiuscole e simboli compresi) o chiedila a chi gestisce il server.",
         SyncServerException { Code: "account_exists" } => "Esiste già un account con questo nome: usa «Accedi».",
         SyncServerException { Code: "registration_disabled" } => "Questo server non accetta registrazioni dall'app: chiedi a chi lo gestisce.",
         SyncServerException s => s.Message,
@@ -170,9 +170,9 @@ internal sealed class SyncAccountDialog : TouchForm
             {
                 SetBusy(false);
                 var code = TextPromptDialog.Ask(this, "Registrazione",
-                    "Codice di registrazione (te lo dà chi gestisce il server):", secret: true);
+                    "Password del server (te la dà chi gestisce il server).\nServe solo la prima volta, per creare il tuo account:", secret: true);
                 if (string.IsNullOrWhiteSpace(code))
-                    throw new ArgumentException("Registrazione annullata: serve il codice di registrazione.");
+                    throw new ArgumentException("Registrazione annullata: serve la password del server.");
                 _registrationCode = code.Trim();
                 SetBusy(true, "Creo l'account…");
             }
