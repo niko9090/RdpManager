@@ -1,5 +1,17 @@
 # Novità di RdpManager
 
+## 1.12.4 (2026-11-10)
+
+**Correzioni**
+- Sincronizzazione: risolto l'errore 400. L'indirizzo del server scritto con http:// o senza https:// viene portato da solo a https://syncnetpro.com:8443, e se qualcosa va storto il messaggio d'errore ora è chiaro e in italiano.
+
+**Novità**
+- Il campo «codice di registrazione» ora si chiama «Password del server». L'installazione sul Synology passa la password in modo corretto (codificata in base64).
+- Nuovo aspetto del programma per Linux.
+
+**Per chi sviluppa**
+- Le prove dell'interfaccia non dipendono più dalla dimensione dello schermo.
+
 ## 1.12.3 (2026-11-10)
 
 **Correzioni**
