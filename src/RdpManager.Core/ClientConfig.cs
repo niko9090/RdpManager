@@ -37,7 +37,7 @@ public sealed record ClientConfig(string ServerUrl, string RegistrationCode, str
         var server = Str("server");
         if (server.Length > 0)
         {
-            try { server = SyncHttp.NormalizeUrl(server.Contains("://", StringComparison.Ordinal) ? server : "https://" + server); }
+            try { server = SyncHttp.NormalizeUrl(server); }
             catch (ArgumentException ex) { throw new FormatException("Indirizzo del server non valido: " + ex.Message, ex); }
         }
         var cfg = new ClientConfig(server, Str("codiceRegistrazione"), Str("vpnEndpoint"));

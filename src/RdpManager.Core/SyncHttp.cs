@@ -40,14 +40,14 @@ public sealed class SyncHttp : IDisposable
         _http = new HttpClient { BaseAddress = new Uri(NormalizeUrl(baseUrl)), Timeout = timeout ?? TimeSpan.FromSeconds(20) };
     }
 
-    /// <summary>Aggiunge «http://» se manca e toglie la barra finale. Lancia ArgumentException se non è un indirizzo.</summary>
+    /// <summary>Aggiunge «https://» se manca lo schema (un «http://» esplicito resta) e toglie la barra finale. Lancia ArgumentException se non è un indirizzo.</summary>
     public static string NormalizeUrl(string? url)
     {
         var text = (url ?? "").Trim();
         if (text.Length == 0)
             throw new ArgumentException("Indica l'indirizzo del server.");
         if (!text.Contains("://", StringComparison.Ordinal))
-            text = "http://" + text;
+            text = "https://" + text; // il server reale è solo HTTPS; «http://» esplicito resta (test locali)
         if (!Uri.TryCreate(text, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https") || uri.Host.Length == 0)
             throw new ArgumentException("L'indirizzo del server non è valido (esempio: https://vpn.example.com:8443).");
         return uri.GetLeftPart(UriPartial.Path).TrimEnd('/') + "/";
