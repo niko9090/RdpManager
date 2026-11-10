@@ -160,9 +160,10 @@ public sealed class UiV151Tests : IDisposable
     // ---------- (2) misura della barra trascinando il bordo ----------
 
     [Theory]
-    [InlineData(BarPosition.Left, 80, 0, 340)]
-    [InlineData(BarPosition.Right, -80, 0, 340)]
-    [InlineData(BarPosition.Bottom, 0, -40, 300)] // non 340: con schermi bassi (metà area ~333 px) 340 supera il limite
+    // Misure scelte per stare sotto il limite di mezza area anche su schermi piccoli (640x480: metà altezza = 240).
+    [InlineData(BarPosition.Left, 40, 0, 220)]
+    [InlineData(BarPosition.Right, -40, 0, 220)]
+    [InlineData(BarPosition.Bottom, 0, -40, 220)]
     [InlineData(BarPosition.Left, -500, 0, FullScreenBarSettings.MinWidth)]
     public void FullScreenBar_DragTheEdge_TheSessionAdaptsAndTheSizeIsSaved(BarPosition position, int dx, int dy, int expected)
     {
@@ -170,7 +171,7 @@ public sealed class UiV151Tests : IDisposable
         WithMainForm(store, form =>
         {
             OpenAllConnected(form);
-            form.ApplyFullScreenBarForTests(new FullScreenBarSettings { Position = position, Mode = BarMode.Fixed, Width = 260 });
+            form.ApplyFullScreenBarForTests(new FullScreenBarSettings { Position = position, Mode = BarMode.Fixed, Width = 180 });
             form.ToggleFullScreen();
             Pump(200);
             var bar = form.FullScreenBarControl;
@@ -218,13 +219,13 @@ public sealed class UiV151Tests : IDisposable
     [Fact]
     public void FullScreenBar_SavedSize_IsUsedAtTheNextStart()
     {
-        var store = StoreWith(d => d.Settings.FullScreenBar = new FullScreenBarSettings { Position = BarPosition.Right, Width = 410 }, Unreachable("Uno"));
+        var store = StoreWith(d => d.Settings.FullScreenBar = new FullScreenBarSettings { Position = BarPosition.Right, Width = 300 }, Unreachable("Uno"));
         WithMainForm(store, form =>
         {
             OpenAllConnected(form);
             form.ToggleFullScreen();
             Pump(200);
-            Assert.Equal(410, form.FullScreenBarControl.Width);
+            Assert.Equal(300, form.FullScreenBarControl.Width);
         });
     }
 
@@ -233,10 +234,10 @@ public sealed class UiV151Tests : IDisposable
     [Fact]
     public void WindowSidebar_Pinned_SavedWidthIsUsedAndTheSplitterSavesIt()
     {
-        var store = StoreWith(d => d.Settings.SidebarWidth = 400, Unreachable("Uno"));
+        var store = StoreWith(d => d.Settings.SidebarWidth = 300, Unreachable("Uno"));
         WithMainForm(store, form =>
         {
-            Assert.Equal(400, form.Sidebar.Width);
+            Assert.Equal(300, form.Sidebar.Width);
             Assert.True(form.SidebarShown, "barra laterale non visibile");
             Assert.True(form.SidebarSplitter.Visible, $"splitter: {form.SidebarSplitter.Bounds} parent {form.SidebarSplitter.Parent?.Visible} sidebar {form.Sidebar.Bounds}");
             Assert.False(form.SidebarGrip.Visible); // fissa: si trascina lo splitter
@@ -262,10 +263,10 @@ public sealed class UiV151Tests : IDisposable
             Assert.True(grip.Visible);
             Assert.Equal(DockStyle.Right, grip.Dock);
             var start = grip.PointToScreen(Point.Empty);
-            grip.SimulateDrag(start, new Point(start.X + 120, start.Y));
+            grip.SimulateDrag(start, new Point(start.X + 20, start.Y));
             Pump(100);
-            Assert.Equal(WindowSidebar.DefaultWidth + 120, form.Sidebar.Width);
-            Assert.Equal(WindowSidebar.DefaultWidth + 120, store.Load().Settings.SidebarWidth);
+            Assert.Equal(WindowSidebar.DefaultWidth + 20, form.Sidebar.Width);
+            Assert.Equal(WindowSidebar.DefaultWidth + 20, store.Load().Settings.SidebarWidth);
 
             grip.SimulateDrag(start, new Point(start.X - 5000, start.Y));
             Pump(100);

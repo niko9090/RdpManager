@@ -23,6 +23,20 @@ internal sealed record SeenDialog(
 /// </summary>
 internal sealed class ModalDialogWatcher : IDisposable
 {
+    /// <summary>
+    /// La finestra sta nell'area utile. Se è più grande dell'area (schermi piccoli, es. 640x480, dove l'avviso alto
+    /// 476 px non entra in 432) non può starci per intero: basta che se ne veda almeno l'85%.
+    /// </summary>
+    internal static bool FitsOn(Rectangle area, Rectangle bounds)
+    {
+        if (area.Contains(bounds))
+            return true;
+        if (bounds.Width <= area.Width && bounds.Height <= area.Height)
+            return false;
+        var visible = Rectangle.Intersect(area, bounds);
+        return (long)visible.Width * visible.Height * 100 >= (long)bounds.Width * bounds.Height * 85;
+    }
+
     private readonly Action<string> _log;
     private readonly string? _screenshotDir;
     private readonly CancellationTokenSource _cts = new();
@@ -74,7 +88,7 @@ internal sealed class ModalDialogWatcher : IDisposable
                 var seen = new SeenDialog(
                     hwnd, cls, Native.WindowText(hwnd), windowPid, processName, windowPid == pid,
                     owner, owner != IntPtr.Zero && Native.IsIconic(owner), owner == IntPtr.Zero || Native.IsWindowEnabled(owner),
-                    bounds, Screen.AllScreens.Any(s => s.WorkingArea.Contains(bounds)),
+                    bounds, Screen.AllScreens.Any(s => FitsOn(s.WorkingArea, bounds)),
                     Native.GetForegroundWindow() == hwnd, texts);
                 lock (_gate)
                     _seen.Add(seen);

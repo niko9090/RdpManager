@@ -141,19 +141,21 @@ public sealed class UiV15Tests(ITestOutputHelper output) : IDisposable
             var root = bar.Parent!.ClientRectangle;
             Assert.True(form.FullScreenBarShown);
             Assert.True(bar.Visible);
+            // Su schermi piccoli la barra non supera metà area (640x480: in basso 240): la misura attesa è 250 entro quel limite.
+            int thickness = Math.Min(250, FullScreenBarLayout.MaxThickness(root, position));
             var session = SessionArea(form);
             Assert.False(session.IntersectsWith(bar.Bounds), $"sessione {session} e barra {bar.Bounds} si sovrappongono");
             Assert.Equal(root, Rectangle.Union(session, bar.Bounds));
             switch (position)
             {
                 case BarPosition.Left:
-                    Assert.Equal((0, 250, root.Height), (bar.Left, bar.Width, bar.Height));
+                    Assert.Equal((0, thickness, root.Height), (bar.Left, bar.Width, bar.Height));
                     break;
                 case BarPosition.Right:
-                    Assert.Equal((root.Right, 250, root.Height), (bar.Right, bar.Width, bar.Height));
+                    Assert.Equal((root.Right, thickness, root.Height), (bar.Right, bar.Width, bar.Height));
                     break;
                 case BarPosition.Bottom:
-                    Assert.Equal((root.Bottom, 250, root.Width), (bar.Bottom, bar.Height, bar.Width));
+                    Assert.Equal((root.Bottom, thickness, root.Width), (bar.Bottom, bar.Height, bar.Width));
                     break;
             }
             AssertNothingAtTheTop(form);
