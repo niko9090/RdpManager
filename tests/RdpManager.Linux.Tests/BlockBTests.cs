@@ -586,6 +586,7 @@ public class AccountAndVpnTests
     }
 }
 
+[Collection("Globali")]
 public class BlockBSettingsPageTests
 {
     [Fact]

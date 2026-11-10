@@ -528,7 +528,7 @@ public sealed partial class MainWindowViewModel
     // --- Account, sincronizzazione, VPN ---
 
     /// <summary>Il servizio di sincronizzazione (creato al primo uso).</summary>
-    public SyncService SyncService => _sync ??= new SyncService(SyncState.PathFor(_store));
+    public SyncService SyncService => _sync ??= new SyncService(SyncState.PathFor(_store), Services.KdfSettings.SyncIterations);
 
     /// <summary>Strumenti, Account e sincronizzazione (#60, #61, #62).</summary>
     public RelayCommand SyncAccountCommand => AsyncCmd(async () =>

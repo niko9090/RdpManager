@@ -21,7 +21,7 @@ public class GroupsAndSearchTests
         c.InheritFolderResolution = true;
         var vm = Vm(data, dialogs, c);
         vm.SelectedNode = Node(vm, "Uffici");
-        dialogs.OnShow = o =>
+        dialogs.OnShowSync = o =>
         {
             var f = (FolderSettingsViewModel)o;
             f.UseResolution = true;
@@ -173,7 +173,7 @@ public class GroupsAndSearchTests
         using var data = new TempData();
         var dialogs = new ScriptedDialogs();
         var vm = Vm(data, dialogs, Seed.Conn("Contabilita", "cont"), Seed.Conn("Magazzino", "mag"));
-        dialogs.OnShow = o =>
+        dialogs.OnShowSync = o =>
         {
             var q = (QuickSearchViewModel)o;
             q.Query = "magaz";
@@ -277,12 +277,12 @@ public class ImportExportTests
         var c = Seed.Conn("PC", "pc1", "Uffici");
         c.Password = "pw-del-pc";
         var vm = Vm(data, dialogs, c);
-        dialogs.OnShow = o =>
+        dialogs.OnShow = async o =>
         {
             var e = (RdpmExportViewModel)o;
             Assert.True(e.WithPasswords); // ci sono password salvate: proposta di default
             e.Password = e.ConfirmPassword = "password-lunga";
-            return e.TryAcceptAsync().GetAwaiter().GetResult();
+            return await e.TryAcceptAsync();
         };
         await vm.ExportRdpmAsync();
         Assert.True(File.Exists(dialogs.SaveTo));
@@ -293,11 +293,11 @@ public class ImportExportTests
         dialogs2.Secrets.Enqueue("sbagliata");
         dialogs2.Secrets.Enqueue("password-lunga");
         var vm2 = Vm(data2, dialogs2);
-        dialogs2.OnShow = o =>
+        dialogs2.OnShow = async o =>
         {
             var i = (RdpmImportViewModel)o;
             Assert.True(i.Merge);
-            return i.TryAcceptAsync().GetAwaiter().GetResult();
+            return await i.TryAcceptAsync();
         };
         await vm2.ImportRdpmAsync();
 
@@ -350,11 +350,11 @@ public class ImportExportTests
         File.WriteAllText(file, RdpmFile.Export(src));
         var dialogs = new ScriptedDialogs { FilesToOpen = [file], Confirm = false };
         var vm = Vm(data, dialogs, Seed.Conn("Vecchia", "vecchia"));
-        dialogs.OnShow = o =>
+        dialogs.OnShow = async o =>
         {
             var i = (RdpmImportViewModel)o;
             i.Replace = true;
-            return i.TryAcceptAsync().GetAwaiter().GetResult();
+            return await i.TryAcceptAsync();
         };
 
         await vm.ImportRdpmAsync();
@@ -386,7 +386,7 @@ public class ImportExportTests
         var dialogs = new ScriptedDialogs { FilesToOpen = [file] };
         var vm = Vm(data, dialogs, Seed.Conn("Esiste", "esiste"));
         CsvImportViewModel? seen = null;
-        dialogs.OnShow = o =>
+        dialogs.OnShowSync = o =>
         {
             seen = (CsvImportViewModel)o;
             seen.Folder = "Importati";
@@ -524,7 +524,7 @@ public class LockTests
         using var data = new TempData();
         var dialogs = new ScriptedDialogs();
         var vm = Vm(data, dialogs, Seed.Conn("PC", "h"));
-        dialogs.OnShow = o =>
+        dialogs.OnShowSync = o =>
         {
             var p = (PinSetViewModel)o;
             p.Pin = p.ConfirmPin = "1357";
@@ -580,7 +580,7 @@ public class LockTests
     public async Task La_pagina_PIN_delle_impostazioni_imposta_toglie_e_controlla_i_minuti()
     {
         var settings = new AppSettings();
-        var dialogs = new ScriptedDialogs { OnShow = o => { var p = (PinSetViewModel)o; p.Pin = p.ConfirmPin = "2468"; return p.TryCommit(); } };
+        var dialogs = new ScriptedDialogs { OnShowSync = o => { var p = (PinSetViewModel)o; p.Pin = p.ConfirmPin = "2468"; return p.TryCommit(); } };
         var page = new PinPageViewModel(settings, dialogs);
         Assert.Equal("Nessun PIN: il blocco è spento", page.PinState);
         Assert.False(page.RemovePinCommand.CanExecute(null));
@@ -627,7 +627,7 @@ public class HistoryAndQuickTextsTests
         Assert.Equal("Chiusa dall'utente", entry.Reason);
 
         HistoryViewModel? shown = null;
-        dialogs.OnShow = o => { shown = (HistoryViewModel)o; return true; };
+        dialogs.OnShowSync = o => { shown = (HistoryViewModel)o; return true; };
         await vm.ShowHistoryAsync();
         Assert.Single(shown!.Rows);
         Assert.Equal("PC", shown.Rows[0].Name);
@@ -690,7 +690,7 @@ public class HistoryAndQuickTextsTests
         using var data = new TempData();
         var dialogs = new ScriptedDialogs();
         var vm = Vm(data, dialogs);
-        dialogs.OnShow = o =>
+        dialogs.OnShowSync = o =>
         {
             var q = (QuickTextsViewModel)o;
             q.NewCommand.Execute(null);
@@ -713,7 +713,7 @@ public class HistoryAndQuickTextsTests
         Assert.Equal(["secondo", "ciao\nmondo"], saved.Select(t => t.Text));
         Assert.Equal("Saluto", saved[1].Name);
 
-        dialogs.OnShow = o =>
+        dialogs.OnShowSync = o =>
         {
             var q = (QuickTextsViewModel)o;
             q.Selected = q.Items[0];
@@ -821,11 +821,11 @@ public class NetworkToolsTests
         };
         vm.ScanSources = sources;
         NetworkScanViewModel? scan = null;
-        dialogs.OnShow = o =>
+        dialogs.OnShow = async o =>
         {
             scan = (NetworkScanViewModel)o;
             scan.LocalTab.Range = "192.168.1.1-192.168.1.20";
-            scan.LocalTab.StartAsync().GetAwaiter().GetResult();
+            await scan.LocalTab.StartAsync();
             Assert.Equal(2, scan.LocalTab.Results.Count);
             Assert.Single(scan.LocalTab.Results, r => r.Note == "già presente");
             scan.Folder = "Rete/Ufficio";
@@ -908,6 +908,7 @@ public class NetworkToolsTests
 }
 
 /// <summary>Impostazioni (pagine A), cartelle di sistema, informazioni, modulo di modifica (#4, #29, #44, #54, #55, #56, #57).</summary>
+[Collection("Globali")]
 public class SettingsAndInfoTests
 {
     [Fact]
@@ -1107,6 +1108,7 @@ public class SettingsAndInfoTests
 }
 
 /// <summary>Il menu e la finestra usano davvero i comandi del blocco A.</summary>
+[Collection("Globali")]
 public class BlockAWiringTests
 {
     [Fact]

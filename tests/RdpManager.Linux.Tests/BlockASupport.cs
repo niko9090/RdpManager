@@ -11,7 +11,9 @@ internal sealed class ScriptedDialogs : IDialogService
     public bool Confirm { get; set; } = true;
     public List<string> ConfirmMessages { get; } = [];
     public List<string> Messages { get; } = [];
-    public Func<object, bool>? OnShow { get; set; }
+    public Func<object, Task<bool>>? OnShow { get; set; }
+    /// <summary>Variante senza attese: per le prove che decidono subito.</summary>
+    public Func<object, bool>? OnShowSync { get; set; }
     public List<object> Shown { get; } = [];
     public IReadOnlyList<string> FilesToOpen { get; set; } = [];
     public string? SaveTo { get; set; }
@@ -53,7 +55,7 @@ internal sealed class ScriptedDialogs : IDialogService
     public Task<bool> ShowAsync(object viewModel)
     {
         Shown.Add(viewModel);
-        return Task.FromResult(OnShow?.Invoke(viewModel) ?? false);
+        return OnShow?.Invoke(viewModel) ?? Task.FromResult(OnShowSync?.Invoke(viewModel) ?? false);
     }
 
     public Task<string?> PromptSecretAsync(string title, string label) => Task.FromResult(Secrets.Count > 0 ? Secrets.Dequeue() : null);

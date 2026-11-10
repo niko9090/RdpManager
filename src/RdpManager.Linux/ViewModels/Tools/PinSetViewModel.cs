@@ -29,7 +29,7 @@ public sealed class PinSetViewModel : ViewModelBase
         Error = PinLock.Validate(Pin) ?? (Pin != ConfirmPin ? "I due PIN non coincidono." : null);
         if (Error is not null)
             return false;
-        Result = PinLock.Create(Pin);
+        Result = PinLock.Create(Pin, Services.KdfSettings.PinIterations);
         return true;
     }
 }

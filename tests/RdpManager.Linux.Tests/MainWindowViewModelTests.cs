@@ -3,6 +3,7 @@ using RdpManager.Linux.ViewModels;
 
 namespace RdpManager.Linux.Tests;
 
+[Collection("Globali")]
 public class MainWindowViewModelTests
 {
     private static IEnumerable<TreeNodeViewModel> All(IEnumerable<TreeNodeViewModel> nodes) =>

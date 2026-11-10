@@ -199,7 +199,8 @@ public sealed partial class MainWindowViewModel
         try
         {
             StatusMessage = "Esportazione in corso…";
-            await Task.Run(() => RdpmFile.Save(path, Document, password, includeSettings));
+            await Task.Run(() => File.WriteAllText(path,
+                RdpmFile.Export(Document, password, KdfSettings.ExportIterations, includeSettings), new System.Text.UTF8Encoding(false)));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {

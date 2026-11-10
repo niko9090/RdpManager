@@ -152,6 +152,7 @@ public class VpnServiceTests
     }
 }
 
+[Collection("Globali")]
 public class SettingsFixesTests
 {
     [Fact]

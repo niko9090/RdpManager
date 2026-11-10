@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using RdpManager.Core;
 using RdpManager.Linux.Platform;
+using RdpManager.Linux.Services;
 using RdpManager.Linux.Sessions;
 using RdpManager.Linux.ViewModels;
 
@@ -9,9 +10,18 @@ namespace RdpManager.Linux.Tests;
 internal static class TestModuleInit
 {
     [ModuleInitializer]
-    internal static void Init() =>
+    internal static void Init()
+    {
         SecretStore.Current = new FileKeySecretStore(Path.Combine(Path.GetTempPath(), "rdpm-linux-tests-" + Guid.NewGuid().ToString("N") + ".key"));
+        SecretStore.Current.Protect([1], null); // crea subito la chiave, prima che partano i test in parallelo
+        KdfSettings.ExportIterations = 1000;
+        KdfSettings.PinIterations = 10_000;
+        KdfSettings.SyncIterations = 1000;
+    }
 }
+
+[CollectionDefinition("Globali", DisableParallelization = true)]
+public sealed class GlobaliCollection;
 
 /// <summary>Cartella temporanea con il file dei dati di una prova.</summary>
 internal sealed class TempData : IDisposable

@@ -5,6 +5,9 @@ namespace RdpManager.Linux.Services;
 /// <summary>Registro e registro dei guasti (#57): come in Windows, si accendono all'avvio e seguono l'impostazione «log dettagliato».</summary>
 public static class LogSetup
 {
+    private static readonly object AttachLock = new();
+    private static bool _attached;
+
     /// <summary>Crea (se mancano) <see cref="AppLog.Default"/> e <see cref="CrashLog.Default"/> nella cartella dei log e li collega.</summary>
     public static void Initialize(AppSettings settings, string? directory = null)
     {
@@ -17,7 +20,14 @@ public static class LogSetup
         if (CrashLog.Default is null)
         {
             var crash = CrashLog.Default = new CrashLog(directory);
-            crash.Attach();
+            lock (AttachLock)
+            {
+                if (!_attached) // i gestori sono del processo: agganciarli una volta sola
+                {
+                    crash.Attach();
+                    _attached = true;
+                }
+            }
         }
         ApplySettings(settings);
     }

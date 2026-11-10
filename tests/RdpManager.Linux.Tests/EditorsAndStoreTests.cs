@@ -122,6 +122,7 @@ public class ProfilesViewModelTests
     }
 }
 
+[Collection("Globali")]
 public class SettingsViewModelTests
 {
     private static T Page<T>(SettingsViewModel vm) where T : SettingsPageViewModel => vm.Pages.OfType<T>().Single();
@@ -180,6 +181,7 @@ public class SettingsViewModelTests
     }
 }
 
+[Collection("Globali")]
 public class FileKeySecretStoreTests
 {
     [Fact]
