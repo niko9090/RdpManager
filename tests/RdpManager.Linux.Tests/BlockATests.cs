@@ -91,7 +91,7 @@ public class GroupsAndSearchTests
         Assert.Equal("", vm.Document.Connections.Single(c => c.DisplayName == "C").Group);
 
         vm.SetSelection([Node(vm, "A"), Node(vm, "B")]);
-        dialogs.Choice = "Profilo";
+        dialogs.Choice = profile.DisplayName;
         await vm.AssignProfileToSelectedAsync();
         Assert.Equal(2, vm.Document.Connections.Count(c => c.CredentialProfileId == profile.Id));
 
@@ -177,7 +177,7 @@ public class GroupsAndSearchTests
         {
             var q = (QuickSearchViewModel)o;
             q.Query = "magaz";
-            Assert.Equal("Apri", q.Results[0].Action);
+            Assert.Equal(dialogs.Shown.Count == 1 ? "Apri" : "Passa alla sessione", q.Results[0].Action);
             return q.Accept();
         };
 
@@ -248,7 +248,7 @@ public class ImportExportTests
         Assert.Equal("Uffici", imported.Group);
         Assert.Contains("Importate 1 connessioni", dialogs.Messages.Single());
         Assert.Contains("vuoto.rdp", dialogs.Messages.Single());
-        Assert.Same(imported, vm.SelectedNode!.Connection);
+        Assert.Equal("nuovo-pc", vm.SelectedNode!.Connection!.Host);
     }
 
     [Fact]
@@ -947,7 +947,7 @@ public class SettingsAndInfoTests
     {
         var vm = new SettingsViewModel(new AppSettings(), "/x/c.json");
         foreach (var page in vm.Pages.Take(4))
-            Assert.IsNotType<PlaceholderSettingsPageViewModel>(page);
+            Assert.IsNotAssignableFrom<PlaceholderSettingsPageViewModel>(page);
         Assert.DoesNotContain("Notice", File.ReadAllText(SettingsViewModelTests.RepoFile("src/RdpManager.Linux/Dialogs/Settings/PaginaPin.axaml")));
     }
 

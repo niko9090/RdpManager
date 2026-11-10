@@ -63,15 +63,19 @@ public sealed class TextDialog : Window
     public static async Task<string?> ChooseAsync(Window owner, string title, string label, IReadOnlyList<string> options, string initial, bool editable)
     {
         var dialog = new TextDialog(title, label, null, "OK", "Annulla");
-        var combo = new ComboBox { ItemsSource = options, IsEditable = editable, HorizontalAlignment = HorizontalAlignment.Stretch };
+        Control input;
         if (editable)
-            combo.Text = initial;
+        {
+            input = new AutoCompleteBox { ItemsSource = options, Text = initial, MinimumPrefixLength = 0, HorizontalAlignment = HorizontalAlignment.Stretch };
+        }
         else
-            combo.SelectedItem = options.Contains(initial) ? initial : options.FirstOrDefault();
-        ((StackPanel)dialog.Content!).Children.Insert(1, combo);
+        {
+            input = new ComboBox { ItemsSource = options, SelectedItem = options.Contains(initial) ? initial : options.FirstOrDefault(), HorizontalAlignment = HorizontalAlignment.Stretch };
+        }
+        ((StackPanel)dialog.Content!).Children.Insert(1, input);
         if (!await dialog.ShowDialog<bool>(owner))
             return null;
-        return editable ? combo.Text ?? "" : combo.SelectedItem as string;
+        return input is AutoCompleteBox box ? box.Text ?? "" : (input as ComboBox)?.SelectedItem as string;
     }
 
     public static async Task<string?> PromptAsync(Window owner, string title, string label, string initial)

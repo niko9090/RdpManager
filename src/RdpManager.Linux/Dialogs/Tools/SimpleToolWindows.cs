@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Layout;
@@ -307,8 +308,8 @@ internal sealed class NetworkScanWindow : ToolWindow
         tabs.ItemTemplate = new Avalonia.Controls.Templates.FuncDataTemplate<ScanTabViewModel>((t, _) => new TextBlock { Text = t?.Title });
         tabs.ContentTemplate = new Avalonia.Controls.Templates.FuncDataTemplate<ScanTabViewModel>((t, _) => BuildTab(t));
 
-        var folder = new ComboBox { IsEditable = true, ItemsSource = vm.Folders, Width = 280 }
-            .Bind(ComboBox.TextProperty, nameof(vm.Folder), BindingMode.TwoWay);
+        var folder = new AutoCompleteBox { ItemsSource = vm.Folders, Width = 280, MinimumPrefixLength = 0 }
+            .Bind(AutoCompleteBox.TextProperty, nameof(vm.Folder), BindingMode.TwoWay);
         var bottom = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(14, 8) };
         bottom.Children.Add(DialogKit.Label("Cartella:"));
         bottom.Children.Add(folder);

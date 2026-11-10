@@ -26,7 +26,7 @@ public static class LinuxTailscale
         {
             try
             {
-                var candidate = System.IO.Path.Combine(dir, "tailscale");
+                var candidate = dir.TrimEnd('/') + "/tailscale";
                 if (fileExists(candidate))
                     return candidate;
             }

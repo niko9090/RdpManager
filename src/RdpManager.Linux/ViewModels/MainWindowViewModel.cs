@@ -205,7 +205,8 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     /// </summary>
     internal static bool MatchesSearch(RdpConnection c, string query) =>
         query.Length == 0 || c.Matches(query)
-        || FuzzySearch.Score(query, [c.DisplayName, c.Host, c.Label, c.Group, c.Username]) > 0;
+        // Con una cifra nella ricerca (indirizzi IP, porte) la tolleranza ai refusi darebbe vicini sbagliati: non si usa.
+        || (!query.Any(char.IsDigit) && FuzzySearch.Score(query, [c.DisplayName, c.Host, c.Label, c.Group, c.Username]) > 0);
 
     /// <summary>Toglie le cartelle senza risultati; vero se la cartella va rimossa.</summary>
     private static bool Prune(TreeNodeViewModel folder)

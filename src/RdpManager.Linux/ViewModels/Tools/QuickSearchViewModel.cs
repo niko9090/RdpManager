@@ -28,8 +28,8 @@ public sealed class QuickSearchViewModel : ViewModelBase
     {
         _connections = connections.ToList();
         _openIds = openSessionIds;
-        Search();
         AcceptCommand = new RelayCommand(() => AcceptRequested?.Invoke(this, EventArgs.Empty), () => Selected is not null);
+        Search();
     }
 
     public ObservableCollection<QuickSearchItem> Results { get; } = [];
