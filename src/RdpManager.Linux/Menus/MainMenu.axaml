@@ -1,0 +1,120 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:RdpManager.Linux.ViewModels"
+             x:Class="RdpManager.Linux.Menus.MainMenu"
+             x:DataType="vm:MainWindowViewModel">
+  <!--
+    Barra di menu, con le stesse voci del programma Windows. La struttura è fissata (passo 0): ogni voce è legata a un comando
+    di MainWindowViewModel.A.cs o .B.cs. Le voci di funzioni non ancora presenti su Linux hanno il comando disabilitato.
+  -->
+  <Border Classes="bar" BorderThickness="0,0,0,1">
+    <Menu>
+      <!-- ===== Zona blocco A: File, Connessioni ===== -->
+      <MenuItem Header="_File">
+        <MenuItem Header="_Importa">
+          <MenuItem Header="Da file _.rdp…" Command="{Binding ImportRdpCommand}" />
+          <MenuItem Header="Da file .rdp_m (backup di RdpManager)…" Command="{Binding ImportRdpmCommand}" />
+          <MenuItem Header="Da file _CSV…" Command="{Binding ImportCsvCommand}" />
+        </MenuItem>
+        <MenuItem Header="_Esporta">
+          <MenuItem Header="Tutte le connessioni in un file .rdp_m…" Command="{Binding ExportRdpmCommand}" />
+        </MenuItem>
+        <Separator />
+        <MenuItem Header="Impo_stazioni…" Command="{Binding SettingsCommand}" InputGesture="Ctrl+OemComma" />
+        <MenuItem Header="_Blocca RdpManager" Command="{Binding LockCommand}" />
+        <MenuItem Header="Apri _cartella dei dati" Command="{Binding OpenDataFolderCommand}" />
+        <Separator />
+        <MenuItem Header="E_sci" Command="{Binding ExitCommand}" InputGesture="Alt+F4" />
+      </MenuItem>
+      <MenuItem Header="_Connessioni">
+        <MenuItem Header="_Nuova connessione…" Command="{Binding NewConnectionCommand}" />
+        <MenuItem Header="Nuova _cartella…" Command="{Binding NewFolderCommand}" />
+        <MenuItem Header="_Modifica…" Command="{Binding EditCommand}" InputGesture="Ctrl+E" />
+        <MenuItem Header="_Duplica" Command="{Binding DuplicateCommand}" InputGesture="Ctrl+D" />
+        <MenuItem Header="_Elimina" Command="{Binding DeleteCommand}" />
+        <MenuItem Header="Impostazioni della c_artella…" Command="{Binding FolderSettingsCommand}" />
+        <Separator />
+        <MenuItem Header="C_onnetti" Command="{Binding ConnectCommand}" />
+        <MenuItem Header="Connetti _tutta la cartella" Command="{Binding ConnectFolderCommand}" />
+        <MenuItem Header="Esporta come file .r_dp…" Command="{Binding ExportRdpFileCommand}" />
+        <MenuItem Header="_Accendi (Wake-on-LAN)" Command="{Binding WakeCommand}" />
+        <MenuItem Header="_Preferita" Command="{Binding FavoriteCommand}" InputGesture="Ctrl+Shift+F" />
+        <MenuItem Header="_Verifica raggiungibilità" Command="{Binding CheckReachabilityCommand}" />
+        <MenuItem Header="Sposta in una cartella…" Command="{Binding MoveToFolderCommand}" />
+        <MenuItem Header="Assegna un profilo di credenziali…" Command="{Binding AssignProfileCommand}" />
+        <Separator />
+        <MenuItem Header="Pre_feriti" ItemsSource="{Binding FavoriteItems}" IsEnabled="{Binding HasFavorites}">
+          <MenuItem.ItemContainerTheme>
+            <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:CompileBindings="False">
+              <Setter Property="Header" Value="{Binding Title}" />
+              <Setter Property="Command" Value="{Binding Command}" />
+              <Setter Property="ToolTip.Tip" Value="{Binding ToolTip}" />
+            </ControlTheme>
+          </MenuItem.ItemContainerTheme>
+        </MenuItem>
+        <MenuItem Header="_Recenti" ItemsSource="{Binding RecentItems}" IsEnabled="{Binding HasRecents}">
+          <MenuItem.ItemContainerTheme>
+            <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:CompileBindings="False">
+              <Setter Property="Header" Value="{Binding Title}" />
+              <Setter Property="Command" Value="{Binding Command}" />
+              <Setter Property="ToolTip.Tip" Value="{Binding ToolTip}" />
+            </ControlTheme>
+          </MenuItem.ItemContainerTheme>
+        </MenuItem>
+        <Separator />
+        <MenuItem Header="Pro_fili di credenziali…" Command="{Binding ProfilesCommand}" />
+        <MenuItem Header="Cronolo_gia…" Command="{Binding HistoryCommand}" InputGesture="Ctrl+H" />
+        <Separator />
+        <MenuItem Header="Ce_rca" Command="{Binding SearchCommand}" InputGesture="Ctrl+F" />
+      </MenuItem>
+      <!-- ===== Zona blocco B: Sessione, Visualizza, Spazi di lavoro ===== -->
+      <MenuItem Header="_Sessione">
+        <MenuItem Header="_Riconnetti" Command="{Binding ReconnectCommand}" InputGesture="F5" />
+        <MenuItem Header="S_tacca in una finestra" Command="{Binding DetachTabCommand}" InputGesture="Ctrl+Shift+D" />
+        <Separator />
+        <MenuItem Header="_Incolla appunti come digitazione" Command="{Binding PasteAsTypingCommand}" />
+        <MenuItem Header="Invia Ctrl+Alt+_Canc" Command="{Binding SendCtrlAltDelCommand}" />
+        <MenuItem Header="Tastiera su schermo" Command="{Binding ScreenKeyboardCommand}" />
+        <MenuItem Header="_Foto della sessione" Command="{Binding SnapshotCommand}" />
+        <MenuItem Header="_Testi rapidi…" Command="{Binding QuickTextsCommand}" />
+        <Separator />
+        <MenuItem Header="C_hiudi scheda" Command="{Binding CloseCurrentTabCommand}" InputGesture="Ctrl+F4" />
+        <Separator />
+        <MenuItem Header="Scheda s_uccessiva" Command="{Binding NextTabCommand}" InputGesture="Ctrl+Tab" />
+        <MenuItem Header="Scheda _precedente" Command="{Binding PreviousTabCommand}" InputGesture="Ctrl+Shift+Tab" />
+      </MenuItem>
+      <MenuItem Header="_Visualizza">
+        <MenuItem Header="_Schermo intero" Command="{Binding FullScreenCommand}" InputGesture="F11" />
+        <MenuItem Header="_Panoramica delle sessioni" Command="{Binding OverviewCommand}" />
+        <MenuItem Header="_Ricerca rapida…" Command="{Binding QuickSearchCommand}" />
+        <MenuItem Header="Vista _affiancata" Command="{Binding SplitViewCommand}" />
+        <Separator />
+        <MenuItem Header="_Mostra/nascondi barra laterale" Command="{Binding ToggleSidebarCommand}" />
+        <MenuItem Header="Barra laterale _fissa" Command="{Binding PinSidebarCommand}" />
+        <Separator />
+        <MenuItem Header="Sposta la finestra sul monitor _successivo" Command="{Binding MoveToNextMonitorCommand}" />
+        <Separator />
+        <MenuItem Header="Ordina le connessioni per _nome" Command="{Binding SortByNameCommand}" />
+      </MenuItem>
+      <MenuItem Header="Spazi di la_voro">
+        <MenuItem Header="_Salva lo spazio attuale…" Command="{Binding SaveWorkspaceCommand}" />
+        <MenuItem Header="_Gestisci…" Command="{Binding ManageWorkspacesCommand}" />
+      </MenuItem>
+      <!-- ===== Zona mista: Strumenti (PC in rete: A; VPN e account: B) ===== -->
+      <MenuItem Header="S_trumenti">
+        <MenuItem Header="Cerca _PC in rete…" Command="{Binding NetworkScanCommand}" />
+        <MenuItem Header="_VPN (WireGuard)…" Command="{Binding VpnCommand}" />
+        <MenuItem Header="Account e _sincronizzazione…" Command="{Binding SyncAccountCommand}" />
+      </MenuItem>
+      <!-- ===== Zona blocco A: Aiuto (le voci Scorciatoie e Aggiornamenti sono del blocco B) ===== -->
+      <MenuItem Header="A_iuto">
+        <MenuItem Header="_Scorciatoie da tastiera" Command="{Binding ShortcutsHelpCommand}" InputGesture="F1" />
+        <MenuItem Header="Controlla _aggiornamenti" Command="{Binding CheckUpdatesCommand}" />
+        <MenuItem Header="Pagina del _progetto su GitHub" Command="{Binding OpenProjectPageCommand}" />
+        <MenuItem Header="Apri la cartella dei _log" Command="{Binding OpenLogFolderCommand}" />
+        <Separator />
+        <MenuItem Header="_Informazioni" Command="{Binding AboutCommand}" />
+      </MenuItem>
+    </Menu>
+  </Border>
+</UserControl>

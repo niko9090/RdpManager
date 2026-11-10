@@ -11,14 +11,15 @@ public sealed class ConnectionEditViewModel : ViewModelBase
     private readonly ConnectionsDocument _doc;
     private readonly RdpConnection _target;
 
-    private string _name, _host, _port, _username, _domain, _group, _label, _mac, _gatewayHost, _width, _height;
+    private string _name, _host, _port, _username, _domain, _group, _label, _mac, _gatewayHost, _width, _height, _attempts, _color;
     private string _password = "";
     private string? _error;
     private bool _clipboard, _drives, _printers, _microphone, _favorite, _autoReconnect, _useGateway, _keepAlive;
+    private bool _inheritResolution, _allMonitors, _showPassword;
     private ChoiceItem<ResolutionMode> _resolution;
     private ChoiceItem<AudioMode> _audio;
     private ChoiceItem<QualityProfile> _quality;
-    private ChoiceItem<Guid?> _profile;
+    private ChoiceItem<Guid?> _profile, _gatewayProfile;
 
     /// <param name="isNew">Vero per una connessione nuova: se la conferma riesce viene aggiunta al documento.</param>
     public ConnectionEditViewModel(ConnectionsDocument doc, RdpConnection connection, bool isNew)
@@ -46,14 +47,77 @@ public sealed class ConnectionEditViewModel : ViewModelBase
         _autoReconnect = connection.AutoReconnect;
         _useGateway = connection.UseGateway;
         _keepAlive = connection.KeepAlive;
+        _inheritResolution = connection.InheritFolderResolution;
+        _allMonitors = connection.UseAllMonitors;
+        _attempts = Math.Clamp(connection.AutoReconnectMaxAttempts, 1, ReconnectPolicy.MaxAllowedAttempts).ToString(CultureInfo.InvariantCulture);
+        _color = connection.Color ?? "";
         _resolution = Choices.Pick(Choices.Resolution, connection.ResolutionMode);
         _audio = Choices.Pick(Choices.Audio, connection.AudioMode);
         _quality = Choices.Pick(Choices.Quality, connection.Quality);
 
         Profiles = [NoProfile, .. doc.CredentialProfiles.Select(p => new ChoiceItem<Guid?>(p.Id, p.DisplayName))];
-        _profile = Profiles.FirstOrDefault(p => p.Value == connection.CredentialProfileId) ?? NoProfile;
+        _profile = Profiles.FirstOrDefault(p => p.Value is not null && p.Value == connection.CredentialProfileId) ?? NoProfile;
+        GatewayProfiles = [SameGatewayCredentials, .. doc.CredentialProfiles.Select(p => new ChoiceItem<Guid?>(p.Id, "Profilo: " + p.DisplayName))];
+        _gatewayProfile = connection.GatewayCredentials == GatewayCredentialsSource.Profile
+            ? GatewayProfiles.FirstOrDefault(p => p.Value is not null && p.Value == connection.GatewayProfileId) ?? SameGatewayCredentials
+            : SameGatewayCredentials;
         Groups = doc.AllGroups();
+        _gatewayTouched = false;
     }
+
+    private static readonly ChoiceItem<Guid?> SameGatewayCredentials = new(null, "Le stesse della connessione");
+
+    private bool _gatewayTouched;
+
+    /// <summary>Profili fra cui scegliere le credenziali del gateway (il primo: le stesse della connessione).</summary>
+    public IReadOnlyList<ChoiceItem<Guid?>> GatewayProfiles { get; }
+
+    public ChoiceItem<Guid?> GatewayProfile
+    {
+        get => _gatewayProfile;
+        set { if (Set(ref _gatewayProfile, value)) _gatewayTouched = true; }
+    }
+
+    /// <summary>Colore dell'etichetta come «#RRGGBB» (vuoto = nessuno).</summary>
+    public string Color
+    {
+        get => _color;
+        set { if (Set(ref _color, value)) OnPropertyChanged(nameof(ColorPreview)); }
+    }
+
+    /// <summary>Il colore normalizzato per l'anteprima, null se vuoto o non valido.</summary>
+    public string? ColorPreview => RdpConnection.NormalizeColor(_color);
+
+    /// <summary>Numero massimo di tentativi di riconnessione automatica.</summary>
+    public string AutoReconnectMaxAttempts { get => _attempts; set => Set(ref _attempts, value); }
+
+    /// <summary>Vale la risoluzione impostata sulla cartella, se c'è.</summary>
+    public bool InheritFolderResolution { get => _inheritResolution; set => Set(ref _inheritResolution, value); }
+
+    public bool UseAllMonitors { get => _allMonitors; set => Set(ref _allMonitors, value); }
+
+    /// <summary>«Mostra» la password mentre la si scrive.</summary>
+    public bool ShowPassword { get => _showPassword; set => Set(ref _showPassword, value); }
+
+    /// <summary>
+    /// Vero se la connessione ha una password salvata che questo utente non riesce a leggere (cifrata da un altro utente o
+    /// sistema, per esempio importata da Windows): va reinserita (#29).
+    /// </summary>
+    public bool HasUnreadablePassword => _target.Password is null && !string.IsNullOrEmpty(_target.ProtectedPassword);
+
+    /// <summary>Testo da mostrare nel campo password quando è vuoto.</summary>
+    public string PasswordHint =>
+        !OwnCredentials ? (Profile.Text.Length > 0 ? "(dal profilo)" : "")
+        : HasUnreadablePassword ? "(password salvata non leggibile da questo utente: scrivila di nuovo)"
+        : "Vuota = non cambiare quella salvata";
+
+    /// <summary>Utente, dominio e password sono quelli della connessione (nessun profilo scelto).</summary>
+    public bool OwnCredentials => Profile.Value is null;
+
+    /// <summary>Avviso sotto il campo password, null se non serve.</summary>
+    public string? PasswordWarning => HasUnreadablePassword && OwnCredentials
+        ? "La password salvata è stata cifrata da un altro utente o computer e non si può leggere qui. Scrivila di nuovo per salvarla."
+        : null;
 
     public bool IsNew { get; }
 
@@ -100,7 +164,18 @@ public sealed class ConnectionEditViewModel : ViewModelBase
 
     public ChoiceItem<AudioMode> Audio { get => _audio; set => Set(ref _audio, value); }
     public ChoiceItem<QualityProfile> Quality { get => _quality; set => Set(ref _quality, value); }
-    public ChoiceItem<Guid?> Profile { get => _profile; set => Set(ref _profile, value); }
+    public ChoiceItem<Guid?> Profile
+    {
+        get => _profile;
+        set
+        {
+            if (!Set(ref _profile, value))
+                return;
+            OnPropertyChanged(nameof(OwnCredentials));
+            OnPropertyChanged(nameof(PasswordHint));
+            OnPropertyChanged(nameof(PasswordWarning));
+        }
+    }
 
     public bool FixedResolution => _resolution.Value == ResolutionMode.Fixed;
 
@@ -110,18 +185,27 @@ public sealed class ConnectionEditViewModel : ViewModelBase
     /// <summary>Controlla i campi e li scrive sulla connessione (aggiungendola se nuova). Falso con <see cref="Error"/> impostato.</summary>
     public bool TryCommit()
     {
-        var host = Host.Trim();
+        // «nome:porta» nel campo del computer vale come la porta (come nel programma Windows).
+        var (host, hostPort) = RdpFile.SplitAddress(Host);
+        host = host.Trim();
         if (host.Length == 0)
             return Fail("Indica il nome o l'indirizzo del computer.");
-        if (!int.TryParse(Port.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int port) || port is < 1 or > 65535)
+        int port = hostPort ?? 0;
+        if (hostPort is null && (!int.TryParse(Port.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out port) || port is < 1 or > 65535))
             return Fail("La porta deve essere un numero da 1 a 65535.");
+        if (!int.TryParse(AutoReconnectMaxAttempts.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int attempts)
+            || attempts is < 1 or > ReconnectPolicy.MaxAllowedAttempts)
+            return Fail($"I tentativi di riconnessione devono essere un numero da 1 a {ReconnectPolicy.MaxAllowedAttempts}.");
+        string? color = null;
+        if (Color.Trim().Length > 0 && (color = RdpConnection.NormalizeColor(Color)) is null)
+            return Fail("Il colore deve essere nella forma #RRGGBB (oppure lascia vuoto).");
         int width = _target.DesktopWidth, height = _target.DesktopHeight;
         if (FixedResolution
             && (!int.TryParse(DesktopWidth.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out width) || width < 320
                 || !int.TryParse(DesktopHeight.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out height) || height < 200))
             return Fail("Larghezza e altezza devono essere numeri (almeno 320 x 200).");
-        var mac = MacAddress.Trim();
-        if (mac.Length > 0 && !WakeOnLan.TryParseMac(mac, out _))
+        var mac = "";
+        if (MacAddress.Trim().Length > 0 && !WakeOnLan.TryNormalizeMac(MacAddress, out mac))
             return Fail("L'indirizzo MAC non è valido (esempio: AA:BB:CC:DD:EE:FF).");
         if (UseGateway && string.IsNullOrWhiteSpace(GatewayHost))
             return Fail("Indica l'host del gateway oppure disattivalo.");
@@ -146,6 +230,15 @@ public sealed class ConnectionEditViewModel : ViewModelBase
         _target.IsFavorite = IsFavorite;
         _target.AutoReconnect = AutoReconnect;
         _target.KeepAlive = KeepAlive;
+        _target.InheritFolderResolution = InheritFolderResolution;
+        _target.UseAllMonitors = UseAllMonitors;
+        _target.AutoReconnectMaxAttempts = attempts;
+        _target.Color = color;
+        if (_gatewayTouched)
+        {
+            _target.GatewayCredentials = GatewayProfile.Value is null ? GatewayCredentialsSource.SameAsConnection : GatewayCredentialsSource.Profile;
+            _target.GatewayProfileId = GatewayProfile.Value;
+        }
         _target.AudioMode = Audio.Value;
         _target.Quality = Quality.Value;
         _target.CredentialProfileId = Profile.Value;
