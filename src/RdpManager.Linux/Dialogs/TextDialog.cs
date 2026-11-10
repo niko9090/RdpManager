@@ -12,25 +12,26 @@ public sealed class TextDialog : Window
     private TextDialog(string title, string message, string? inputInitial, string okText, string? cancelText)
     {
         Title = title;
-        Width = 420;
+        Width = 440;
+        MinWidth = 320;
         SizeToContent = SizeToContent.Height;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         CanResize = false;
 
-        var ok = new Button { Content = okText, IsDefault = true };
+        var ok = new Button { Content = okText, IsDefault = true, MinWidth = 96 };
         ok.Classes.Add("accent");
         ok.Click += (_, _) => Close(true);
 
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8 };
         if (cancelText is not null)
         {
-            var cancel = new Button { Content = cancelText, IsCancel = true };
+            var cancel = new Button { Content = cancelText, IsCancel = true, MinWidth = 96 };
             cancel.Click += (_, _) => Close(false);
             buttons.Children.Add(cancel);
         }
         buttons.Children.Add(ok);
 
-        var panel = new StackPanel { Margin = new Thickness(16), Spacing = 12 };
+        var panel = new StackPanel { Margin = new Thickness(20), Spacing = 16 };
         panel.Children.Add(new TextBlock { Text = message, TextWrapping = Avalonia.Media.TextWrapping.Wrap });
         if (inputInitial is not null)
         {

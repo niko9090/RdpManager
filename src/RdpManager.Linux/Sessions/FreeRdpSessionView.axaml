@@ -19,7 +19,7 @@
       <!-- Sessione in finestra separata (Wayland, SDL, più monitor). -->
       <StackPanel IsVisible="{Binding ShowOverlay}" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8" MaxWidth="520">
         <TextBlock Text="{Binding DisplayTitle}" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" />
-        <TextBlock Text="{Binding TargetText}" HorizontalAlignment="Center" Opacity="0.7" />
+        <TextBlock Text="{Binding TargetText}" HorizontalAlignment="Center" Classes="muted" />
         <TextBlock Text="{Binding Message}" TextWrapping="Wrap" TextAlignment="Center" />
         <Button Content="Riconnetti" Command="{Binding ReconnectCommand}" IsVisible="{Binding CanReconnect}" HorizontalAlignment="Center" />
       </StackPanel>

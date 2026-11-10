@@ -3,8 +3,135 @@
              xmlns:s="using:RdpManager.Linux.Sessions"
              x:Class="RdpManager.Linux.App"
              RequestedThemeVariant="Default">
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+          <Color x:Key="AppAccent">#2563EB</Color>
+          <SolidColorBrush x:Key="AppAccentBrush" Color="#2563EB" />
+          <SolidColorBrush x:Key="AppSidebarBrush" Color="#F3F5F9" />
+          <SolidColorBrush x:Key="AppBarBrush" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="AppSurfaceBrush" Color="#FAFBFD" />
+          <SolidColorBrush x:Key="AppBorderBrush" Color="#D9DEE7" />
+          <SolidColorBrush x:Key="AppMutedBrush" Color="#6B7280" />
+          <SolidColorBrush x:Key="AppDangerBrush" Color="#C62828" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+          <Color x:Key="AppAccent">#60A5FA</Color>
+          <SolidColorBrush x:Key="AppAccentBrush" Color="#60A5FA" />
+          <SolidColorBrush x:Key="AppSidebarBrush" Color="#1B1E26" />
+          <SolidColorBrush x:Key="AppBarBrush" Color="#232731" />
+          <SolidColorBrush x:Key="AppSurfaceBrush" Color="#15171D" />
+          <SolidColorBrush x:Key="AppBorderBrush" Color="#323846" />
+          <SolidColorBrush x:Key="AppMutedBrush" Color="#9CA3AF" />
+          <SolidColorBrush x:Key="AppDangerBrush" Color="#F87171" />
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+
+      <!-- Misure comuni: bersagli da almeno 40 px per l'uso al tocco. -->
+      <x:Double x:Key="AppTouchSize">40</x:Double>
+      <x:Double x:Key="AppFontSize">14</x:Double>
+      <x:Double x:Key="AppSmallFontSize">12</x:Double>
+      <x:Double x:Key="AppTitleFontSize">22</x:Double>
+      <CornerRadius x:Key="AppRadius">6</CornerRadius>
+      <Thickness x:Key="AppPagePadding">20</Thickness>
+
+      <!-- Icone vettoriali (niente dipendenza da font di simboli). -->
+      <StreamGeometry x:Key="IconFolder">M2,5 L2,17 L18,17 L18,7 L9,7 L7,5 Z</StreamGeometry>
+      <StreamGeometry x:Key="IconComputer">M2,3 L18,3 L18,13 L2,13 Z M7,15 L13,15 L13,17 L7,17 Z</StreamGeometry>
+      <StreamGeometry x:Key="IconSearch">M8,2 A6,6 0 1 0 8,14 A6,6 0 1 0 8,2 Z M8,4 A4,4 0 1 1 8,12 A4,4 0 1 1 8,4 Z M12,12 L17,17 L15.6,18.4 L10.6,13.4 Z</StreamGeometry>
+    </ResourceDictionary>
+  </Application.Resources>
+
   <Application.Styles>
     <FluentTheme />
+
+    <!-- Tipografia e bersagli. -->
+    <Style Selector="Window">
+      <Setter Property="FontSize" Value="{StaticResource AppFontSize}" />
+    </Style>
+    <Style Selector="Button">
+      <Setter Property="MinHeight" Value="{StaticResource AppTouchSize}" />
+      <Setter Property="MinWidth" Value="{StaticResource AppTouchSize}" />
+      <Setter Property="Padding" Value="14,0" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="CornerRadius" Value="{StaticResource AppRadius}" />
+    </Style>
+    <Style Selector="TextBox">
+      <Setter Property="MinHeight" Value="{StaticResource AppTouchSize}" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="CornerRadius" Value="{StaticResource AppRadius}" />
+    </Style>
+    <Style Selector="ComboBox">
+      <Setter Property="MinHeight" Value="{StaticResource AppTouchSize}" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="CornerRadius" Value="{StaticResource AppRadius}" />
+    </Style>
+    <Style Selector="AutoCompleteBox">
+      <Setter Property="MinHeight" Value="{StaticResource AppTouchSize}" />
+    </Style>
+    <Style Selector="CheckBox">
+      <Setter Property="MinHeight" Value="{StaticResource AppTouchSize}" />
+    </Style>
+    <Style Selector="ListBoxItem">
+      <Setter Property="MinHeight" Value="{StaticResource AppTouchSize}" />
+      <Setter Property="CornerRadius" Value="{StaticResource AppRadius}" />
+    </Style>
+    <Style Selector="TreeViewItem">
+      <Setter Property="MinHeight" Value="{StaticResource AppTouchSize}" />
+    </Style>
+    <Style Selector="TabItem">
+      <Setter Property="MinHeight" Value="{StaticResource AppTouchSize}" />
+      <Setter Property="Padding" Value="12,0" />
+      <Setter Property="FontSize" Value="{StaticResource AppFontSize}" />
+    </Style>
+
+    <!-- Pulsante discreto per la barra comandi e per le schede. -->
+    <Style Selector="Button.flat">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="Button.flat:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+    </Style>
+    <Style Selector="Button.danger">
+      <Setter Property="Foreground" Value="{DynamicResource AppDangerBrush}" />
+    </Style>
+
+    <!-- Etichette e titoli nei moduli. -->
+    <Style Selector="TextBlock.label">
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Foreground" Value="{DynamicResource AppMutedBrush}" />
+      <Setter Property="Margin" Value="0,0,12,0" />
+    </Style>
+    <Style Selector="TextBlock.section">
+      <Setter Property="FontSize" Value="16" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Margin" Value="0,14,0,0" />
+    </Style>
+    <Style Selector="TextBlock.muted">
+      <Setter Property="Foreground" Value="{DynamicResource AppMutedBrush}" />
+    </Style>
+    <Style Selector="TextBlock.error">
+      <Setter Property="Foreground" Value="{DynamicResource AppDangerBrush}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="Border.bar">
+      <Setter Property="Background" Value="{DynamicResource AppBarBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+    </Style>
+    <Style Selector="Path.icon">
+      <Setter Property="Fill" Value="{DynamicResource AppAccentBrush}" />
+      <Setter Property="Stretch" Value="Uniform" />
+      <Setter Property="Width" Value="18" />
+      <Setter Property="Height" Value="18" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Path.icon.muted">
+      <Setter Property="Fill" Value="{DynamicResource AppMutedBrush}" />
+    </Style>
   </Application.Styles>
 
   <Application.DataTemplates>
@@ -15,9 +142,10 @@
 
     <!-- Contenuto della scheda segnaposto (finché non c'è l'host FreeRDP). -->
     <DataTemplate DataType="s:PlaceholderSessionContent" x:DataType="s:PlaceholderSessionContent">
-      <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8" MaxWidth="480">
-        <TextBlock Text="{Binding Title}" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" />
-        <TextBlock Text="{Binding Target}" HorizontalAlignment="Center" Opacity="0.7" />
+      <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8" MaxWidth="480" Margin="20">
+        <Path Classes="icon" Data="{StaticResource IconComputer}" Width="48" Height="48" HorizontalAlignment="Center" />
+        <TextBlock Text="{Binding Title}" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" TextWrapping="Wrap" />
+        <TextBlock Text="{Binding Target}" HorizontalAlignment="Center" Classes="muted" />
         <TextBlock Text="{Binding Message}" TextWrapping="Wrap" TextAlignment="Center" />
       </StackPanel>
     </DataTemplate>

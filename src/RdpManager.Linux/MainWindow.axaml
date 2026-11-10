@@ -4,67 +4,85 @@
         xmlns:l="using:RdpManager.Linux"
         x:Class="RdpManager.Linux.MainWindow"
         x:DataType="vm:MainWindowViewModel"
-        Title="RdpManager" Width="1100" Height="700" MinWidth="720" MinHeight="420">
+        Title="RdpManager" Width="1100" Height="700" MinWidth="560" MinHeight="420">
 
-  <DockPanel>
-    <Border DockPanel.Dock="Bottom" Padding="10,4" BorderThickness="0,1,0,0"
-            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
-      <TextBlock Text="{Binding StatusMessage}" TextTrimming="CharacterEllipsis" MinHeight="18" />
+  <DockPanel Background="{DynamicResource AppSurfaceBrush}">
+    <!-- Barra di stato -->
+    <Border DockPanel.Dock="Bottom" Classes="bar" Padding="14,6" BorderThickness="0,1,0,0">
+      <TextBlock Text="{Binding StatusMessage}" TextTrimming="CharacterEllipsis" MinHeight="20"
+                 FontSize="12" Classes="muted" VerticalAlignment="Center" />
     </Border>
 
-    <Grid ColumnDefinitions="320,Auto,*">
-      <!-- Elenco connessioni -->
-      <DockPanel Grid.Column="0" Margin="8">
-        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,6">
-          <StackPanel Orientation="Horizontal" Spacing="4">
-            <Button Content="Nuova" Command="{Binding NewConnectionCommand}" ToolTip.Tip="Nuova connessione" />
-            <Button Content="Cartella" Command="{Binding NewFolderCommand}" ToolTip.Tip="Nuova cartella" />
-            <Button Content="Modifica" Command="{Binding EditCommand}" />
-            <Button Content="Elimina" Command="{Binding DeleteCommand}" />
-          </StackPanel>
-          <StackPanel Orientation="Horizontal" Spacing="4">
-            <Button Content="Duplica" Command="{Binding DuplicateCommand}" />
-            <Button Content="Preferita" Command="{Binding FavoriteCommand}" />
-            <Button Content="Profili" Command="{Binding ProfilesCommand}" ToolTip.Tip="Profili di credenziali" />
-            <Button Content="Impostazioni" Command="{Binding SettingsCommand}" />
-          </StackPanel>
-          <Grid ColumnDefinitions="*,Auto">
-            <TextBox Name="SearchBox" Text="{Binding SearchText}" Watermark="Cerca connessioni…" />
-            <Button Grid.Column="1" Content="✕" Margin="4,0,0,0" Command="{Binding ClearSearchCommand}" ToolTip.Tip="Cancella la ricerca" />
-          </Grid>
+    <!-- Barra comandi -->
+    <Border DockPanel.Dock="Top" Classes="bar" BorderThickness="0,0,0,1">
+      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+        <StackPanel Orientation="Horizontal" Spacing="4" Margin="10,6">
+          <Button Classes="accent" Content="Nuova connessione" Command="{Binding NewConnectionCommand}" />
+          <Button Classes="flat" Content="Nuova cartella" Command="{Binding NewFolderCommand}" />
+          <Rectangle Width="1" Margin="6,6" Fill="{DynamicResource AppBorderBrush}" />
+          <Button Classes="flat" Content="Modifica" Command="{Binding EditCommand}" />
+          <Button Classes="flat" Content="Duplica" Command="{Binding DuplicateCommand}" />
+          <Button Classes="flat" Content="Preferita" Command="{Binding FavoriteCommand}" ToolTip.Tip="Aggiungi o togli dalle preferite" />
+          <Button Classes="flat danger" Content="Elimina" Command="{Binding DeleteCommand}" />
+          <Rectangle Width="1" Margin="6,6" Fill="{DynamicResource AppBorderBrush}" />
+          <Button Classes="flat" Content="Profili" Command="{Binding ProfilesCommand}" ToolTip.Tip="Profili di credenziali" />
+          <Button Classes="flat" Content="Impostazioni" Command="{Binding SettingsCommand}" />
         </StackPanel>
+      </ScrollViewer>
+    </Border>
 
-        <Grid>
-          <TreeView Name="ConnectionTree" ItemsSource="{Binding Roots}" SelectedItem="{Binding SelectedNode}">
-            <TreeView.Styles>
-              <Style Selector="TreeViewItem" x:DataType="vm:TreeNodeViewModel">
-                <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
-              </Style>
-            </TreeView.Styles>
-            <TreeView.ItemTemplate>
-              <TreeDataTemplate DataType="vm:TreeNodeViewModel" ItemsSource="{Binding Children}">
-                <StackPanel Margin="0,2">
-                  <TextBlock Text="{Binding Title}" FontWeight="{Binding IsFolder, Converter={x:Static l:Converters.FolderWeight}}" />
-                  <TextBlock Text="{Binding Subtitle}" FontSize="11" Opacity="0.65" IsVisible="{Binding !IsFolder}" />
-                </StackPanel>
-              </TreeDataTemplate>
-            </TreeView.ItemTemplate>
-          </TreeView>
-          <TextBlock Text="Nessuna connessione trovata." IsVisible="{Binding NoResults}"
-                     HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.7" />
-        </Grid>
-      </DockPanel>
+    <Grid ColumnDefinitions="300,Auto,*">
+      <!-- Barra laterale: ricerca e albero delle connessioni -->
+      <Border Grid.Column="0" MinWidth="200" Background="{DynamicResource AppSidebarBrush}">
+        <DockPanel Margin="10">
+          <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+            <TextBox Name="SearchBox" Text="{Binding SearchText}" Watermark="Cerca connessioni…" />
+            <Button Grid.Column="1" Classes="flat" Content="✕" Margin="4,0,0,0"
+                    Command="{Binding ClearSearchCommand}" ToolTip.Tip="Cancella la ricerca" />
+          </Grid>
 
-      <GridSplitter Grid.Column="1" Width="4" />
+          <Grid>
+            <TreeView Name="ConnectionTree" Background="Transparent" ItemsSource="{Binding Roots}" SelectedItem="{Binding SelectedNode}">
+              <TreeView.Styles>
+                <Style Selector="TreeViewItem" x:DataType="vm:TreeNodeViewModel">
+                  <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                </Style>
+              </TreeView.Styles>
+              <TreeView.ItemTemplate>
+                <TreeDataTemplate DataType="vm:TreeNodeViewModel" ItemsSource="{Binding Children}">
+                  <Grid ColumnDefinitions="Auto,*" Margin="0,4">
+                    <Path Classes="icon" Margin="0,0,10,0"
+                          Data="{StaticResource IconFolder}" IsVisible="{Binding IsFolder}" />
+                    <Path Classes="icon" Margin="0,0,10,0"
+                          Data="{StaticResource IconComputer}" IsVisible="{Binding !IsFolder}" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis"
+                                 FontWeight="{Binding IsFolder, Converter={x:Static l:Converters.FolderWeight}}" />
+                      <TextBlock Text="{Binding Subtitle}" FontSize="12" Classes="muted"
+                                 TextTrimming="CharacterEllipsis" IsVisible="{Binding !IsFolder}" />
+                    </StackPanel>
+                  </Grid>
+                </TreeDataTemplate>
+              </TreeView.ItemTemplate>
+            </TreeView>
+            <TextBlock Text="Nessuna connessione trovata." IsVisible="{Binding NoResults}"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" Classes="muted" />
+          </Grid>
+        </DockPanel>
+      </Border>
+
+      <GridSplitter Grid.Column="1" Width="4" Background="{DynamicResource AppBorderBrush}" ResizeDirection="Columns" />
 
       <!-- Area a schede per le sessioni -->
       <Grid Grid.Column="2">
-        <TabControl ItemsSource="{Binding Tabs}" SelectedItem="{Binding SelectedTab}" IsVisible="{Binding HasTabs}">
+        <TabControl ItemsSource="{Binding Tabs}" SelectedItem="{Binding SelectedTab}" IsVisible="{Binding HasTabs}" Padding="0">
           <TabControl.ItemTemplate>
             <DataTemplate x:DataType="vm:SessionTabViewModel">
               <StackPanel Orientation="Horizontal" Spacing="6">
-                <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
-                <Button Content="✕" Padding="4,0" Command="{Binding CloseCommand}" ToolTip.Tip="Chiudi la scheda" />
+                <Path Classes="icon" Data="{StaticResource IconComputer}" Width="16" Height="16" />
+                <TextBlock Text="{Binding Title}" VerticalAlignment="Center" MaxWidth="220" TextTrimming="CharacterEllipsis" />
+                <Button Classes="flat" Content="✕" MinWidth="32" MinHeight="32" Padding="0"
+                        Command="{Binding CloseCommand}" ToolTip.Tip="Chiudi la scheda" />
               </StackPanel>
             </DataTemplate>
           </TabControl.ItemTemplate>
@@ -74,9 +92,17 @@
             </DataTemplate>
           </TabControl.ContentTemplate>
         </TabControl>
-        <TextBlock Text="Nessuna sessione aperta. Fai doppio clic su una connessione per aprirla in una scheda."
-                   IsVisible="{Binding !HasTabs}" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="420"
-                   HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.7" />
+
+        <!-- Stato vuoto -->
+        <StackPanel IsVisible="{Binding !HasTabs}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                    Spacing="10" MaxWidth="440" Margin="24">
+          <Path Classes="icon muted" Data="{StaticResource IconComputer}" Width="64" Height="64" HorizontalAlignment="Center" />
+          <TextBlock Text="Nessuna sessione aperta" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" />
+          <TextBlock Text="Fai doppio clic su una connessione per aprirla in una scheda, oppure creane una nuova."
+                     TextWrapping="Wrap" TextAlignment="Center" Classes="muted" />
+          <Button Classes="accent" Content="Nuova connessione" Command="{Binding NewConnectionCommand}"
+                  HorizontalAlignment="Center" Margin="0,8,0,0" />
+        </StackPanel>
       </Grid>
     </Grid>
   </DockPanel>
