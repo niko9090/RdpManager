@@ -56,6 +56,7 @@ setv() { # setv CHIAVE VALORE: riempie la riga vuota o aggiunge la chiave
 }
 [ -n "$(getv RDPM_SYNC_ADMIN_KEY)" ] || { setv RDPM_SYNC_ADMIN_KEY "$(rnd 40)"; say "creata chiave admin"; }
 # codice scelto in config/locale.json (DEPLOY_REG_CODE): vale sempre e sostituisce quello nel .env
+[ -z "${DEPLOY_REG_CODE_B64:-}" ] || DEPLOY_REG_CODE=$(printf %s "$DEPLOY_REG_CODE_B64" | base64 -d)
 if [ -n "${DEPLOY_REG_CODE:-}" ]; then
   [ "$(getv RDPM_SYNC_REGISTRATION_CODE)" = "$DEPLOY_REG_CODE" ] || { setv RDPM_SYNC_REGISTRATION_CODE "$DEPLOY_REG_CODE"; say "impostato codice di registrazione da config/locale.json"; }
 elif [ -z "$(getv RDPM_SYNC_REGISTRATION_CODE)" ] && [ -z "$(getv RDPM_SYNC_OPEN_REGISTRATION)" ]; then
