@@ -4,32 +4,40 @@
         xmlns:core="using:RdpManager.Core"
         x:Class="RdpManager.Linux.Dialogs.ProfilesWindow"
         x:DataType="vm:ProfilesViewModel"
-        Title="Profili di credenziali" Width="640" Height="420"
+        Title="Profili di credenziali" Width="700" Height="460" MinWidth="460" MinHeight="380"
         WindowStartupLocation="CenterOwner">
 
-  <Grid ColumnDefinitions="220,*" Margin="12">
-    <DockPanel Margin="0,0,12,0">
-      <Button DockPanel.Dock="Bottom" Content="Nuovo profilo" Command="{Binding NewCommand}" Margin="0,8,0,0" HorizontalAlignment="Stretch" />
-      <ListBox ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}">
+  <Grid ColumnDefinitions="240,*" Margin="20">
+    <DockPanel Margin="0,0,20,0">
+      <Button DockPanel.Dock="Bottom" Content="Nuovo profilo" Command="{Binding NewCommand}" Margin="0,10,0,0" HorizontalAlignment="Stretch" />
+      <ListBox ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" Background="Transparent">
         <ListBox.ItemTemplate>
           <DataTemplate x:DataType="core:CredentialProfile">
-            <TextBlock Text="{Binding DisplayName}" />
+            <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
           </DataTemplate>
         </ListBox.ItemTemplate>
       </ListBox>
     </DockPanel>
 
-    <StackPanel Grid.Column="1" Spacing="8">
-      <TextBlock Text="Nome" /><TextBox Text="{Binding Name}" />
-      <TextBlock Text="Utente" /><TextBox Text="{Binding Username}" />
-      <TextBlock Text="Dominio" /><TextBox Text="{Binding Domain}" />
-      <TextBlock Text="Password" /><TextBox Text="{Binding Password}" PasswordChar="●" Watermark="Vuota = non cambiare quella salvata" />
-      <TextBlock Text="{Binding Error}" Foreground="OrangeRed" TextWrapping="Wrap" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
-      <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
-        <Button Content="Salva" Command="{Binding SaveCommand}" Classes="accent" />
-        <Button Content="Elimina" Command="{Binding DeleteCommand}" />
-        <Button Content="Chiudi" Click="OnClose" />
+    <DockPanel Grid.Column="1">
+      <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,10,0,0">
+        <TextBlock Classes="error" Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+          <Button Content="Elimina" Command="{Binding DeleteCommand}" Classes="danger" />
+          <Button Content="Chiudi" Click="OnClose" MinWidth="88" />
+          <Button Content="Salva" Command="{Binding SaveCommand}" Classes="accent" MinWidth="88" />
+        </StackPanel>
       </StackPanel>
-    </StackPanel>
+
+      <ScrollViewer>
+        <StackPanel Spacing="10">
+          <TextBlock Classes="section" Margin="0,0,0,4" Text="Dettagli del profilo" />
+          <Grid ColumnDefinitions="110,*"><TextBlock Classes="label" Text="Nome" /><TextBox Grid.Column="1" Text="{Binding Name}" /></Grid>
+          <Grid ColumnDefinitions="110,*"><TextBlock Classes="label" Text="Utente" /><TextBox Grid.Column="1" Text="{Binding Username}" /></Grid>
+          <Grid ColumnDefinitions="110,*"><TextBlock Classes="label" Text="Dominio" /><TextBox Grid.Column="1" Text="{Binding Domain}" /></Grid>
+          <Grid ColumnDefinitions="110,*"><TextBlock Classes="label" Text="Password" /><TextBox Grid.Column="1" Text="{Binding Password}" PasswordChar="●" Watermark="Vuota = non cambiare quella salvata" /></Grid>
+        </StackPanel>
+      </ScrollViewer>
+    </DockPanel>
   </Grid>
 </Window>

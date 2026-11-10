@@ -3,24 +3,30 @@
         xmlns:vm="using:RdpManager.Linux.ViewModels"
         x:Class="RdpManager.Linux.Dialogs.SettingsWindow"
         x:DataType="vm:SettingsViewModel"
-        Title="Impostazioni" Width="480" Height="440"
+        Title="Impostazioni" Width="520" Height="500" MinWidth="380" MinHeight="380"
         WindowStartupLocation="CenterOwner">
 
-  <DockPanel Margin="14">
-    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,10,0,0">
-      <Button Content="Annulla" Click="OnCancel" IsCancel="True" />
-      <Button Content="Salva" Click="OnSave" IsDefault="True" Classes="accent" />
-    </StackPanel>
+  <DockPanel>
+    <Border DockPanel.Dock="Bottom" Classes="bar" BorderThickness="0,1,0,0" Padding="20,12">
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+        <Button Content="Annulla" Click="OnCancel" IsCancel="True" MinWidth="96" />
+        <Button Content="Salva" Click="OnSave" IsDefault="True" Classes="accent" MinWidth="96" />
+      </StackPanel>
+    </Border>
 
-    <StackPanel Spacing="8">
-      <TextBlock Text="Tema" /><ComboBox ItemsSource="{Binding ThemeChoices}" SelectedItem="{Binding Theme}" HorizontalAlignment="Stretch" />
-      <TextBlock Text="Ordine delle connessioni" /><ComboBox ItemsSource="{Binding OrderChoices}" SelectedItem="{Binding Order}" HorizontalAlignment="Stretch" />
-      <TextBlock Text="Aggiornamenti" /><ComboBox ItemsSource="{Binding UpdateChoices}" SelectedItem="{Binding Update}" HorizontalAlignment="Stretch" />
-      <CheckBox Content="Ricorda le ultime connessioni aperte" IsChecked="{Binding HistoryEnabled}" />
-      <CheckBox Content="Registro dettagliato (per cercare i guasti)" IsChecked="{Binding VerboseLog}" />
-      <Separator />
-      <TextBlock Text="File dei dati (lo stesso dell'app Windows, per la sincronizzazione)" TextWrapping="Wrap" />
-      <TextBox Text="{Binding DataFilePath}" IsReadOnly="True" />
-    </StackPanel>
+    <ScrollViewer>
+      <StackPanel Spacing="10" Margin="20">
+        <TextBlock Classes="section" Margin="0,0,0,4" Text="Aspetto e comportamento" />
+        <Grid ColumnDefinitions="170,*"><TextBlock Classes="label" Text="Tema" /><ComboBox Grid.Column="1" ItemsSource="{Binding ThemeChoices}" SelectedItem="{Binding Theme}" HorizontalAlignment="Stretch" /></Grid>
+        <Grid ColumnDefinitions="170,*"><TextBlock Classes="label" Text="Ordine delle connessioni" /><ComboBox Grid.Column="1" ItemsSource="{Binding OrderChoices}" SelectedItem="{Binding Order}" HorizontalAlignment="Stretch" /></Grid>
+        <Grid ColumnDefinitions="170,*"><TextBlock Classes="label" Text="Aggiornamenti" /><ComboBox Grid.Column="1" ItemsSource="{Binding UpdateChoices}" SelectedItem="{Binding Update}" HorizontalAlignment="Stretch" /></Grid>
+        <Grid ColumnDefinitions="170,*"><CheckBox Grid.Column="1" Content="Ricorda le ultime connessioni aperte" IsChecked="{Binding HistoryEnabled}" /></Grid>
+        <Grid ColumnDefinitions="170,*"><CheckBox Grid.Column="1" Content="Registro dettagliato (per cercare i guasti)" IsChecked="{Binding VerboseLog}" /></Grid>
+
+        <TextBlock Classes="section" Text="Dati" />
+        <TextBlock Classes="muted" TextWrapping="Wrap" Text="File dei dati (lo stesso dell'app Windows, per la sincronizzazione)" />
+        <TextBox Text="{Binding DataFilePath}" IsReadOnly="True" />
+      </StackPanel>
+    </ScrollViewer>
   </DockPanel>
 </Window>
