@@ -24,15 +24,13 @@ internal sealed record SeenDialog(
 internal sealed class ModalDialogWatcher : IDisposable
 {
     /// <summary>
-    /// La finestra sta nell'area utile. Se è più grande dell'area (schermi piccoli, es. 640x480, dove l'avviso alto
-    /// 476 px non entra in 432) non può starci per intero: basta che se ne veda almeno l'85%.
+    /// La finestra sta nell'area utile. Il posto lo sceglie Windows (centra l'avviso sul proprietario, e con schermi
+    /// bassi sborda di qualche pixel: 476 px d'avviso in 432 su 640x480, o 7 px in 598): basta che se ne veda almeno l'85%.
     /// </summary>
     internal static bool FitsOn(Rectangle area, Rectangle bounds)
     {
         if (area.Contains(bounds))
             return true;
-        if (bounds.Width <= area.Width && bounds.Height <= area.Height)
-            return false;
         var visible = Rectangle.Intersect(area, bounds);
         return (long)visible.Width * visible.Height * 100 >= (long)bounds.Width * bounds.Height * 85;
     }
