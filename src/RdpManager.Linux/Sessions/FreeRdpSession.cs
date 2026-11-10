@@ -169,6 +169,27 @@ public sealed class FreeRdpSession : ViewModelBase, ISession
         Launch(new FreeRdpLaunchContext { AvailableWidth = width, AvailableHeight = height, DrivePath = HomePath() });
     }
 
+    /// <summary>
+    /// Con l'app bloccata riduce a icona la finestra separata di FreeRDP (le sessioni incorporate le nasconde la finestra principale).
+    /// Serve <c>xdotool</c> su X11; su Wayland il sistema non lascia a un'app muovere le finestre di altri programmi.
+    /// </summary>
+    public void SetHidden(bool hidden)
+    {
+        if (!_detached || _process is not { HasExited: false } process || !OperatingSystem.IsLinux())
+            return;
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo("xdotool") { UseShellExecute = false, CreateNoWindow = true };
+            foreach (var a in new[] { "search", "--pid", process.Id.ToString(), hidden ? "windowminimize" : "windowactivate", "%@" })
+                psi.ArgumentList.Add(a);
+            System.Diagnostics.Process.Start(psi)?.Dispose();
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            // xdotool non c'è: la finestra resta com'è (lo dice la guida del blocco).
+        }
+    }
+
     public void Reconnect()
     {
         if (_isRunning || _starting || _closed)

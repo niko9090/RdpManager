@@ -32,8 +32,13 @@ public sealed partial class MainWindowViewModel
     public async Task CheckReachabilityAsync(IReadOnlyList<RdpConnection>? list = null, bool announce = false)
     {
         list ??= SelectedConnections.Count > 0 && announce ? SelectedConnections : Document.Connections.ToList();
-        if (_checking && !announce)
+        // Mai due controlli insieme: il secondo azzererebbe il segnale del primo e i risultati si sovrapporrebbero.
+        if (_checking)
+        {
+            if (announce)
+                StatusMessage = "Un controllo della raggiungibilità è già in corso.";
             return;
+        }
         _checking = true;
         try
         {
@@ -71,6 +76,8 @@ public sealed partial class MainWindowViewModel
     /// <summary>Accende il PC selezionato con un pacchetto Wake-on-LAN, poi controlla per un paio di minuti quando risponde.</summary>
     public async Task WakeAsync()
     {
+        if (IsLocked)
+            return;
         if (SelectedNode?.Connection is not { } c)
             return;
         if (!WakeOnLan.IsValidMac(c.MacAddress))
@@ -109,6 +116,8 @@ public sealed partial class MainWindowViewModel
 
     public async Task ShowNetworkScanAsync()
     {
+        if (IsLocked)
+            return;
         var vm = new NetworkScanViewModel(Document, AddDiscoveredPcs, text => _dialogs.ConfirmAsync("Cerca PC in rete", text), ScanSources);
         try
         {

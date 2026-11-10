@@ -238,6 +238,13 @@ public static class RdpmFile
     /// <exception cref="InvalidDataException">Il contenuto non è un file .rdpm valido.</exception>
     public static bool IsEncrypted(string json) => ReadDocument(json).Encryption is not null;
 
+    /// <summary>
+    /// Toglie a capo e caratteri nulli da una password importata: finirebbero su una riga dello stdin di FreeRDP e
+    /// farebbero passare il resto come argomenti (iniezione con /args-from:stdin).
+    /// </summary>
+    internal static string StripLineBreaks(string password) =>
+        string.Concat(password.Where(ch => ch is not ((char)13 or (char)10 or (char)0)));
+
     /// <summary>Legge un .rdpm; le password decifrate finiscono in <see cref="RdpConnection.Password"/>.</summary>
     /// <exception cref="RdpmPasswordException">File cifrato e password del file mancante o sbagliata.</exception>
     /// <exception cref="InvalidDataException">Il contenuto non è un file .rdpm valido.</exception>
@@ -278,7 +285,7 @@ public static class RdpmFile
                 {
                     if (!TryOpen(key, sealedPassword, c.Id.ToString(), out var plain))
                         throw new InvalidDataException($"La password della connessione «{c.DisplayName}» è danneggiata.");
-                    c.Password = Encoding.UTF8.GetString(plain);
+                    c.Password = StripLineBreaks(Encoding.UTF8.GetString(plain));
                 }
                 c.Group = RdpConnection.NormalizeGroup(c.Group);
                 c.Color = RdpConnection.NormalizeColor(c.Color);
@@ -302,7 +309,7 @@ public static class RdpmFile
                 {
                     if (!TryOpen(key, sealedPassword, ProfileContext(p.Id), out var plain))
                         throw new InvalidDataException($"La password del profilo «{p.DisplayName}» è danneggiata.");
-                    p.Password = Encoding.UTF8.GetString(plain);
+                    p.Password = StripLineBreaks(Encoding.UTF8.GetString(plain));
                 }
                 doc.CredentialProfiles.Add(p);
             }

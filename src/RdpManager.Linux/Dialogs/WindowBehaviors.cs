@@ -4,6 +4,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using RdpManager.Linux.Platform;
 using RdpManager.Linux.ViewModels;
 
 namespace RdpManager.Linux.Dialogs;
@@ -49,12 +50,29 @@ public static class WindowBehaviors
             if (window.DataContext is not MainWindowViewModel vm)
                 return;
             vm.StartBackgroundWork();
+            ActivitySink = vm.NotifyActivity;
             timer = new DispatcherTimer { Interval = TickInterval };
-            timer.Tick += (_, _) => vm.Tick();
+            timer.Tick += async (_, _) =>
+            {
+                // L'inattività si misura con il sistema (anche dentro le sessioni, dove la finestra non vede i tasti).
+                TimeSpan? idle = null;
+                try { idle = await Task.Run(SystemIdle.Query); }
+                catch (Exception ex) { RdpManager.Core.AppLog.Default?.Warning("Misura dell'inattività non riuscita: " + ex.Message); }
+                vm.Tick(idle);
+            };
             timer.Start();
         };
         window.Closed += (_, _) => timer?.Stop();
-        void Activity(object? s, RoutedEventArgs e) => (window.DataContext as MainWindowViewModel)?.NotifyActivity();
+        TrackActivity(window);
+    }
+
+    /// <summary>Chi riceve la notizia di un tasto o di un movimento in una qualunque finestra dell'app (il blocco a tempo).</summary>
+    private static Action? ActivitySink;
+
+    /// <summary>Registra l'attività dell'utente in questa finestra (principale, dialoghi, finestre staccate), non solo nella principale.</summary>
+    public static void TrackActivity(Window window)
+    {
+        void Activity(object? s, RoutedEventArgs e) => ActivitySink?.Invoke();
         window.AddHandler(InputElement.KeyDownEvent, Activity, RoutingStrategies.Tunnel, handledEventsToo: true);
         window.AddHandler(InputElement.PointerMovedEvent, Activity, RoutingStrategies.Tunnel, handledEventsToo: true);
         window.AddHandler(InputElement.PointerPressedEvent, Activity, RoutingStrategies.Tunnel, handledEventsToo: true);
@@ -106,19 +124,26 @@ public static class WindowBehaviors
         });
         tree.AddHandler(DragDrop.DropEvent, (_, e) =>
         {
-            if (tree.DataContext is not MainWindowViewModel vm)
-                return;
+            try
+            {
+                if (tree.DataContext is not MainWindowViewModel vm)
+                    return;
 #pragma warning disable CS0618
-            if (e.Data.Get(DragFormat) is not string key)
-                return;
+                if (e.Data.Get(DragFormat) is not string key)
+                    return;
 #pragma warning restore CS0618
-            var source = vm.FindNode(key);
-            if (source is null)
-                return;
-            var target = NodeAt(e.Source);
-            if (target != source)
-                vm.MoveNode(source, target);
-            e.Handled = true;
+                var source = vm.FindNode(key);
+                if (source is null)
+                    return;
+                var target = NodeAt(e.Source);
+                if (target != source)
+                    vm.MoveNode(source, target);
+                e.Handled = true;
+            }
+            catch (Exception ex)
+            {
+                RdpManager.Core.AppLog.Default?.Warning("Trascinamento non riuscito: " + ex.Message);
+            }
         });
     }
 

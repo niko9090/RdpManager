@@ -19,6 +19,16 @@ internal sealed class ScriptedDialogs : IDialogService
     public string? Choice { get; set; }
     public string? PromptAnswer { get; set; }
     public Func<SettingsViewModel, bool>? OnSettings { get; set; }
+    public int CloseAllCalls { get; private set; }
+    public int DestructiveCalls { get; private set; }
+
+    public void CloseAllDialogs() => CloseAllCalls++;
+
+    public Task<bool> ConfirmDestructiveAsync(string title, string message)
+    {
+        DestructiveCalls++;
+        return ConfirmAsync(title, message);
+    }
 
     public Task<bool> ConfirmAsync(string title, string message)
     {

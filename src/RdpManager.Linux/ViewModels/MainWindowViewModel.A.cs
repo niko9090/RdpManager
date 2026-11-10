@@ -132,6 +132,8 @@ public sealed partial class MainWindowViewModel
     /// <summary>Impostazioni della cartella selezionata: profilo di credenziali e risoluzione ereditati dalle sue connessioni.</summary>
     public async Task FolderSettingsAsync()
     {
+        if (IsLocked)
+            return;
         if (SelectedNode is not { IsFolder: true } node)
             return;
         var vm = new FolderSettingsViewModel(Document, node.FolderPath);
@@ -145,6 +147,8 @@ public sealed partial class MainWindowViewModel
     /// <summary>Connette tutta la cartella selezionata (e le sottocartelle), ognuna in una scheda.</summary>
     public async Task ConnectFolderAsync()
     {
+        if (IsLocked)
+            return;
         if (SelectedNode is not { IsFolder: true } node)
             return;
         await ConnectManyAsync(Document.ConnectionsInFolder(node.FolderPath), "Connetti tutta la cartella");
@@ -165,6 +169,8 @@ public sealed partial class MainWindowViewModel
     /// <summary>Torna all'ordine per nome.</summary>
     public void SortByName()
     {
+        if (IsLocked)
+            return;
         Document.SortAlphabetically();
         Save();
         RebuildTree();
@@ -187,6 +193,8 @@ public sealed partial class MainWindowViewModel
     /// <summary>Passa alla scheda già aperta della connessione, oppure la apre.</summary>
     public void OpenOrSwitch(RdpConnection connection)
     {
+        if (IsLocked)
+            return;
         if (Tabs.FirstOrDefault(t => t.Session.ConnectionId == connection.Id) is { } tab)
             SelectedTab = tab;
         else
@@ -217,7 +225,9 @@ public sealed partial class MainWindowViewModel
 
     public async Task ShowQuickTextsAsync()
     {
-        var vm = new QuickTextsViewModel(Document, text => _dialogs.ConfirmAsync("Testi rapidi", text));
+        if (IsLocked)
+            return;
+        var vm = new QuickTextsViewModel(Document, text => _dialogs.ConfirmDestructiveAsync("Testi rapidi", text));
         await _dialogs.ShowAsync(vm);
         if (vm.Changed)
             Save();
@@ -225,9 +235,9 @@ public sealed partial class MainWindowViewModel
 
     // --- Cartelle di sistema e informazioni (#55, #56) ---
 
-    private void OpenDataFolder() => OpenFolder(Path.GetDirectoryName(Path.GetFullPath(_store.FilePath))!);
+    private void OpenDataFolder() { if (!IsLocked) OpenFolder(Path.GetDirectoryName(Path.GetFullPath(_store.FilePath))!); }
 
-    private void OpenLogFolder() => OpenFolder(AppLog.Default?.Directory ?? AppLog.DefaultDirectory);
+    private void OpenLogFolder() { if (!IsLocked) OpenFolder(AppLog.Default?.Directory ?? AppLog.DefaultDirectory); }
 
     private void OpenFolder(string dir)
     {

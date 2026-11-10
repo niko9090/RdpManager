@@ -14,6 +14,8 @@ public sealed partial class MainWindowViewModel
     /// <summary>Importa uno o più file .rdp nella cartella selezionata.</summary>
     public async Task ImportRdpAsync()
     {
+        if (IsLocked)
+            return;
         var files = await _dialogs.PickFilesToOpenAsync("Importa file .rdp", "Connessioni Desktop remoto (*.rdp)", ["*.rdp"], multiple: true);
         if (files.Count == 0)
             return;
@@ -22,6 +24,8 @@ public sealed partial class MainWindowViewModel
 
     internal async Task ImportRdpFilesAsync(IReadOnlyList<string> files)
     {
+        if (IsLocked)
+            return;
         var group = SelectedNode?.FolderPath ?? "";
         var errors = new List<string>();
         var added = new List<RdpConnection>();
@@ -29,11 +33,11 @@ public sealed partial class MainWindowViewModel
         {
             try
             {
-                var c = RdpFile.Load(file);
+                var path = file;
+                var c = await Task.Run(() => RdpFile.Load(path));
                 if (string.IsNullOrWhiteSpace(c.Host))
                     throw new InvalidDataException("indirizzo («full address») mancante");
                 c.Group = group;
-                Document.Connections.Add(c);
                 added.Add(c);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or FormatException)
@@ -41,6 +45,8 @@ public sealed partial class MainWindowViewModel
                 errors.Add($"{Path.GetFileName(file)}: {ex.Message}");
             }
         }
+        // Si aggiunge tutto alla fine: durante le letture (asincrone) l'elenco non cambia sotto i piedi.
+        Document.Connections.AddRange(added);
         Save();
         RebuildTree();
         SelectedNode = added.Count == 0 ? SelectedNode : Flatten(Roots).FirstOrDefault(n => n.Connection == added[^1]);
@@ -55,6 +61,8 @@ public sealed partial class MainWindowViewModel
     /// <summary>Importa un backup .rdpm: chiede la password del file se serve, poi unisci o sostituisci.</summary>
     public async Task ImportRdpmAsync()
     {
+        if (IsLocked)
+            return;
         var files = await _dialogs.PickFilesToOpenAsync("Importa connessioni", "Connessioni RdpManager (*.rdpm)", ["*.rdpm"], multiple: false);
         if (files.Count == 0)
             return;
@@ -94,7 +102,7 @@ public sealed partial class MainWindowViewModel
 
         var options = new RdpmImportViewModel(imported.Connections.Count, Document.Connections.Count,
             imported.Connections.Any(c => c.HasPassword) || imported.CredentialProfiles.Any(p => p.HasPassword),
-            imported.SettingsIncluded, text => _dialogs.ConfirmAsync("Importa connessioni", text));
+            imported.SettingsIncluded, text => _dialogs.ConfirmDestructiveAsync("Importa connessioni", text));
         if (!await _dialogs.ShowAsync(options))
             return;
         await ApplyRdpmImportAsync(imported, options.Mode, options.ApplySettingsChosen);
@@ -122,6 +130,8 @@ public sealed partial class MainWindowViewModel
 
     public async Task ImportCsvAsync()
     {
+        if (IsLocked)
+            return;
         var files = await _dialogs.PickFilesToOpenAsync("Importa connessioni da CSV", "File CSV (*.csv, *.txt)", ["*.csv", "*.txt"], multiple: false);
         if (files.Count == 0)
             return;
@@ -170,6 +180,8 @@ public sealed partial class MainWindowViewModel
 
     public async Task ExportRdpmAsync()
     {
+        if (IsLocked)
+            return;
         if (Document.Connections.Count == 0)
         {
             await _dialogs.ShowMessageAsync("Esporta", "Non ci sono connessioni da esportare.");
@@ -211,6 +223,8 @@ public sealed partial class MainWindowViewModel
     /// </summary>
     public async Task ExportRdpFileAsync()
     {
+        if (IsLocked)
+            return;
         if (SelectedNode?.Connection is not { } c)
             return;
         var safe = string.Concat(c.DisplayName.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));

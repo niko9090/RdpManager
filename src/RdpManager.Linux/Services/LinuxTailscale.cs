@@ -74,9 +74,12 @@ public static class LinuxTailscale
                 await process.WaitForExitAsync(cts.Token).ConfigureAwait(false);
                 return TailscaleCli.Interpret(process.ExitCode, await stdout.ConfigureAwait(false), await stderr.ConfigureAwait(false));
             }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            catch (OperationCanceledException)
             {
-                try { process.Kill(); } catch (InvalidOperationException) { }
+                // Tempo scaduto oppure annullato dal chiamante: in ogni caso il processo non deve restare vivo.
+                try { process.Kill(entireProcessTree: true); } catch (Exception ex) when (ex is InvalidOperationException or Win32Exception) { }
+                if (cancellationToken.IsCancellationRequested)
+                    throw;
                 return new TailscaleLookup(TailscaleLookupOutcome.Failed, null, "Tailscale non ha risposto in tempo.");
             }
         }

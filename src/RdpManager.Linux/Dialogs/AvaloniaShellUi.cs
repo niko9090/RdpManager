@@ -19,7 +19,7 @@ public sealed class AvaloniaShellUi : IShellUi
 
     private Window RequireOwner() => Owner ?? throw new InvalidOperationException("Finestra principale non ancora creata.");
 
-    public Task ShowAccountAsync(AccountViewModel account) => new AccountWindow { DataContext = account }.ShowDialog(RequireOwner());
+    public Task ShowAccountAsync(AccountViewModel account) => new AccountWindow { DataContext = account }.ShowDialogTracked(RequireOwner());
 
     public Task ShowVpnAsync(VpnViewModel vpn)
     {
@@ -33,13 +33,13 @@ public sealed class AvaloniaShellUi : IShellUi
         };
         window.Opened += (_, _) => timer.Start();
         window.Closed += (_, _) => timer.Stop();
-        return window.ShowDialog(RequireOwner());
+        return window.ShowDialogTracked(RequireOwner());
     }
 
     public Task ShowWorkspacesAsync(WorkspacesViewModel workspaces)
     {
         var window = new WorkspacesWindow { DataContext = workspaces };
-        return window.ShowDialog(RequireOwner());
+        return window.ShowDialogTracked(RequireOwner());
     }
 
     public Task ShowTextAsync(string title, string text)
@@ -69,7 +69,7 @@ public sealed class AvaloniaShellUi : IShellUi
         dock.Children.Add(close);
         dock.Children.Add(box);
         window.Content = dock;
-        return window.ShowDialog(RequireOwner());
+        return window.ShowDialogTracked(RequireOwner());
     }
 
     public async Task<string?> AskSecretAsync(string title, string message)
@@ -101,7 +101,7 @@ public sealed class AvaloniaShellUi : IShellUi
                 new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Children = { cancel, ok } },
             },
         };
-        return await window.ShowDialog<bool>(RequireOwner()) ? input.Text : null;
+        return await window.ShowDialogTracked<bool>(RequireOwner()) ? input.Text : null;
     }
 
     public async Task<bool> AskCertificateAsync(CertificatePrompt prompt)
@@ -132,7 +132,7 @@ public sealed class AvaloniaShellUi : IShellUi
                 new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Children = { trust, reject } },
             },
         };
-        return await window.ShowDialog<bool>(RequireOwner());
+        return await window.ShowDialogTracked<bool>(RequireOwner());
     }
 
     public async Task<bool> OfferUpdateAsync(ReleaseInfo release, string currentVersion)
@@ -165,7 +165,7 @@ public sealed class AvaloniaShellUi : IShellUi
         var panel = new StackPanel { Margin = new Thickness(20), Spacing = 14 };
         panel.Children.AddRange(children);
         window.Content = panel;
-        return await window.ShowDialog<bool>(RequireOwner());
+        return await window.ShowDialogTracked<bool>(RequireOwner());
     }
 
     public async Task<string?> PickFileAsync(string title, string filterName, params string[] patterns)

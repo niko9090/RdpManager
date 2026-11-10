@@ -46,9 +46,30 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         CloseCurrentTabCommand = new RelayCommand(() => { if (SelectedTab is { } t) CloseTab(t); }, () => SelectedTab is not null);
         ExitCommand = new RelayCommand(() => ExitRequested?.Invoke(this, EventArgs.Empty));
         InitBlockA();
+        // Da bloccata l'app non esegue nessun comando (né dai menu né dalle scorciatoie), tranne blocco, uscita e informazioni.
+        foreach (var c in new[]
+                 {
+                     NewConnectionCommand, NewFolderCommand, EditCommand, DuplicateCommand, DeleteCommand, ConnectCommand, FavoriteCommand,
+                     ProfilesCommand, SettingsCommand, ClearSearchCommand, SearchCommand, CloseCurrentTabCommand,
+                     ImportRdpCommand, ImportRdpmCommand, ImportCsvCommand, ExportRdpmCommand, OpenDataFolderCommand, ConnectFolderCommand,
+                     FolderSettingsCommand, ExportRdpFileCommand, WakeCommand, CheckReachabilityCommand, HistoryCommand, QuickSearchCommand,
+                     SortByNameCommand, QuickTextsCommand, NetworkScanCommand, OpenLogFolderCommand, MoveToFolderCommand, AssignProfileCommand,
+                 })
+            GateWhenLocked(c);
 
         Reload();
         StartLockedIfNeeded();
+    }
+
+    private readonly List<RelayCommand> _gated = [];
+
+    /// <summary>Spegne il comando mentre l'app è bloccata.</summary>
+    private RelayCommand GateWhenLocked(RelayCommand command)
+    {
+        command.Disabled = () => IsLocked;
+        if (!_gated.Contains(command))
+            _gated.Add(command);
+        return command;
     }
 
     public ConnectionsDocument Document { get; private set; } = new();
@@ -232,6 +253,8 @@ public sealed partial class MainWindowViewModel : ViewModelBase
 
     public async Task NewConnectionAsync()
     {
+        if (IsLocked)
+            return;
         var connection = new RdpConnection { Group = SelectedNode?.FolderPath ?? "" };
         var editor = new ConnectionEditViewModel(Document, connection, isNew: true);
         if (!await _dialogs.EditConnectionAsync(editor))
@@ -244,6 +267,8 @@ public sealed partial class MainWindowViewModel : ViewModelBase
 
     public async Task NewFolderAsync()
     {
+        if (IsLocked)
+            return;
         var parent = SelectedNode?.FolderPath ?? "";
         var name = await _dialogs.PromptAsync("Nuova cartella",
             parent.Length > 0 ? $"Nome della cartella (dentro «{parent}»)" : "Nome della cartella", "");
@@ -258,6 +283,8 @@ public sealed partial class MainWindowViewModel : ViewModelBase
 
     public async Task EditSelectedAsync()
     {
+        if (IsLocked)
+            return;
         if (SelectedNode is not { } node || HasMultiSelection)
             return;
         if (node.Connection is { } c)
@@ -278,7 +305,11 @@ public sealed partial class MainWindowViewModel : ViewModelBase
             var name = await _dialogs.PromptAsync("Rinomina cartella", "Nuovo nome", node.Title);
             var newPath = Document.RenameFolder(node.FolderPath, name);
             if (newPath is null)
+            {
+                if (!string.IsNullOrWhiteSpace(name))
+                    StatusMessage = "Non posso rinominare la cartella: esiste già una cartella con quel nome.";
                 return;
+            }
             _expanded.Add(newPath);
             Save();
             RebuildTree();
@@ -287,6 +318,8 @@ public sealed partial class MainWindowViewModel : ViewModelBase
 
     public void DuplicateSelected()
     {
+        if (IsLocked)
+            return;
         if (SelectedNode?.Connection is not { } c)
             return;
         var copy = c.Duplicate();
@@ -298,6 +331,8 @@ public sealed partial class MainWindowViewModel : ViewModelBase
 
     public async Task DeleteSelectedAsync()
     {
+        if (IsLocked)
+            return;
         if (HasMultiSelection)
         {
             await DeleteGroupAsync();
@@ -307,7 +342,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
             return;
         if (node.Connection is { } c)
         {
-            if (!await _dialogs.ConfirmAsync("Elimina connessione", $"Eliminare la connessione «{c.DisplayName}»?"))
+            if (!await _dialogs.ConfirmDestructiveAsync("Elimina connessione", $"Eliminare la connessione «{c.DisplayName}»?"))
                 return;
             Document.Connections.Remove(c);
         }
@@ -317,7 +352,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
             var message = inside == 0
                 ? $"Eliminare la cartella «{node.FolderPath}»?"
                 : $"Eliminare la cartella «{node.FolderPath}»? Le {inside} connessioni contenute non vengono cancellate: passano alla cartella superiore.";
-            if (!await _dialogs.ConfirmAsync("Elimina cartella", message))
+            if (!await _dialogs.ConfirmDestructiveAsync("Elimina cartella", message))
                 return;
             Document.DeleteFolder(node.FolderPath);
         }
@@ -327,6 +362,8 @@ public sealed partial class MainWindowViewModel : ViewModelBase
 
     public void ToggleFavorite()
     {
+        if (IsLocked)
+            return;
         if (SelectedNode?.Connection is not { } c)
             return;
         c.IsFavorite = !c.IsFavorite;
@@ -338,12 +375,16 @@ public sealed partial class MainWindowViewModel : ViewModelBase
 
     public async Task ShowProfilesAsync()
     {
+        if (IsLocked)
+            return;
         await _dialogs.ShowProfilesAsync(new ProfilesViewModel(Document, Save, _dialogs));
         RebuildTree();
     }
 
     public async Task ShowSettingsAsync()
     {
+        if (IsLocked)
+            return;
         var settings = new SettingsViewModel(Document.Settings, _store.FilePath, _shell, _dialogs);
         if (!await _dialogs.ShowSettingsAsync(settings))
             return;
@@ -361,6 +402,8 @@ public sealed partial class MainWindowViewModel : ViewModelBase
 
     public void ConnectSelected()
     {
+        if (IsLocked)
+            return;
         if (HasMultiSelection)
             ConnectGroup();
         else if (SelectedNode?.Connection is { } c)
@@ -427,7 +470,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
             AfterSave();
             return true;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.Cryptography.CryptographicException)
         {
             StatusMessage = $"Salvataggio non riuscito: {ex.Message}";
             return false;

@@ -17,7 +17,7 @@
     <Button Content="Apri la cartella dei log" Command="{Binding OpenLogFolderCommand}" HorizontalAlignment="Left" />
     <TextBlock Classes="section" Text="Dati" />
     <TextBlock Classes="muted" TextWrapping="Wrap" Text="File dei dati (lo stesso dell'app Windows, per la sincronizzazione)" />
-    <TextBox Text="{Binding DataFilePath}" IsReadOnly="True" />
+    <TextBox Text="{Binding DataFilePath, Mode=OneWay}" IsReadOnly="True" />
     <Button Content="Apri la cartella dei dati" Command="{Binding OpenDataFolderCommand}" HorizontalAlignment="Left" />
   </StackPanel>
 </UserControl>

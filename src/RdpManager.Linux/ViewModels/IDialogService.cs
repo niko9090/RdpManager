@@ -7,6 +7,12 @@ public interface IDialogService
 
     Task ShowMessageAsync(string title, string message);
 
+    /// <summary>Conferma di un'azione distruttiva (elimina, sostituisci…): l'interfaccia vera propone «No» come scelta predefinita.</summary>
+    /// <summary>Chiude i dialoghi aperti (lo fa il blocco con il PIN).</summary>
+    void CloseAllDialogs() { }
+
+    Task<bool> ConfirmDestructiveAsync(string title, string message) => ConfirmAsync(title, message);
+
     /// <summary>Chiede una riga di testo; null se annullato.</summary>
     Task<string?> PromptAsync(string title, string label, string initial);
 

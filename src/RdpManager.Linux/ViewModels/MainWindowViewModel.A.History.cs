@@ -66,7 +66,9 @@ public sealed partial class MainWindowViewModel
     /// <summary>Mostra la cronologia; filtrata sulla connessione selezionata, se ce n'è una.</summary>
     public async Task ShowHistoryAsync()
     {
-        var vm = new HistoryViewModel(History, Document, SelectedNode?.Connection?.Id, text => _dialogs.ConfirmAsync("Cronologia", text));
+        if (IsLocked)
+            return;
+        var vm = new HistoryViewModel(History, Document, SelectedNode?.Connection?.Id, text => _dialogs.ConfirmDestructiveAsync("Cronologia", text));
         await _dialogs.ShowAsync(vm);
         if (!vm.Changed)
             return;

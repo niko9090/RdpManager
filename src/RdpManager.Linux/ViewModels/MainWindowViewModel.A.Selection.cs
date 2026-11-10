@@ -46,7 +46,11 @@ public sealed partial class MainWindowViewModel
         _selectedNodes = Flatten(Roots).Where(n => keys.Contains(n.Key)).ToList();
     }
 
-    public async Task ConnectGroupAsync() => await ConnectManyAsync(SelectedConnections, "Connetti");
+    public async Task ConnectGroupAsync()
+    {
+        if (!IsLocked)
+            await ConnectManyAsync(SelectedConnections, "Connetti");
+    }
 
     /// <summary>Connette le connessioni selezionate (chiede conferma se sono più di sei).</summary>
     public void ConnectGroup() => Run(ConnectGroupAsync);
@@ -54,11 +58,13 @@ public sealed partial class MainWindowViewModel
     /// <summary>Elimina le connessioni selezionate dopo la conferma (le sessioni aperte restano finché non si chiudono).</summary>
     public async Task DeleteGroupAsync()
     {
+        if (IsLocked)
+            return;
         var list = SelectedConnections;
         if (list.Count == 0)
             return;
         var question = $"Eliminare {GroupActions.DescribeForConfirmation(list)}?\n\nLe sessioni già aperte restano finché non le chiudi.";
-        if (!await _dialogs.ConfirmAsync("Elimina", question))
+        if (!await _dialogs.ConfirmDestructiveAsync("Elimina", question))
             return;
         int n = GroupActions.Delete(Document, list.Select(c => c.Id));
         _selectedNodes = [];
@@ -71,6 +77,8 @@ public sealed partial class MainWindowViewModel
     /// <summary>Sposta le connessioni selezionate in una cartella scelta (anche nuova, per esempio Clienti/Rossi; vuoto = radice).</summary>
     public async Task MoveSelectedToFolderAsync()
     {
+        if (IsLocked)
+            return;
         var list = SelectedConnections;
         if (list.Count == 0)
             return;
@@ -90,6 +98,8 @@ public sealed partial class MainWindowViewModel
     /// <summary>Assegna un profilo di credenziali (o nessuno) alle connessioni selezionate.</summary>
     public async Task AssignProfileToSelectedAsync()
     {
+        if (IsLocked)
+            return;
         var list = SelectedConnections;
         if (list.Count == 0)
             return;
@@ -119,6 +129,8 @@ public sealed partial class MainWindowViewModel
     /// </summary>
     public bool MoveNode(TreeNodeViewModel source, TreeNodeViewModel? target)
     {
+        if (IsLocked)
+            return false;
         bool moved;
         string? selectKey = source.Key;
         if (source.Connection is { } c)

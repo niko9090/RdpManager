@@ -146,7 +146,7 @@ internal sealed class HistoryWindow : ToolWindow
         body.Children.Add(header);
         body.Children.Add(list);
         var clear = DialogKit.Button("Svuota quelle mostrate", (_, _) => vm.ClearShownCommand.Execute(null));
-        Content = DialogKit.Frame(body, DialogKit.Buttons(clear, DialogKit.Button("Chiudi", (_, _) => Close(true), isCancel: true, isDefault: true)), top);
+        Content = DialogKit.Frame(body, DialogKit.Buttons(clear, DialogKit.Button("Chiudi", (_, _) => Close(true), isCancel: true)), top);
 
         static Grid Row(string a, string b, string c, string d, string e, string f, bool bold)
         {
@@ -203,7 +203,7 @@ internal sealed class QuickTextsWindow : ToolWindow
         grid.Children.Add(right);
         var note = DialogKit.Label(vm.Note, "muted");
         note.Margin = new Thickness(16, 12);
-        Content = DialogKit.Frame(grid, DialogKit.Buttons(DialogKit.Button("Chiudi", (_, _) => Close(true), isCancel: true, isDefault: true)), note);
+        Content = DialogKit.Frame(grid, DialogKit.Buttons(DialogKit.Button("Chiudi", (_, _) => Close(true), isCancel: true)), note);
 
         static Button Cmd(string text, RdpManager.Linux.ViewModels.RelayCommand c) => new() { Content = text, Command = c, MinWidth = 64 };
     }
@@ -317,7 +317,7 @@ internal sealed class NetworkScanWindow : ToolWindow
         bottom.Children.Add(new Button { Content = "Aggiungi i selezionati", Command = vm.AddCommand });
         bottom.Children.Add(DialogKit.BoundLabel(nameof(vm.Summary), "muted"));
         DockPanel.SetDock(bottom, Dock.Bottom);
-        Content = DialogKit.Frame(tabs, DialogKit.Buttons(DialogKit.Button("Chiudi", (_, _) => Close(true), isCancel: true, isDefault: true)), bottom);
+        Content = DialogKit.Frame(tabs, DialogKit.Buttons(DialogKit.Button("Chiudi", (_, _) => Close(true), isCancel: true)), bottom);
         Closing += (_, _) => vm.CancelAll();
     }
 

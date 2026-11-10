@@ -31,9 +31,11 @@ public sealed partial class MainWindowViewModel
             if (!Set(ref _locked, value))
                 return;
             OnPropertyChanged(nameof(IsUnlocked));
-            foreach (var c in new[] { ImportRdpCommand, ImportRdpmCommand, ImportCsvCommand, ExportRdpmCommand, QuickSearchCommand, NetworkScanCommand })
+            foreach (var c in _gated.ToList())
                 c.RaiseCanExecuteChanged();
             RefreshQuickLists();
+            foreach (var tab in Tabs.ToList())
+                tab.Session.SetHidden(value);
         }
     }
 
@@ -60,7 +62,49 @@ public sealed partial class MainWindowViewModel
         if (!Document.Settings.LockEnabled)
             return;
         Document.SealPasswords();
+        LoadLockState();
         IsLocked = true;
+    }
+
+    // --- Tentativi sbagliati: si salvano su disco, così riavviare l'app non azzera le attese ---
+
+    private string LockStatePath => Path.Combine(Path.GetDirectoryName(Path.GetFullPath(_store.FilePath))!, "lock-state.json");
+
+    private sealed record LockState(int Failures, DateTime WaitUntilUtc);
+
+    private void LoadLockState()
+    {
+        try
+        {
+            if (!File.Exists(LockStatePath))
+                return;
+            var state = System.Text.Json.JsonSerializer.Deserialize<LockState>(File.ReadAllText(LockStatePath));
+            if (state is null)
+                return;
+            _pinFailures = Math.Max(0, state.Failures);
+            _pinWaitUntilUtc = state.WaitUntilUtc;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            // File illeggibile: si riparte senza attese (non si blocca l'utente fuori per un file rovinato).
+        }
+    }
+
+    private void SaveLockState()
+    {
+        try
+        {
+            if (_pinFailures == 0 && _pinWaitUntilUtc == default)
+            {
+                File.Delete(LockStatePath);
+                return;
+            }
+            File.WriteAllText(LockStatePath, System.Text.Json.JsonSerializer.Serialize(new LockState(_pinFailures, _pinWaitUntilUtc)));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            AppLog.Default?.Warning("Tentativi PIN non salvati: " + ex.Message);
+        }
     }
 
     /// <summary>
@@ -89,6 +133,8 @@ public sealed partial class MainWindowViewModel
         Document.SealPasswords();
         PinInput = "";
         LockError = null;
+        // I dialoghi aperti (impostazioni, modifica di una connessione…) non devono restare visibili sopra la schermata del PIN.
+        _dialogs.CloseAllDialogs();
         IsLocked = true;
         AppLog.Default?.Info("RdpManager bloccato");
     }
@@ -124,6 +170,7 @@ public sealed partial class MainWindowViewModel
             PinInput = "";
             if (_pinFailures >= 5)
                 _pinWaitUntilUtc = now + TimeSpan.FromSeconds(Math.Min(300, 5 << Math.Min(_pinFailures - 5, 6)));
+            SaveLockState();
             LockError = "PIN sbagliato.";
             AppLog.Default?.Warning("PIN sbagliato alla schermata di blocco");
             return false;
@@ -136,6 +183,7 @@ public sealed partial class MainWindowViewModel
     {
         _pinFailures = 0;
         _pinWaitUntilUtc = default;
+        SaveLockState();
         PinInput = "";
         LockError = null;
         Document.UnsealPasswords();
@@ -151,7 +199,7 @@ public sealed partial class MainWindowViewModel
         if (!IsLocked)
             return;
         int passwords = Document.Connections.Count(c => c.HasPassword) + Document.CredentialProfiles.Count(p => p.HasPassword);
-        if (!await _dialogs.ConfirmAsync("PIN dimenticato",
+        if (!await _dialogs.ConfirmDestructiveAsync("PIN dimenticato",
                 $"Il PIN viene tolto e le {passwords} password salvate vengono cancellate: le connessioni restano, ma le " +
                 "password andranno reinserite.\n\nContinuare?"))
             return;
@@ -163,6 +211,9 @@ public sealed partial class MainWindowViewModel
     {
         int n = Document.ForgetPinAndPasswords();
         Save();
+        // Le sessioni aperte erano nascoste dal PIN: senza il PIN nessuno deve ritrovarsele davanti, quindi si chiudono tutte.
+        foreach (var tab in Tabs.ToList())
+            CloseTab(tab);
         AppLog.Default?.Warning($"PIN dimenticato: tolto il PIN e cancellate {n} password salvate");
         FinishUnlock();
         StatusMessage = $"PIN tolto: {n} password salvate cancellate, le connessioni sono rimaste.";
@@ -190,11 +241,20 @@ public sealed partial class MainWindowViewModel
     /// Il battito dell'app (ogni 15 secondi, dal comportamento della finestra): controlla il blocco a tempo e, una volta al minuto,
     /// la raggiungibilità dei PC.
     /// </summary>
-    public void Tick()
+    /// <param name="systemIdle">Inattività misurata dal sistema (tastiera e mouse in tutto il desktop, anche dentro le sessioni); null = si usano gli eventi della finestra.</param>
+    public void Tick(TimeSpan? systemIdle = null)
     {
-        if (CheckIdleLock() || IsLocked)
-            return;
-        if (_backgroundChecks && ++_tickCount % 4 == 0)
-            _ = CheckReachabilityAsync(announce: false);
+        try
+        {
+            var idle = systemIdle is { } system ? TimeSpan.FromTicks(Math.Min(system.Ticks, (UtcNow() - _lastActivityUtc).Ticks)) : (TimeSpan?)null;
+            if (CheckIdleLock(idle) || IsLocked)
+                return;
+            if (_backgroundChecks && ++_tickCount % 4 == 0)
+                _ = CheckReachabilityAsync(announce: false);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Default?.Warning("Errore nel battito dell'app: " + ex.Message);
+        }
     }
 }

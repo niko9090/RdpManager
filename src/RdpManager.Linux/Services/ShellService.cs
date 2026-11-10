@@ -36,10 +36,19 @@ public sealed class XdgShellService : IShellService
     {
         try
         {
-            var psi = new ProcessStartInfo("xdg-open") { UseShellExecute = false, RedirectStandardError = true, RedirectStandardOutput = true };
+            // Senza redirect: nessuno legge l'output, e un pipe pieno bloccherebbe xdg-open.
+            var psi = new ProcessStartInfo("xdg-open") { UseShellExecute = false };
             psi.ArgumentList.Add(target);
-            using var process = Process.Start(psi);
-            return process is not null;
+            var process = Process.Start(psi);
+            if (process is null)
+                return false;
+            // Il processo non si chiude subito: si aspetta che finisca (senza lasciare zombie) e solo allora si libera.
+            _ = Task.Run(() =>
+            {
+                using (process)
+                    process.WaitForExit();
+            });
+            return true;
         }
         catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
         {

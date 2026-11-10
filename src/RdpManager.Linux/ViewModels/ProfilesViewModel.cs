@@ -104,7 +104,7 @@ public sealed class ProfilesViewModel : ViewModelBase
         var warning = uses == 0
             ? $"Eliminare il profilo «{profile.DisplayName}»?"
             : $"Il profilo «{profile.DisplayName}» è usato da {uses} connessioni: manterranno utente e dominio ma non la password. Eliminarlo?";
-        if (!await _dialogs.ConfirmAsync("Elimina profilo", warning))
+        if (!await _dialogs.ConfirmDestructiveAsync("Elimina profilo", warning))
             return;
         _doc.DeleteProfile(profile.Id);
         Items.Remove(profile);

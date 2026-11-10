@@ -102,9 +102,26 @@ public sealed record FreeRdpLaunchContext
     public ResolvedCredentials? Gateway { get; init; }
 }
 
-/// <summary>Il comando da avviare: argomenti senza segreti, e righe da scrivere sullo stdin del processo.</summary>
+/// <summary>
+/// Il comando da avviare: argomenti senza segreti, e righe da scrivere sullo stdin del processo. Se fra gli argomenti c'è
+/// <c>/args-from:stdin</c> (FreeRDP 3) l'avvio mette sulla riga di comando solo quello e scrive TUTTI gli altri argomenti nello
+/// stdin, prima delle righe segrete: la documentazione di FreeRDP dice che l'opzione non si combina con altri argomenti.
+/// </summary>
 public sealed record FreeRdpCommand(string FileName, IReadOnlyList<string> Arguments, IReadOnlyList<string> StdinLines)
 {
+    public const string ArgsFromStdin = "/args-from:stdin";
+
+    /// <summary>Gli argomenti della riga di comando davvero passati al processo.</summary>
+    public IReadOnlyList<string> CommandLine => Arguments.Contains(ArgsFromStdin) ? [ArgsFromStdin] : Arguments;
+
+    /// <summary>Le righe da scrivere nello stdin: con <c>/args-from:stdin</c> prima gli altri argomenti (senza a capo), poi i segreti.</summary>
+    public IReadOnlyList<string> AllStdinLines => Arguments.Contains(ArgsFromStdin)
+        ? Arguments.Where(a => a != ArgsFromStdin).Select(NoLineBreaks).Concat(StdinLines).ToList()
+        : StdinLines;
+
+    private static string NoLineBreaks(string value) =>
+        string.Concat(value.Select(ch => ch is (char)13 or (char)10 or (char)0 ? ' ' : ch));
+
     /// <summary>Per i log: la riga di comando (non contiene password).</summary>
     public override string ToString() => FileName + " " + string.Join(' ', Arguments);
 }
@@ -124,6 +141,10 @@ public static class FreeRdpCommandBuilder
         ArgumentNullException.ThrowIfNull(c);
         ArgumentNullException.ThrowIfNull(client);
         ctx ??= new FreeRdpLaunchContext();
+        // Le password vanno su una riga dello stdin: un a capo o un NUL farebbe passare il resto come argomenti di FreeRDP
+        // (con /args-from:stdin) o come dominio (con /from-stdin). Meglio rifiutare che modificare la password.
+        RejectLineBreaks(c.Password, "La password");
+        RejectLineBreaks(ctx.Gateway?.Password, "La password del gateway");
         var embedded = WillEmbed(c, client, ctx);
         var args = new List<string> { "/v:" + c.Host.Trim() };
         var stdin = new List<string>();
@@ -219,7 +240,7 @@ public static class FreeRdpCommandBuilder
             if (!string.IsNullOrEmpty(c.Password))
                 stdin.Insert(0, "/p:" + c.Password);
             if (stdin.Count > 0)
-                args.Add("/args-from:stdin");
+                args.Add(FreeRdpCommand.ArgsFromStdin);
         }
         else if (!string.IsNullOrEmpty(c.Password))
         {
@@ -228,6 +249,15 @@ public static class FreeRdpCommandBuilder
         }
 
         return new FreeRdpCommand(client.Executable, args, stdin);
+    }
+
+    private static readonly char[] LineBreakChars = [(char)13, (char)10, (char)0];
+
+    /// <summary>Lancia <see cref="ArgumentException"/> se il segreto contiene un a capo o un carattere nullo.</summary>
+    private static void RejectLineBreaks(string? secret, string what)
+    {
+        if (secret is not null && secret.IndexOfAny(LineBreakChars) >= 0)
+            throw new ArgumentException(what + " contiene un a capo o un carattere non ammesso: non può essere passata a FreeRDP. Reinseriscila senza.");
     }
 
     /// <summary>L'argomento di FreeRDP per la politica del certificato (la forma cambia fra FreeRDP 2 e 3).</summary>

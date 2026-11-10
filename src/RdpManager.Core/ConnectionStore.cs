@@ -70,6 +70,11 @@ public sealed partial class ConnectionsDocument
         var newPath = RdpConnection.NormalizeGroup(parent.Length > 0 ? $"{parent}/{newName}" : newName);
         if (newPath.Length == 0)
             return null;
+        // Il nome di una cartella sorella è già preso: unirle di nascosto confonderebbe connessioni e impostazioni.
+        // (Cambiare solo maiuscole e minuscole del proprio nome resta permesso.)
+        if (!newPath.Equals(path, StringComparison.CurrentCultureIgnoreCase)
+            && AllGroups().Any(g => g.Equals(newPath, StringComparison.CurrentCultureIgnoreCase)))
+            return null;
         string Move(string g) => RdpConnection.NormalizeGroup(newPath + g[path.Length..]);
         foreach (var c in Connections.Where(c => IsInFolder(c.Group, path)))
             c.Group = Move(c.Group);

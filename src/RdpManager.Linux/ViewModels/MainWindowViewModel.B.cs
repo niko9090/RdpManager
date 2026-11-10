@@ -124,7 +124,7 @@ public sealed partial class MainWindowViewModel
     {
         EnsureBHooks();
         if (!_bCommands.TryGetValue(name, out var command))
-            _bCommands[name] = command = new RelayCommand(action, can);
+            _bCommands[name] = command = GateWhenLocked(new RelayCommand(action, can));
         return command;
     }
 
@@ -164,6 +164,8 @@ public sealed partial class MainWindowViewModel
 
     public async Task PasteAsTypingAsync()
     {
+        if (IsLocked)
+            return;
         if (SelectedSession is null)
             return;
         var text = await Ui.GetClipboardTextAsync();
@@ -172,6 +174,8 @@ public sealed partial class MainWindowViewModel
 
     public async Task SnapshotAsync()
     {
+        if (IsLocked)
+            return;
         if (SelectedSession is not { } session)
             return;
         var folder = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
@@ -184,6 +188,8 @@ public sealed partial class MainWindowViewModel
     /// <summary>Azione da un gesto a più dita (#48, #49): comandi della finestra, oppure tasti verso il PC remoto con xdotool.</summary>
     public void RunTouchAction(TouchActionKind kind)
     {
+        if (IsLocked)
+            return;
         switch (kind)
         {
             case TouchActionKind.NextTab: NextTabCommand.Execute(null); break;
@@ -223,6 +229,8 @@ public sealed partial class MainWindowViewModel
     /// <summary>Azione da tastiera: passaggio fra sessioni, schermo intero, barra, panoramica, ricerca, vista affiancata, blocco.</summary>
     public bool RunShortcut(ShortcutAction action)
     {
+        if (IsLocked)
+            return false;
         var connected = Tabs.Select(t => t.IsConnected).ToList();
         if (ShortcutAction.NextSession == action || ShortcutAction.PreviousSession == action || ShortcutMap.SessionNumber(action) is not null)
         {
@@ -246,7 +254,7 @@ public sealed partial class MainWindowViewModel
     /// <summary>Una combinazione premuta nella finestra: scorciatoia dell'app o di uno spazio di lavoro. Vero se gestita.</summary>
     public bool TryRunShortcut(KeyCombo combo)
     {
-        if (combo.IsEmpty)
+        if (combo.IsEmpty || IsLocked)
             return false;
         if (_shortcuts.TryGetAction(combo, out var action))
             return RunShortcut(action);

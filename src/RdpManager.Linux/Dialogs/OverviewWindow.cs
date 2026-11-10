@@ -65,5 +65,5 @@ public sealed class OverviewWindow : Window
     }
 
     public static Task<SessionTabViewModel?> ShowAsync(Window owner, IReadOnlyList<SessionTabViewModel> tabs, SessionTabViewModel? selected) =>
-        new OverviewWindow(tabs, selected).ShowDialog<SessionTabViewModel?>(owner);
+        new OverviewWindow(tabs, selected).ShowDialogTracked<SessionTabViewModel?>(owner);
 }

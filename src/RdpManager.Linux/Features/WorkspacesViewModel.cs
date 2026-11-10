@@ -103,7 +103,7 @@ public sealed class WorkspacesViewModel : ViewModelBase
     {
         if (Selected is not { } item)
             return;
-        if (!await _dialogs.ConfirmAsync("Elimina spazio di lavoro", $"Eliminare lo spazio di lavoro «{item.Name}»? Le connessioni non vengono toccate."))
+        if (!await _dialogs.ConfirmDestructiveAsync("Elimina spazio di lavoro", $"Eliminare lo spazio di lavoro «{item.Name}»? Le connessioni non vengono toccate."))
             return;
         _doc.Workspaces.Remove(item.Workspace);
         _save();

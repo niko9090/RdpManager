@@ -30,7 +30,7 @@ public sealed class FreeRdpProcess : IDisposable
             UseShellExecute = false,
             CreateNoWindow = true,
         };
-        foreach (var a in command.Arguments)
+        foreach (var a in command.CommandLine)
             psi.ArgumentList.Add(a);
 
         var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
@@ -53,10 +53,12 @@ public sealed class FreeRdpProcess : IDisposable
         process.BeginOutputReadLine();
         try
         {
-            foreach (var line in command.StdinLines)
+            foreach (var line in command.AllStdinLines)
                 process.StandardInput.WriteLine(line);
             process.StandardInput.Flush();
-            // Non si chiude: FreeRDP può leggere ancora; si chiude con il processo.
+            // Si chiude subito: /args-from:stdin legge fino alla fine del flusso, e con /from-stdin e il dominio vuoto
+            // FreeRDP 2 aspetterebbe anche il dominio (con la fine del flusso lo prende vuoto).
+            process.StandardInput.Close();
         }
         catch (IOException)
         {

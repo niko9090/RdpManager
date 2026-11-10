@@ -21,8 +21,8 @@ public sealed class PinPageViewModel : SettingsPageViewModel
         _dialogs = dialogs;
         _pin = settings.LockPin;
         _lockAfter = Math.Clamp(settings.LockAfterMinutes, 0, MaxMinutes).ToString(CultureInfo.InvariantCulture);
-        SetPinCommand = new RelayCommand(() => _ = SetPinAsync());
-        RemovePinCommand = new RelayCommand(RemovePin, () => _pin is not null);
+        SetPinCommand = new RelayCommand(() => _ = RunAsync(SetPinAsync));
+        RemovePinCommand = new RelayCommand(() => _ = RunAsync(RemovePinAsync), () => _pin is not null);
     }
 
     public override string Title => "PIN";
@@ -43,10 +43,44 @@ public sealed class PinPageViewModel : SettingsPageViewModel
 
     public string? Error { get => _error; private set => Set(ref _error, value); }
 
-    /// <summary>Imposta o cambia il PIN (chiede il PIN due volte). Il PIN vale quando si preme Salva.</summary>
+    private async Task RunAsync(Func<Task> action)
+    {
+        try
+        {
+            await action();
+        }
+        catch (Exception ex)
+        {
+            Error = "Operazione non riuscita: " + ex.Message;
+        }
+    }
+
+    /// <summary>
+    /// Con un PIN già salvato, cambiarlo o toglierlo richiede il PIN attuale (altrimenti chi trova il PC sbloccato, o aperto sulle
+    /// impostazioni, lo aggira). Falso con <see cref="Error"/> se il PIN non è stato dato o è sbagliato.
+    /// </summary>
+    private async Task<bool> ConfirmCurrentPinAsync()
+    {
+        if (_settings.LockPin is not { IsValid: true } stored)
+            return true;
+        if (_dialogs is null)
+            return false;
+        var typed = await _dialogs.PromptSecretAsync("PIN attuale", "Scrivi il PIN attuale per continuare.");
+        if (typed is null)
+            return false;
+        if (!PinLock.Verify(typed, stored))
+        {
+            Error = "PIN attuale sbagliato.";
+            return false;
+        }
+        Error = null;
+        return true;
+    }
+
+    /// <summary>Imposta o cambia il PIN (chiede il PIN attuale, se c'è, poi il nuovo due volte). Il PIN vale quando si preme Salva.</summary>
     public async Task SetPinAsync()
     {
-        if (_dialogs is null)
+        if (_dialogs is null || !await ConfirmCurrentPinAsync())
             return;
         var vm = new PinSetViewModel();
         if (await _dialogs.ShowAsync(vm) && vm.Result is { } hash)
@@ -56,8 +90,11 @@ public sealed class PinPageViewModel : SettingsPageViewModel
         }
     }
 
-    public void RemovePin()
+    /// <summary>Toglie il PIN (chiede il PIN attuale). Vale quando si preme Salva.</summary>
+    public async Task RemovePinAsync()
     {
+        if (!await ConfirmCurrentPinAsync())
+            return;
         _pin = null;
         Refresh();
     }

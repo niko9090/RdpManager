@@ -591,7 +591,14 @@ public class LockTests
         Assert.True(settings.LockEnabled);
         Assert.Equal(15, settings.LockAfterMinutes);
 
-        page.RemovePin();
+        // Con un PIN già salvato serve il PIN attuale per toglierlo.
+        dialogs.Secrets.Enqueue("1111");
+        await page.RemovePinAsync();
+        Assert.True(page.HasPin);
+        Assert.Equal("PIN attuale sbagliato.", page.Error);
+        dialogs.Secrets.Enqueue("2468");
+        await page.RemovePinAsync();
+        Assert.False(page.HasPin);
         page.LockAfterMinutes = "x";
         Assert.False(page.Validate());
         page.LockAfterMinutes = "0";

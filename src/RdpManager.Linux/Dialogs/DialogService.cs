@@ -15,19 +15,23 @@ public sealed class DialogService : IDialogService
 
     public Task<bool> ConfirmAsync(string title, string message) => TextDialog.ConfirmAsync(RequireOwner(), title, message);
 
+    public void CloseAllDialogs() => DialogTracker.CloseAll();
+
+    public Task<bool> ConfirmDestructiveAsync(string title, string message) => TextDialog.ConfirmDestructiveAsync(RequireOwner(), title, message);
+
     public Task ShowMessageAsync(string title, string message) => TextDialog.MessageAsync(RequireOwner(), title, message);
 
     public Task<string?> PromptAsync(string title, string label, string initial) =>
         TextDialog.PromptAsync(RequireOwner(), title, label, initial);
 
     public Task<bool> EditConnectionAsync(ConnectionEditViewModel editor) =>
-        new ConnectionEditWindow { DataContext = editor }.ShowDialog<bool>(RequireOwner());
+        new ConnectionEditWindow { DataContext = editor }.ShowDialogTracked<bool>(RequireOwner());
 
     public Task ShowProfilesAsync(ProfilesViewModel profiles) =>
-        new ProfilesWindow { DataContext = profiles }.ShowDialog(RequireOwner());
+        new ProfilesWindow { DataContext = profiles }.ShowDialogTracked(RequireOwner());
 
     public Task<bool> ShowSettingsAsync(SettingsViewModel settings) =>
-        new SettingsWindow { DataContext = settings }.ShowDialog<bool>(RequireOwner());
+        new SettingsWindow { DataContext = settings }.ShowDialogTracked<bool>(RequireOwner());
 
     public Task<bool> ShowAsync(object viewModel)
     {
@@ -44,7 +48,7 @@ public sealed class DialogService : IDialogService
             PinSetViewModel vm => new PinSetWindow(vm),
             _ => throw new NotSupportedException($"Nessuna finestra per {viewModel.GetType().Name}."),
         };
-        return window.ShowDialog<bool>(RequireOwner());
+        return window.ShowDialogTracked<bool>(RequireOwner());
     }
 
     public Task<string?> PromptSecretAsync(string title, string label) =>

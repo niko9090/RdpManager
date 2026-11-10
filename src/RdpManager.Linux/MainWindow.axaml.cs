@@ -53,6 +53,11 @@ public sealed partial class MainWindow : Window
             if (DataContext is not MainWindowViewModel vm)
                 return;
             vm.ExitRequested += (_, _) => Close();
+            vm.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(MainWindowViewModel.IsLocked))
+                    ApplyLockToDetachedWindows(vm.IsLocked);
+            };
             vm.FocusSearchRequested += (_, _) => { SearchBox.Focus(); SearchBox.SelectAll(); };
             vm.FullScreenChanged += (_, on) => ApplyFullScreen(vm, on);
             vm.MoveToNextMonitorRequested += (_, _) => MoveToNextMonitor(vm);
@@ -161,6 +166,21 @@ public sealed partial class MainWindow : Window
 
     // --- Sessione in una finestra staccata ---
 
+    /// <summary>Con l'app bloccata le finestre delle sessioni staccate si nascondono (sono fuori dalla schermata del PIN); allo sblocco tornano.</summary>
+    private void ApplyLockToDetachedWindows(bool locked)
+    {
+        foreach (var window in _detached.Values.ToList())
+        {
+            if (locked)
+            {
+                window.WindowState = WindowState.Minimized;
+                window.Hide();
+            }
+            else
+                window.Show();
+        }
+    }
+
     private void ToggleDetach(MainWindowViewModel vm, SessionTabViewModel tab)
     {
         if (_detached.TryGetValue(tab, out var existing))
@@ -183,6 +203,7 @@ public sealed partial class MainWindow : Window
             Content = new ContentControl { Content = tab.Content },
         };
         _detached[tab] = window;
+        Dialogs.WindowBehaviors.TrackActivity(window);
         tab.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(SessionTabViewModel.Title)) window.Title = tab.Title; };
         session.Closed += (_, _) => window.Close();
         window.Closed += (_, _) =>
@@ -201,7 +222,7 @@ public sealed partial class MainWindow : Window
 
     private void OnTreeKeyDown(object? sender, KeyEventArgs e)
     {
-        if (DataContext is not MainWindowViewModel vm)
+        if (DataContext is not MainWindowViewModel vm || vm.IsLocked)
             return;
         switch (e.Key)
         {
@@ -222,6 +243,8 @@ public sealed partial class MainWindow : Window
 
     private void OnWindowKeyDown(object? sender, KeyEventArgs e)
     {
+        if ((DataContext as MainWindowViewModel)?.IsLocked ?? false)
+            return;
         if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.F)
         {
             SearchBox.Focus();
@@ -237,7 +260,7 @@ public sealed partial class MainWindow : Window
 
     private void OnShortcutKeyDown(object? sender, KeyEventArgs e)
     {
-        if (DataContext is not MainWindowViewModel vm)
+        if (DataContext is not MainWindowViewModel vm || vm.IsLocked)
             return;
         var command = (e.Key, e.KeyModifiers) switch
         {
@@ -267,7 +290,7 @@ public sealed partial class MainWindow : Window
 
     private void RunTouch(IReadOnlyList<TouchAction> actions)
     {
-        if (DataContext is not MainWindowViewModel vm)
+        if (DataContext is not MainWindowViewModel vm || vm.IsLocked)
             return;
         foreach (var action in actions)
             if (TouchActionKinds.IsWindowCommand(action.Kind) || TouchActionKinds.IsRemoteKeys(action.Kind))
@@ -297,7 +320,7 @@ public sealed partial class MainWindow : Window
     /// <summary>Il clic destro su una scheda la seleziona, così il menu della scheda agisce su quella.</summary>
     private void OnTabPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (!e.GetCurrentPoint(this).Properties.IsRightButtonPressed || DataContext is not MainWindowViewModel vm)
+        if (!e.GetCurrentPoint(this).Properties.IsRightButtonPressed || DataContext is not MainWindowViewModel { IsLocked: false } vm)
             return;
         if ((e.Source as Visual)?.FindAncestorOfType<TabItem>()?.DataContext is SessionTabViewModel tab)
             vm.SelectedTab = tab;
