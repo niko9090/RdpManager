@@ -197,4 +197,20 @@ public class VpnProvisioningEndToEndTests : IAsyncLifetime
         Assert.Equal("account_exists", dup.Code);
         await Assert.ThrowsAsync<SyncServerException>(() => sync.SignInAsync(_url, "nessuno", "boh"));
     }
+
+    [Fact]
+    public async Task Dopo_la_chiusura_del_servizio_la_vpn_si_annulla_senza_errori_di_oggetto_eliminato()
+    {
+        // Caso del log del 06/11: la finestra si chiude (il servizio viene eliminato) mentre l'avvio chiede ancora la VPN.
+        var sync = new SyncService(Path.Combine(_dir, "sync.json"), Iterations);
+        await sync.RegisterAsync(_url, "mario", "frase segreta lunga", null);
+        await sync.SignInAsync(_url, "mario", "frase segreta lunga");
+
+        sync.Dispose();
+        sync.Dispose(); // una seconda chiusura non deve fare danni
+
+        var path = Path.Combine(_dir, "vpn.json");
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => VpnProvisioning.EnsureAsync(sync, path, "Ufficio"));
+        Assert.Empty(_wg.Peers);
+    }
 }
