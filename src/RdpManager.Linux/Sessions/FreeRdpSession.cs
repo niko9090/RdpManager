@@ -19,6 +19,7 @@ public sealed class FreeRdpSession : ViewModelBase, ISession
     private readonly Func<CancellationToken, Task<string?>> _prepareVpn;
     private readonly Action<Action> _post;
     private readonly CancellationTokenSource _cts = new();
+    private readonly object _gate = new();
     private FreeRdpProcess? _process;
     private FreeRdpLaunchContext _context = new();
     private bool _closed;
@@ -184,9 +185,13 @@ public sealed class FreeRdpSession : ViewModelBase, ISession
     {
         if (_closed)
             return;
-        _generation++;
-        var process = _process;
-        _process = null;
+        FreeRdpProcess? process;
+        lock (_gate)
+        {
+            _generation++;
+            process = _process;
+            _process = null;
+        }
         if (process is not null)
             _ = process.StopAsync().ContinueWith(_ => process.Dispose(), TaskScheduler.Default);
         _started = false;
@@ -233,14 +238,26 @@ public sealed class FreeRdpSession : ViewModelBase, ISession
             var command = BuildCommand();
             var process = FreeRdpProcess.Start(command);
             process.Exited += (code, err) => _post(() => { if (generation == _generation) OnProcessExited(process, code, err); });
+            // Il processo si registra subito: se nel frattempo la sessione è stata chiusa non deve restare vivo.
+            bool stale;
+            lock (_gate)
+            {
+                stale = _closed || generation != _generation;
+                if (stale)
+                {
+                    var stop = process.StopAsync().ContinueWith(_ => process.Dispose(), TaskScheduler.Default);
+                    if (_closed)
+                        StopTask = Task.WhenAll(StopTask, stop);
+                }
+                else
+                    _process = process;
+            }
+            if (stale)
+                return;
             _post(() =>
             {
                 if (_closed || generation != _generation)
-                {
-                    _ = process.StopAsync();
                     return;
-                }
-                _process = process;
                 _starting = false;
                 IsRunning = !process.HasExited;
                 if (process.HasExited)
@@ -270,7 +287,8 @@ public sealed class FreeRdpSession : ViewModelBase, ISession
     {
         if (_closed || !ReferenceEquals(_process, process) && _process is not null)
             return;
-        _process = null;
+        lock (_gate)
+            _process = null;
         if (exitCode != 0 && CertificateTrust.IsCertificateProblem(exitCode, error) && CertificateDecider is not null)
         {
             _ = AskCertificateAsync(error);
@@ -354,14 +372,17 @@ public sealed class FreeRdpSession : ViewModelBase, ISession
 
     public void Close()
     {
-        if (_closed)
-            return;
-        _closed = true;
+        lock (_gate)
+        {
+            if (_closed)
+                return;
+            _closed = true;
+            var process = _process;
+            _process = null;
+            if (process is not null)
+                StopTask = process.StopAsync().ContinueWith(_ => process.Dispose(), TaskScheduler.Default);
+        }
         _cts.Cancel();
-        var process = _process;
-        _process = null;
-        if (process is not null)
-            StopTask = process.StopAsync().ContinueWith(_ => process.Dispose(), TaskScheduler.Default);
         Closed?.Invoke(this, EventArgs.Empty);
     }
 

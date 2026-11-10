@@ -142,19 +142,20 @@ public sealed class VpnViewModel : ViewModelBase
                     return;
                 }
                 Status = "In avvio…";
-                var r = await _tunnel.ConnectAsync(_profile.ToConfig());
+                var r = await _tunnel.EnsureConnectedAsync(_profile.ToConfig());
                 Message = r.Message;
             }
         }
-        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or IOException or System.ComponentModel.Win32Exception)
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException
+                                       or OperationCanceledException or System.ComponentModel.Win32Exception)
         {
             Message = ex.Message;
         }
         finally
         {
             Busy = false;
-            await RefreshStateAsync();
         }
+        await RefreshStateAsync();
     }
 
     public async Task RefreshStateAsync()
@@ -163,7 +164,8 @@ public sealed class VpnViewModel : ViewModelBase
         {
             IsConnected = await _tunnel.IsConnectedAsync();
         }
-        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or IOException)
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or IOException
+                                       or UnauthorizedAccessException or OperationCanceledException)
         {
             IsConnected = false;
         }
@@ -200,14 +202,16 @@ public sealed class VpnViewModel : ViewModelBase
             Message = "Questo server non offre la VPN automatica: usa il frammento qui sopra.";
         }
         catch (Exception ex) when (ex is SyncServerException or SyncUnreachableException or ArgumentException
-                                       or InvalidOperationException or FormatException)
+                                       or InvalidOperationException or FormatException or IOException
+                                       or UnauthorizedAccessException or OperationCanceledException)
         {
             Message = "VPN non configurata: " + ex.Message;
         }
         finally
         {
             Busy = false;
-            RefreshKeys();
+            try { RefreshKeys(); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException) { }
         }
     }
 
@@ -225,7 +229,7 @@ public sealed class VpnViewModel : ViewModelBase
             if (profile is null)
                 return "";
             AppLog.Default?.Info("VPN: profilo ottenuto dal server, indirizzo " + profile.Address);
-            var result = await tunnel.ConnectAsync(profile.ToConfig(), ct);
+            var result = await tunnel.EnsureConnectedAsync(profile.ToConfig(), ct);
             return result.Success
                 ? "VPN configurata e accesa (indirizzo " + profile.Address + ")."
                 : "VPN configurata ma non accesa: " + result.Message;
@@ -239,7 +243,8 @@ public sealed class VpnViewModel : ViewModelBase
             return "";
         }
         catch (Exception ex) when (ex is SyncServerException or SyncUnreachableException or ArgumentException
-                                       or InvalidOperationException or FormatException)
+                                       or InvalidOperationException or FormatException or IOException
+                                       or UnauthorizedAccessException)
         {
             AppLog.Default?.Info("VPN automatica non riuscita: " + ex.Message);
             return "VPN non configurata: " + ex.Message;

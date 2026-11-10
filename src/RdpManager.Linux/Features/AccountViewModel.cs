@@ -137,11 +137,18 @@ public sealed class AccountViewModel : ViewModelBase
         _ => ex.Message,
     };
 
+    /// <summary>Gli errori che i metodi qui sotto mostrano nello stato invece di lasciarli uscire (e lasciare il dialogo occupato).</summary>
+    private static bool IsExpected(Exception ex) =>
+        ex is SyncServerException or SyncUnreachableException or ArgumentException or IOException
+            or UnauthorizedAccessException or InvalidOperationException or OperationCanceledException;
+
     public async Task SignInAsync(bool create)
     {
         if (Busy)
             return;
         SetBusy(true, create ? "Creo l'account…" : "Accedo…");
+        string? error = null;
+        var extra = "";
         try
         {
             if (create)
@@ -151,17 +158,23 @@ public sealed class AccountViewModel : ViewModelBase
             SetBusy(true, "Sincronizzo…");
             var outcome = await _syncNow();
             var vpnLine = _afterSignIn is null ? "" : await _afterSignIn();
-            SetBusy(false);
             if (!outcome.Ok)
-                Status += "\n" + outcome.Message;
+                extra += "\n" + outcome.Message;
             if (vpnLine.Length > 0)
-                Status += "\n" + vpnLine;
+                extra += "\n" + vpnLine;
         }
-        catch (Exception ex) when (ex is SyncServerException or SyncUnreachableException or ArgumentException)
+        catch (Exception ex) when (IsExpected(ex))
+        {
+            error = Explain(ex);
+        }
+        finally
         {
             SetBusy(false);
-            Status = Explain(ex);
         }
+        if (error is not null)
+            Status = error;
+        else
+            Status += extra;
     }
 
     /// <summary>
@@ -202,7 +215,7 @@ public sealed class AccountViewModel : ViewModelBase
             Apply(ClientConfig.Load(path));
             Status = "Configurazione importata: ora scrivi nome utente e password e premi «Registrati» (o «Accedi»).";
         }
-        catch (Exception ex) when (ex is FormatException or FileNotFoundException)
+        catch (Exception ex) when (ex is FormatException or IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             Status = "Configurazione non importata: " + ex.Message;
         }
@@ -221,9 +234,21 @@ public sealed class AccountViewModel : ViewModelBase
         if (Busy)
             return;
         SetBusy(true, "Sincronizzo…");
-        var outcome = await _syncNow();
-        SetBusy(false);
-        Status += "\n" + outcome.Message;
+        string? line = null;
+        try
+        {
+            var outcome = await _syncNow();
+            line = outcome.Message;
+        }
+        catch (Exception ex) when (IsExpected(ex))
+        {
+            line = Explain(ex);
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+        Status += "\n" + line;
     }
 
     public async Task SignOutAsync()
@@ -234,7 +259,20 @@ public sealed class AccountViewModel : ViewModelBase
                 "Uscire dall'account? Le connessioni di questo PC restano dove sono, ma non si sincronizzano più."))
             return;
         SetBusy(true, "Esco…");
-        await _sync.SignOutAsync();
-        SetBusy(false);
+        string? error = null;
+        try
+        {
+            await _sync.SignOutAsync();
+        }
+        catch (Exception ex) when (IsExpected(ex))
+        {
+            error = Explain(ex);
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+        if (error is not null)
+            Status = error;
     }
 }

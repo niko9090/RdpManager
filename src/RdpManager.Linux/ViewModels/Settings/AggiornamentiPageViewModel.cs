@@ -18,7 +18,7 @@ public sealed class AggiornamentiPageViewModel : SettingsPageViewModel
 
     public IReadOnlyList<ChoiceItem<UpdateMode>> UpdateChoices => Choices.Update;
 
-    public ChoiceItem<UpdateMode> Update { get => _update; set => Set(ref _update, value); }
+    public ChoiceItem<UpdateMode> Update { get => _update; set { if (value is not null) Set(ref _update, value); } }
 
     public string Version => "Versione in uso: " + AppInfo.VersionText;
 

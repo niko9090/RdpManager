@@ -35,7 +35,7 @@ public sealed partial class MainWindowViewModel
     public RemoteInput Input { get; set; } = new();
 
     /// <summary>Crea il gestore VPN (nelle prove si sostituisce).</summary>
-    public Func<LinuxWireGuard> VpnFactory { get; set; } = () => LinuxPlatformInit.CreateVpn();
+    public Func<LinuxWireGuard> VpnFactory { get; set; } = () => LinuxPlatformInit.Vpn;
 
     /// <summary>Controllo degli aggiornamenti (nelle prove si sostituisce); di norma interroga GitHub.</summary>
     public Func<CancellationToken, Task<UpdateCheckResult>> UpdateCheck { get; set; } =
@@ -67,9 +67,21 @@ public sealed partial class MainWindowViewModel
         if (SyncService.SignedIn)
             _ = Task.Run(async () =>
             {
-                await RunSyncAsync(manual: false);
-                if (await VpnViewModel.EnsureAsync(SyncService, VpnFactory(), VpnProfilePath, _shutdown.Token) is { Length: > 0 } line)
-                    Notice(line);
+                try
+                {
+                    await RunSyncAsync(manual: false);
+                    if (await VpnViewModel.EnsureAsync(SyncService, VpnFactory(), VpnProfilePath, _shutdown.Token) is { Length: > 0 } line)
+                        Notice(line);
+                }
+                catch (OperationCanceledException)
+                {
+                }
+                catch (Exception ex)
+                {
+                    // Un errore dell'avvio automatico non si perde: finisce nel registro e in un avviso.
+                    AppLog.Default?.Info("Avvio automatico (sincronizzazione e VPN) non riuscito: " + ex.Message);
+                    Notice("Sincronizzazione o VPN non riuscite all'avvio: " + ex.Message);
+                }
             });
         _syncPoll = new Timer(_ => _ = RunSyncAsync(manual: false), null, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
         _ = CheckUpdatesAsync(manual: false);
@@ -527,6 +539,9 @@ public sealed partial class MainWindowViewModel
         finally { vpn.Persist(); }
     });
 
+    /// <summary>L'accesso al documento che usa la sincronizzazione (per le prove).</summary>
+    internal ISyncDocumentAccess SyncDocumentAccess => new SyncAccess(this);
+
     private sealed class SyncAccess(MainWindowViewModel vm) : ISyncDocumentAccess
     {
         public ConnectionsDocument Snapshot() => vm.Ui.Invoke(() => SyncMerge.Snapshot(vm.Document));
@@ -538,7 +553,10 @@ public sealed partial class MainWindowViewModel
             vm._syncApplying = true;
             try
             {
-                vm.Save();
+                // Se il salvataggio locale non riesce la sincronizzazione deve fallire: altrimenti la base avanzerebbe
+                // senza che i dati siano su disco e il giro dopo il server verrebbe svuotato.
+                if (!vm.Save())
+                    throw new IOException("Salvataggio locale non riuscito");
                 vm.RebuildTree();
             }
             finally
@@ -568,12 +586,14 @@ public sealed partial class MainWindowViewModel
             return new SyncOutcome(SyncStatus.NotSignedIn, "Nessun account di sincronizzazione.");
         if (_shutdown.IsCancellationRequested)
             return new SyncOutcome(SyncStatus.Error, "Il programma si sta chiudendo.");
+        if (!_canSave)
+            return new SyncOutcome(SyncStatus.Error, "Il file dei dati locale non era leggibile: non sincronizzo per non svuotare il server.");
         SyncOutcome outcome;
         try
         {
             outcome = await SyncService.SyncAsync(new SyncAccess(this), _shutdown.Token);
         }
-        catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException or OperationCanceledException)
+        catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException or OperationCanceledException or IOException)
         {
             return new SyncOutcome(SyncStatus.Error, "Sincronizzazione interrotta: " + ex.Message);
         }

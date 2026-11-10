@@ -23,13 +23,25 @@ public sealed class VassoioPageViewModel : SettingsPageViewModel
     public bool ShowTrayIcon
     {
         get => _showTray;
-        set { if (Set(ref _showTray, value) && !value) CloseToTray = false; }
+        set
+        {
+            Set(ref _showTray, value);
+            if (!value)
+                CloseToTray = false;
+            OnPropertyChanged(nameof(CloseToTrayEnabled));
+        }
     }
 
     public bool CloseToTray
     {
         get => _closeToTray;
-        set { if (Set(ref _closeToTray, value && ShowTrayIcon)) OnPropertyChanged(nameof(CloseToTrayEnabled)); }
+        set
+        {
+            Set(ref _closeToTray, value && ShowTrayIcon);
+            // Sempre: se la casella è stata spuntata ma il valore reale resta spento, la vista deve tornare allineata.
+            OnPropertyChanged(nameof(CloseToTray));
+            OnPropertyChanged(nameof(CloseToTrayEnabled));
+        }
     }
 
     public bool CloseToTrayEnabled => ShowTrayIcon;

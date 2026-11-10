@@ -34,6 +34,14 @@ public sealed partial class MainWindow : Window
         SidebarEdge.PointerEntered += (_, _) => { if (DataContext is MainWindowViewModel vm) vm.SidebarHover = true; };
         SidebarPanel.PointerExited += (_, _) => { if (DataContext is MainWindowViewModel vm) vm.SidebarHover = false; };
         PositionChanged += (_, _) => UpdateCurrentMonitor();
+        Closing += (_, e) =>
+        {
+            // Da qui in poi le finestre staccate non riagganciano più le schede; se la chiusura viene annullata
+            // (per esempio nascondendo la finestra nel vassoio) il flag torna com'era.
+            _closing = true;
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => { if (e.Cancel) _closing = false; },
+                Avalonia.Threading.DispatcherPriority.Background);
+        };
         Closed += (_, _) =>
         {
             _closing = true;

@@ -26,7 +26,11 @@ public sealed class AvaloniaShellUi : IShellUi
         // Lo stato del tunnel si aggiorna mentre il pannello è aperto (come ogni 2 secondi su Windows).
         var window = new VpnWindow { DataContext = vpn };
         var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
-        timer.Tick += async (_, _) => await vpn.RefreshStateAsync();
+        timer.Tick += async (_, _) =>
+        {
+            if (!vpn.Busy)
+                await vpn.RefreshStateAsync();
+        };
         window.Opened += (_, _) => timer.Start();
         window.Closed += (_, _) => timer.Stop();
         return window.ShowDialog(RequireOwner());
