@@ -82,7 +82,7 @@ $wslTools = ConvertTo-WslPath $tools
 # Copio i file di pacchetto in /tmp di WSL (toglie anche eventuali CR da fine riga Windows) e lancio lo script da lì.
 $src = $script.Substring(0, $script.LastIndexOf('/'))
 $run = "set -e; D=/tmp/rdpmanager-pkg; mkdir -p `$D; tr -d '\r' < '$script' > `$D/build-packages.sh; " +
-       "cp -f '$src/rdpmanager.desktop' '$src/rdpmanager.png' `$D/; " +
+       "cp -f '$src/rdpmanager.desktop' '$src/rdpmanager.png' '$src/rdpmanager-rdpmconfig.xml' `$D/; " +
        "bash `$D/build-packages.sh '$wslPublish' '$Version' '$wslDist' '$wslTools'"
 if ((Invoke-Wsl @() $run) -ne 0) { throw 'Costruzione dei pacchetti Linux non riuscita' }
 
