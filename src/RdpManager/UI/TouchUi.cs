@@ -113,6 +113,44 @@ internal static class TouchUi
         Touchify(root, min);
         foreach (var c in Descendants(root))
             Touchify(c, min);
+        Relayout(root);
+    }
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ComboBox, ItemPad> ComboPads = new();
+
+    /// <summary>
+    /// Causa dei dialoghi con controlli sovrapposti: i controlli sono posizionati con le misure di serie e poi ingranditi
+    /// a bersagli da dito (tendine da 40 px) senza che i contenitori lo sappiano. Qui si rifà la disposizione dal basso
+    /// verso l'alto, così ogni riga si adatta all'altezza vera dei suoi controlli.
+    /// </summary>
+    internal static void Relayout(Control root)
+    {
+        // L'altezza vera di una tendina si fissa solo quando nasce la sua finestra: la si fa nascere prima di misurare.
+        foreach (var combo in Descendants(root).OfType<ComboBox>())
+        {
+            _ = combo.Handle;
+            // Una tendina dichiara come altezza preferita quella di serie (circa 23 px) anche con righe da 34 (campo da 40):
+            // le righe e i contenitori che si adattano da soli la prendono per buona e le si sovrappongono. La differenza
+            // si aggiunge al margine sotto, così ogni disposizione riserva lo spazio vero.
+            var pad = ComboPads.GetValue(combo, _ => new ItemPad());
+            int missing = combo.Height - combo.PreferredSize.Height - pad.Extra;
+            if (missing > 0)
+            {
+                combo.Margin = new Padding(combo.Margin.Left, combo.Margin.Top, combo.Margin.Right, combo.Margin.Bottom + missing);
+                pad.Extra += missing;
+            }
+        }
+        foreach (var up in Descendants(root).OfType<NumericUpDown>())
+            if (up.Height > up.MinimumSize.Height)
+                up.MinimumSize = new Size(up.MinimumSize.Width, up.Height);
+        var containers = Descendants(root).Where(c => c.Controls.Count > 0).Reverse().ToList();
+        foreach (var c in containers)
+        {
+            if (c is ComboBox or NumericUpDown)
+                continue;
+            c.PerformLayout();
+        }
+        root.PerformLayout();
     }
 
     private static void Touchify(Control c, int min)
@@ -362,6 +400,9 @@ internal static class TouchUi
         var area = WorkArea(f);
         int dpi = f.DeviceDpi;
         var max = TouchMetrics.MaxDialogSize(area, dpi);
+        // Prima si abbassa il minimo: Windows non lascia scendere la finestra sotto MinimumSize.
+        if (f.MinimumSize.Width > max.Width || f.MinimumSize.Height > max.Height)
+            f.MinimumSize = new Size(Math.Min(f.MinimumSize.Width, max.Width), Math.Min(f.MinimumSize.Height, max.Height));
         if (f.AutoSize)
         {
             var preferred = f.GetPreferredSize(Size.Empty);

@@ -10,6 +10,9 @@ public static class DialogTracker
 {
     private static readonly List<Window> Open = [];
 
+    /// <summary>Per le prove: se impostato, al posto di <c>ShowDialog</c> (modale, bloccante) si chiama questa funzione con (dialogo, proprietaria).</summary>
+    internal static Func<Window, Window, Task>? PresenterForTests { get; set; }
+
     /// <summary>Quanti dialoghi sono aperti ora.</summary>
     public static int Count => Open.Count;
 
@@ -18,8 +21,14 @@ public static class DialogTracker
     {
         Open.Add(window);
         WindowBehaviors.TrackActivity(window);
+        DialogFit.Prepare(window, owner);
         try
         {
+            if (PresenterForTests is { } present)
+            {
+                await present(window, owner);
+                return default!;
+            }
             return await window.ShowDialog<T>(owner);
         }
         finally
@@ -33,9 +42,13 @@ public static class DialogTracker
     {
         Open.Add(window);
         WindowBehaviors.TrackActivity(window);
+        DialogFit.Prepare(window, owner);
         try
         {
-            await window.ShowDialog(owner);
+            if (PresenterForTests is { } present)
+                await present(window, owner);
+            else
+                await window.ShowDialog(owner);
         }
         finally
         {
