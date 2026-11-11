@@ -8,6 +8,8 @@ using RdpManager.Core;
 using RdpManager.Linux;
 using RdpManager.Linux.Dialogs;
 using RdpManager.Linux.Features;
+using RdpManager.Linux.Platform;
+using RdpManager.Platform.Linux;
 using RdpManager.Linux.ViewModels;
 using RdpManager.Linux.ViewModels.Tools;
 
@@ -28,6 +30,13 @@ public static class DialogLayoutAppBuilder
 [Collection("Globali")]
 public class DialogLayoutTests
 {
+    /// <summary>Nessun programma vero: la finestra della VPN si apre senza toccare wg, pkexec o ip.</summary>
+    private sealed class NoRunner : IProcessRunner
+    {
+        public Task<ProcessResult> RunAsync(string fileName, IReadOnlyList<string> arguments, string? stdin = null, CancellationToken ct = default) =>
+            Task.FromResult(new ProcessResult(1, "", ""));
+    }
+
     private static readonly HeadlessUnitTestSession Session = HeadlessUnitTestSession.StartNew(typeof(DialogLayoutAppBuilder));
 
     private sealed record Seen(string Name, List<string> Problems);
@@ -164,6 +173,9 @@ public class DialogLayoutTests
             ("Password del server", () => shell.AskSecretAsync("Password", "Scrivi la password del server remoto")),
             ("Avviso certificato", () => shell.AskCertificateAsync(new CertificatePrompt("pc.invalid", string.Join(" ", Enumerable.Repeat("Il certificato del server non corrisponde a quello visto la volta scorsa.", 8))))),
             ("Aggiornamento", () => shell.OfferUpdateAsync(release, "1.0.0")),
+            ("VPN", () => shell.ShowVpnAsync(new VpnViewModel(
+                new LinuxWireGuard(new NoRunner(), Path.Combine(Path.GetDirectoryName(data.FilePath)!, "vpn.conf"), LinuxVpnBackend.WgQuick), null,
+                new NullShellUi(), fake, Path.Combine(Path.GetDirectoryName(data.FilePath)!, "vpn.json")))),
         ];
     }
 
@@ -194,6 +206,9 @@ public class DialogLayoutTests
             DialogTracker.PresenterForTests = async (w, o) =>
             {
                 w.Show(o);
+                // Le sezioni a scomparsa (es. «Avanzate» della VPN) si provano aperte: è il caso peggiore.
+                foreach (var e in Walk(w).OfType<Expander>().ToList())
+                    e.IsExpanded = true;
                 for (int i = 0; i < 4; i++)
                 {
                     Dispatcher.UIThread.RunJobs();

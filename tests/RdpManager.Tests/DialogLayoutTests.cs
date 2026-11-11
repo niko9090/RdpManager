@@ -60,6 +60,25 @@ public sealed class DialogLayoutTests
         Activator.CreateInstance(type, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic,
             null, args, null)!;
 
+    private sealed class OffTunnel : RdpManager.Vpn.IWireGuardTunnel
+    {
+        public RdpManager.Vpn.TunnelState Stato => RdpManager.Vpn.TunnelState.Spento;
+        public void Accendi(WireGuardConfig config) { }
+        public void Spegni() { }
+    }
+
+    /// <summary>Finestra VPN con un tunnel finto e un profilo in una cartella temporanea: niente VPN vera, niente file dell'utente.</summary>
+    private static Form NewVpn(bool withImport, bool expandAdvanced)
+    {
+        var path = Path.Combine(Path.GetTempPath(), "rdpm-dl-vpn-" + Guid.NewGuid().ToString("N") + ".json");
+        var form = (Form)Make(typeof(VpnForm), new OffTunnel(), path, withImport ? new Func<IWin32Window, string, Task>((_, _) => Task.CompletedTask) : null!);
+        form.FormClosed += (_, _) => { try { File.Delete(path); } catch (IOException) { } };
+        if (expandAdvanced)
+            foreach (var b in All(form).OfType<Button>().Where(b => b.Text.StartsWith("Avanzate", StringComparison.Ordinal)))
+                b.PerformClick();
+        return form;
+    }
+
     /// <summary>Ogni dialogo con il nome per il messaggio d'errore. Fabbriche: si crea un dialogo nuovo a ogni giro.</summary>
     private static List<(string Name, Func<Form> Make)> Dialogs()
     {
@@ -100,6 +119,10 @@ public sealed class DialogLayoutTests
             ("ChoiceDialog", () => new ChoiceDialog("Cartella", "Scegli", ["A", "B"], "A", editable: true)),
             ("SyncAccountDialog", () => new SyncAccountDialog(new SyncService(Path.Combine(Path.GetTempPath(), "rdpm-dl-" + Guid.NewGuid().ToString("N") + ".sync")),
                 () => Task.FromResult(new SyncOutcome(SyncStatus.UpToDate, "")), () => null)),
+            // Con il file di configurazione collegato c'è il pulsante grande in alto; «Avanzate» si prova chiusa e aperta.
+            ("VpnForm", () => NewVpn(withImport: true, expandAdvanced: false)),
+            ("VpnForm avanzate", () => NewVpn(withImport: true, expandAdvanced: true)),
+            ("VpnForm senza file", () => NewVpn(withImport: false, expandAdvanced: false)),
             ("UpdateOfferForm", () => new UpdateOfferForm(new PendingUpdate(release, "x.exe", new string('0', 64)), "1.0.0")),
         ];
     }

@@ -81,9 +81,6 @@ public static class DialogFit
     /// <summary>Prepara il dialogo per aprirsi sopra <paramref name="owner"/>: misura sull'area di lavoro e posizione dentro lo schermo.</summary>
     public static void Prepare(Window window, Window owner)
     {
-        // Le finestre della VPN sono in lavorazione a parte: ci si arriva con questa stessa regola dopo.
-        if (window.GetType().Name.StartsWith("Vpn", StringComparison.Ordinal))
-            return;
         if (TryWorkArea(owner, out var logical, out _))
             Constrain(window, logical);
         window.Opened += (_, _) =>
