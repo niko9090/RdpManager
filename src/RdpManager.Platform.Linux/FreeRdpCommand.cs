@@ -66,9 +66,25 @@ public static class FreeRdpLocator
         + "Poi riapri la connessione.";
 }
 
+/// <summary>Cosa fare quando il certificato del server non è già noto.</summary>
+public enum CertificatePolicy
+{
+    /// <summary>«Fidati al primo uso»: accetta la prima volta e fallisce se in seguito il certificato cambia (predefinito).</summary>
+    Tofu,
+
+    /// <summary>Accetta qualunque certificato (dopo che l'utente ha scelto «fidati» nell'avviso).</summary>
+    Ignore,
+
+    /// <summary>Rifiuta i certificati non noti (per mostrare l'avviso «fidati / rifiuta» all'utente).</summary>
+    Deny,
+}
+
 /// <summary>Cosa serve al costruttore degli argomenti oltre alla connessione.</summary>
 public sealed record FreeRdpLaunchContext
 {
+    /// <summary>Come trattare il certificato del server (l'avviso certificato dell'interfaccia lo cambia).</summary>
+    public CertificatePolicy CertificatePolicy { get; init; } = CertificatePolicy.Tofu;
+
     /// <summary>Handle X11 della finestra della scheda (per /parent-window); null = finestra separata.</summary>
     public long? ParentWindow { get; init; }
 
@@ -86,9 +102,26 @@ public sealed record FreeRdpLaunchContext
     public ResolvedCredentials? Gateway { get; init; }
 }
 
-/// <summary>Il comando da avviare: argomenti senza segreti, e righe da scrivere sullo stdin del processo.</summary>
+/// <summary>
+/// Il comando da avviare: argomenti senza segreti, e righe da scrivere sullo stdin del processo. Se fra gli argomenti c'è
+/// <c>/args-from:stdin</c> (FreeRDP 3) l'avvio mette sulla riga di comando solo quello e scrive TUTTI gli altri argomenti nello
+/// stdin, prima delle righe segrete: la documentazione di FreeRDP dice che l'opzione non si combina con altri argomenti.
+/// </summary>
 public sealed record FreeRdpCommand(string FileName, IReadOnlyList<string> Arguments, IReadOnlyList<string> StdinLines)
 {
+    public const string ArgsFromStdin = "/args-from:stdin";
+
+    /// <summary>Gli argomenti della riga di comando davvero passati al processo.</summary>
+    public IReadOnlyList<string> CommandLine => Arguments.Contains(ArgsFromStdin) ? [ArgsFromStdin] : Arguments;
+
+    /// <summary>Le righe da scrivere nello stdin: con <c>/args-from:stdin</c> prima gli altri argomenti (senza a capo), poi i segreti.</summary>
+    public IReadOnlyList<string> AllStdinLines => Arguments.Contains(ArgsFromStdin)
+        ? Arguments.Where(a => a != ArgsFromStdin).Select(NoLineBreaks).Concat(StdinLines).ToList()
+        : StdinLines;
+
+    private static string NoLineBreaks(string value) =>
+        string.Concat(value.Select(ch => ch is (char)13 or (char)10 or (char)0 ? ' ' : ch));
+
     /// <summary>Per i log: la riga di comando (non contiene password).</summary>
     public override string ToString() => FileName + " " + string.Join(' ', Arguments);
 }
@@ -108,6 +141,10 @@ public static class FreeRdpCommandBuilder
         ArgumentNullException.ThrowIfNull(c);
         ArgumentNullException.ThrowIfNull(client);
         ctx ??= new FreeRdpLaunchContext();
+        // Le password vanno su una riga dello stdin: un a capo o un NUL farebbe passare il resto come argomenti di FreeRDP
+        // (con /args-from:stdin) o come dominio (con /from-stdin). Meglio rifiutare che modificare la password.
+        RejectLineBreaks(c.Password, "La password");
+        RejectLineBreaks(ctx.Gateway?.Password, "La password del gateway");
         var embedded = WillEmbed(c, client, ctx);
         var args = new List<string> { "/v:" + c.Host.Trim() };
         var stdin = new List<string>();
@@ -122,8 +159,8 @@ public static class FreeRdpCommandBuilder
         if (c.Domain.Length > 0)
             args.Add("/d:" + c.Domain);
 
-        // Certificato: «fidati al primo uso», perché senza terminale FreeRDP non può chiedere nulla.
-        args.Add(client.IsVersion3 ? "/cert:tofu" : "/cert-tofu");
+        // Certificato: senza terminale FreeRDP non può chiedere nulla, quindi la scelta arriva da fuori (predefinito «fidati al primo uso»).
+        args.Add(CertificateArgument(ctx.CertificatePolicy, client.IsVersion3));
 
         // Schermo.
         var resizable = c.ResolutionMode == ResolutionMode.FitToWindow;
@@ -170,6 +207,11 @@ public static class FreeRdpCommandBuilder
             _ => "/network:auto",
         });
 
+        // «Tieni sveglia la sessione»: FreeRDP non ha l'intervallo di keep-alive di mstsc; i PDU di heartbeat
+        // (+heartbeat, presente anche in FreeRDP 2) tengono viva la sessione.
+        if (KeepAlive.IntervalFor(c) > 0)
+            args.Add("+heartbeat");
+
         if (c.AutoReconnect)
         {
             args.Add("+auto-reconnect");
@@ -198,7 +240,7 @@ public static class FreeRdpCommandBuilder
             if (!string.IsNullOrEmpty(c.Password))
                 stdin.Insert(0, "/p:" + c.Password);
             if (stdin.Count > 0)
-                args.Add("/args-from:stdin");
+                args.Add(FreeRdpCommand.ArgsFromStdin);
         }
         else if (!string.IsNullOrEmpty(c.Password))
         {
@@ -208,6 +250,23 @@ public static class FreeRdpCommandBuilder
 
         return new FreeRdpCommand(client.Executable, args, stdin);
     }
+
+    private static readonly char[] LineBreakChars = [(char)13, (char)10, (char)0];
+
+    /// <summary>Lancia <see cref="ArgumentException"/> se il segreto contiene un a capo o un carattere nullo.</summary>
+    private static void RejectLineBreaks(string? secret, string what)
+    {
+        if (secret is not null && secret.IndexOfAny(LineBreakChars) >= 0)
+            throw new ArgumentException(what + " contiene un a capo o un carattere non ammesso: non può essere passata a FreeRDP. Reinseriscila senza.");
+    }
+
+    /// <summary>L'argomento di FreeRDP per la politica del certificato (la forma cambia fra FreeRDP 2 e 3).</summary>
+    public static string CertificateArgument(CertificatePolicy policy, bool isVersion3) => policy switch
+    {
+        CertificatePolicy.Ignore => isVersion3 ? "/cert:ignore" : "/cert-ignore",
+        CertificatePolicy.Deny => isVersion3 ? "/cert:deny" : "/cert-deny",
+        _ => isVersion3 ? "/cert:tofu" : "/cert-tofu",
+    };
 
     private static void AddSize(List<string> args, RdpConnection c, FreeRdpLaunchContext ctx, bool resizable)
     {

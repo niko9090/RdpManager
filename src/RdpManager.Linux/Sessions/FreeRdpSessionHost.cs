@@ -34,6 +34,9 @@ public sealed class FreeRdpSessionHost : ISessionHost
         _post = post ?? (a => a());
     }
 
+    /// <summary>Come chiedere all'utente se fidarsi di un certificato non verificato (avviso certificato); null = non si chiede.</summary>
+    public Func<Features.CertificatePrompt, Task<bool>>? CertificateDecider { get; set; }
+
     public bool IsAvailable => FreeRdpLocator.Find(false, _isInstalled) is not null;
 
     public string? UnavailableReason => IsAvailable ? null : FreeRdpLocator.NotInstalledMessage();
@@ -44,7 +47,10 @@ public sealed class FreeRdpSessionHost : ISessionHost
         if (client is null)
             return new MissingFreeRdpSession(connection, FreeRdpLocator.NotInstalledMessage());
 
-        var session = new FreeRdpSession(connection, client, _gatewayCredentials(connection), ct => PrepareVpnAsync(connection, ct), _post);
+        var session = new FreeRdpSession(connection, client, _gatewayCredentials(connection), ct => PrepareVpnAsync(connection, ct), _post)
+        {
+            CertificateDecider = CertificateDecider,
+        };
         lock (_sessions)
             _sessions.Add(session);
         session.Closed += (_, _) =>
@@ -67,10 +73,8 @@ public sealed class FreeRdpSessionHost : ISessionHost
             return null; // la VPN non è configurata su questo PC: si prova comunque (potrebbe essere già raggiungibile)
         try
         {
-            var vpn = _vpn();
-            if (await vpn.IsConnectedAsync(ct).ConfigureAwait(false))
-                return null;
-            var result = await vpn.ConnectAsync(profile.ToConfig(), ct).ConfigureAwait(false);
+            // Servizio unico: il controllo «già accesa?» sta dentro il suo semaforo.
+            var result = await _vpn().EnsureConnectedAsync(profile.ToConfig(), ct).ConfigureAwait(false);
             return result.Success ? null : "Non riesco ad accendere la VPN: " + result.Message;
         }
         catch (OperationCanceledException)
@@ -91,13 +95,16 @@ public sealed class FreeRdpSessionHost : ISessionHost
             open = [.. _sessions];
         foreach (var s in open)
             s.Close();
-        Task.WaitAll(open.Select(s => s.StopTask).ToArray(), wait);
+        // Mai bloccare il thread dell'interfaccia: l'attesa gira su un altro thread, e qui si aspetta solo il tempo concesso.
+        var stops = open.Select(s => s.StopTask).ToArray();
+        try { Task.Run(() => Task.WaitAll(stops, wait)).Wait(wait + TimeSpan.FromMilliseconds(250)); }
+        catch (AggregateException) { }
     }
 }
 
 internal static class LinuxPlatformInitHelper
 {
-    public static LinuxWireGuard CreateVpn() => global::RdpManager.Platform.Linux.LinuxPlatformInit.CreateVpn();
+    public static LinuxWireGuard CreateVpn() => global::RdpManager.Platform.Linux.LinuxPlatformInit.Vpn;
 }
 
 /// <summary>Scheda aperta senza FreeRDP: spiega come installarlo.</summary>

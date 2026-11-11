@@ -1,3 +1,4 @@
+using RdpManager.Linux.ViewModels.Settings;
 using System.Security.Cryptography;
 using RdpManager.Core;
 using RdpManager.Linux.Platform;
@@ -121,28 +122,66 @@ public class ProfilesViewModelTests
     }
 }
 
+[Collection("Globali")]
 public class SettingsViewModelTests
 {
+    private static T Page<T>(SettingsViewModel vm) where T : SettingsPageViewModel => vm.Pages.OfType<T>().Single();
+
     [Fact]
-    public void Apply_scrive_le_scelte_sulle_impostazioni()
+    public void Apply_scrive_le_scelte_di_ogni_pagina_sulle_impostazioni()
     {
         var settings = new AppSettings();
-        var vm = new SettingsViewModel(settings, "/x/connections.json")
-        {
-            Theme = Choices.Pick(Choices.Theme, AppTheme.Dark),
-            Order = Choices.Pick(Choices.Order, ConnectionOrder.Manual),
-            Update = Choices.Pick(Choices.Update, UpdateMode.Off),
-            HistoryEnabled = false,
-            VerboseLog = true,
-        };
+        var vm = new SettingsViewModel(settings, "/x/connections.json");
+        Page<AspettoPageViewModel>(vm).Theme = Choices.Pick(Choices.Theme, AppTheme.Dark);
+        Page<ElencoPageViewModel>(vm).ManualOrder = true;
+        Page<AggiornamentiPageViewModel>(vm).Update = Choices.Pick(Choices.Update, UpdateMode.Off);
+        Page<AvvioPageViewModel>(vm).HistoryEnabled = false;
+        Page<AvvioPageViewModel>(vm).VerboseLog = true;
 
         vm.Apply();
 
         Assert.Equal((AppTheme.Dark, ConnectionOrder.Manual, UpdateMode.Off, false, true),
             (settings.Theme, settings.ConnectionOrder, settings.UpdateMode, settings.HistoryEnabled, settings.VerboseLog));
     }
+
+    [Fact]
+    public void Le_pagine_sono_quelle_del_documento_di_parita()
+    {
+        var vm = new SettingsViewModel(new AppSettings(), "/x/connections.json");
+        Assert.Equal(["Aspetto", "Avvio", "Elenco", "PIN", "Area di notifica", "Monitor", "Tocco", "Scorciatoie", "Aggiornamenti"],
+            vm.Pages.Select(p => p.Title));
+        Assert.Same(vm.Pages[0], vm.SelectedPage);
+    }
+
+    [Fact]
+    public void Ogni_pagina_ha_la_sua_vista()
+    {
+        var vm = new SettingsViewModel(new AppSettings(), "/x/connections.json");
+        foreach (var page in vm.Pages)
+            Assert.NotNull(RdpManager.Linux.Dialogs.Settings.SettingsPageTemplate.ViewTypeFor(page.GetType()));
+    }
+
+    [Fact]
+    public void La_casella_della_cronologia_ha_l_etichetta_giusta_e_la_pagina_non_tocca_altro()
+    {
+        var settings = new AppSettings { HistoryEnabled = true };
+        var page = Page<AvvioPageViewModel>(new SettingsViewModel(settings, "/x/c.json"));
+        Assert.True(page.HistoryEnabled);
+        var axaml = File.ReadAllText(RepoFile("src/RdpManager.Linux/Dialogs/Settings/PaginaAvvio.axaml"));
+        Assert.Contains("Registra la cronologia delle connessioni", axaml);
+        Assert.DoesNotContain("Ricorda le ultime connessioni", axaml);
+    }
+
+    internal static string RepoFile(string relative)
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, relative)))
+            dir = dir.Parent;
+        return dir is null ? throw new FileNotFoundException(relative) : Path.Combine(dir.FullName, relative);
+    }
 }
 
+[Collection("Globali")]
 public class FileKeySecretStoreTests
 {
     [Fact]

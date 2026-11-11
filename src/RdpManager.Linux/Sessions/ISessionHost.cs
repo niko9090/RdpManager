@@ -37,6 +37,12 @@ public interface ISession
     /// <summary>Il titolo della scheda è cambiato (per esempio «(disconnesso)»).</summary>
     event EventHandler? TitleChanged { add { } remove { } }
 
+    /// <summary>
+    /// L'app si blocca (<paramref name="hidden"/> vero) o si sblocca: una sessione in una finestra propria, fuori dalla finestra
+    /// principale, deve ridursi a icona, altrimenti resterebbe visibile e usabile sopra la schermata del PIN.
+    /// </summary>
+    void SetHidden(bool hidden) { }
+
     /// <summary>Chiude la sessione e libera le risorse.</summary>
     void Close();
 

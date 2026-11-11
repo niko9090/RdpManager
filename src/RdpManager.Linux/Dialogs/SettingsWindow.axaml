@@ -1,9 +1,11 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:RdpManager.Linux.ViewModels"
+        xmlns:vms="using:RdpManager.Linux.ViewModels.Settings"
+        xmlns:pages="using:RdpManager.Linux.Dialogs.Settings"
         x:Class="RdpManager.Linux.Dialogs.SettingsWindow"
         x:DataType="vm:SettingsViewModel"
-        Title="Impostazioni" Width="520" Height="500" MinWidth="380" MinHeight="380"
+        Title="Impostazioni" Width="720" Height="520" MinWidth="520" MinHeight="380"
         WindowStartupLocation="CenterOwner">
 
   <DockPanel>
@@ -14,19 +16,23 @@
       </StackPanel>
     </Border>
 
-    <ScrollViewer>
-      <StackPanel Spacing="10" Margin="20">
-        <TextBlock Classes="section" Margin="0,0,0,4" Text="Aspetto e comportamento" />
-        <Grid ColumnDefinitions="170,*"><TextBlock Classes="label" Text="Tema" /><ComboBox Grid.Column="1" ItemsSource="{Binding ThemeChoices}" SelectedItem="{Binding Theme}" HorizontalAlignment="Stretch" /></Grid>
-        <Grid ColumnDefinitions="170,*"><TextBlock Classes="label" Text="Ordine delle connessioni" /><ComboBox Grid.Column="1" ItemsSource="{Binding OrderChoices}" SelectedItem="{Binding Order}" HorizontalAlignment="Stretch" /></Grid>
-        <Grid ColumnDefinitions="170,*"><TextBlock Classes="label" Text="Aggiornamenti" /><ComboBox Grid.Column="1" ItemsSource="{Binding UpdateChoices}" SelectedItem="{Binding Update}" HorizontalAlignment="Stretch" /></Grid>
-        <Grid ColumnDefinitions="170,*"><CheckBox Grid.Column="1" Content="Ricorda le ultime connessioni aperte" IsChecked="{Binding HistoryEnabled}" /></Grid>
-        <Grid ColumnDefinitions="170,*"><CheckBox Grid.Column="1" Content="Registro dettagliato (per cercare i guasti)" IsChecked="{Binding VerboseLog}" /></Grid>
+    <!-- Navigazione a sinistra: una voce per pagina -->
+    <Border DockPanel.Dock="Left" Width="190" Background="{DynamicResource AppSidebarBrush}">
+      <ListBox ItemsSource="{Binding Pages}" SelectedItem="{Binding SelectedPage}" Background="Transparent" Margin="6">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="vms:SettingsPageViewModel">
+            <TextBlock Text="{Binding Title}" Margin="6,4" />
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </Border>
 
-        <TextBlock Classes="section" Text="Dati" />
-        <TextBlock Classes="muted" TextWrapping="Wrap" Text="File dei dati (lo stesso dell'app Windows, per la sincronizzazione)" />
-        <TextBox Text="{Binding DataFilePath}" IsReadOnly="True" />
-      </StackPanel>
+    <ScrollViewer>
+      <ContentControl Content="{Binding SelectedPage}" Margin="20">
+        <ContentControl.DataTemplates>
+          <pages:SettingsPageTemplate />
+        </ContentControl.DataTemplates>
+      </ContentControl>
     </ScrollViewer>
   </DockPanel>
 </Window>

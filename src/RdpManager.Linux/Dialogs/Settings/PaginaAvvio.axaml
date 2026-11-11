@@ -1,0 +1,23 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:RdpManager.Linux.ViewModels.Settings"
+             x:Class="RdpManager.Linux.Dialogs.Settings.PaginaAvvio"
+             x:DataType="vm:AvvioPageViewModel">
+  <!-- Pagina Impostazioni «Avvio» (blocco A). -->
+  <StackPanel Spacing="10">
+    <TextBlock Classes="section" Margin="0,0,0,4" Text="Avvio" />
+    <CheckBox Content="Riapri all'avvio le sessioni lasciate aperte" IsChecked="{Binding ReopenSessionsOnStartup}" />
+    <TextBlock Classes="muted" TextWrapping="Wrap" Text="Le sessioni aperte alla chiusura si riaprono da sole." />
+    <TextBlock Classes="section" Text="Cronologia e log" />
+    <CheckBox Content="Registra la cronologia delle connessioni" IsChecked="{Binding HistoryEnabled}" />
+    <TextBlock Classes="muted" TextWrapping="Wrap" Text="Annota inizio, fine e motivo di ogni sessione (Connessioni › Cronologia)." />
+    <CheckBox Content="Registro dettagliato (per cercare i guasti)" IsChecked="{Binding VerboseLog}" />
+    <TextBlock Classes="muted" TextWrapping="Wrap" Text="Anche gli indirizzi dei PC; mai le password." />
+    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding LogFolderNote}" />
+    <Button Content="Apri la cartella dei log" Command="{Binding OpenLogFolderCommand}" HorizontalAlignment="Left" />
+    <TextBlock Classes="section" Text="Dati" />
+    <TextBlock Classes="muted" TextWrapping="Wrap" Text="File dei dati (lo stesso dell'app Windows, per la sincronizzazione)" />
+    <TextBox Text="{Binding DataFilePath, Mode=OneWay}" IsReadOnly="True" />
+    <Button Content="Apri la cartella dei dati" Command="{Binding OpenDataFolderCommand}" HorizontalAlignment="Left" />
+  </StackPanel>
+</UserControl>

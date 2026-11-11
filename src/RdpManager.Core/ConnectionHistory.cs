@@ -165,7 +165,14 @@ public sealed class HistoryStore
             if (File.Exists(FilePath))
                 history = JsonSerializer.Deserialize<ConnectionHistory>(File.ReadAllText(FilePath), JsonOptions);
         }
-        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
+        catch (JsonException)
+        {
+            // Rovinato: si tiene da parte come history.json.bad, così il prossimo salvataggio non lo cancella.
+            history = null;
+            try { File.Move(FilePath, FilePath + ".bad", overwrite: true); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             history = null;
         }

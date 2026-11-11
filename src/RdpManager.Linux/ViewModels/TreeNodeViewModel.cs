@@ -7,6 +7,7 @@ namespace RdpManager.Linux.ViewModels;
 public sealed class TreeNodeViewModel : ViewModelBase
 {
     private bool _isExpanded;
+    private ReachabilityStatus _reachability;
 
     private TreeNodeViewModel(string title, string subtitle, string folderPath, RdpConnection? connection)
     {
@@ -44,4 +45,38 @@ public sealed class TreeNodeViewModel : ViewModelBase
 
     /// <summary>Chiave stabile per ritrovare la riga dopo una ricostruzione dell'albero.</summary>
     public string Key => Connection is { } c ? "c:" + c.Id : "f:" + FolderPath;
+
+    /// <summary>Colore dell'etichetta («#RRGGBB»); vuoto se la connessione non ne ha.</summary>
+    public string LabelColor => Connection?.Color is { } c ? RdpConnection.NormalizeColor(c) ?? "" : "";
+
+    public bool HasLabelColor => LabelColor.Length > 0;
+
+    /// <summary>Esito dell'ultima verifica di raggiungibilità (#13).</summary>
+    public ReachabilityStatus Reachability
+    {
+        get => _reachability;
+        set
+        {
+            if (!Set(ref _reachability, value))
+                return;
+            OnPropertyChanged(nameof(StatusText));
+            OnPropertyChanged(nameof(StatusColor));
+        }
+    }
+
+    /// <summary>«Raggiungibile», «Non raggiungibile» o «Non verificata» (solo connessioni).</summary>
+    public string StatusText => IsFolder ? "" : _reachability switch
+    {
+        ReachabilityStatus.Reachable => "Raggiungibile",
+        ReachabilityStatus.Unreachable => "Non raggiungibile",
+        _ => "Non verificata",
+    };
+
+    /// <summary>Colore del pallino di stato: verde se raggiungibile, grigio se no, vuoto se non verificata.</summary>
+    public string StatusColor => _reachability switch
+    {
+        ReachabilityStatus.Reachable => "#2EA043",
+        ReachabilityStatus.Unreachable => "#969696",
+        _ => "",
+    };
 }

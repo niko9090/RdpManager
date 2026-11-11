@@ -1,6 +1,9 @@
 using System.Runtime.CompilerServices;
 using RdpManager.Core;
+using RdpManager.Linux.Features;
 using RdpManager.Linux.Platform;
+using RdpManager.Platform.Linux;
+using RdpManager.Linux.Services;
 using RdpManager.Linux.Sessions;
 using RdpManager.Linux.ViewModels;
 
@@ -9,9 +12,18 @@ namespace RdpManager.Linux.Tests;
 internal static class TestModuleInit
 {
     [ModuleInitializer]
-    internal static void Init() =>
+    internal static void Init()
+    {
         SecretStore.Current = new FileKeySecretStore(Path.Combine(Path.GetTempPath(), "rdpm-linux-tests-" + Guid.NewGuid().ToString("N") + ".key"));
+        SecretStore.Current.Protect([1], null); // crea subito la chiave, prima che partano i test in parallelo
+        KdfSettings.ExportIterations = 1000;
+        KdfSettings.PinIterations = 10_000;
+        KdfSettings.SyncIterations = 1000;
+    }
 }
+
+[CollectionDefinition("Globali", DisableParallelization = true)]
+public sealed class GlobaliCollection;
 
 /// <summary>Cartella temporanea con il file dei dati di una prova.</summary>
 internal sealed class TempData : IDisposable
@@ -70,6 +82,15 @@ internal static class Seed
     public static RdpConnection Conn(string name, string host, string group = "") =>
         new() { Name = name, Host = host, Group = group };
 
-    public static MainWindowViewModel Main(TempData data, FakeDialogs? dialogs = null, ISessionHost? host = null) =>
-        new(data.Store, host ?? new PlaceholderSessionHost(), dialogs ?? new FakeDialogs());
+    /// <summary>
+    /// Finestra principale per le prove: niente servizi veri. Shell finta (niente xdg-open), VPN con processi finti
+    /// e .conf nella cartella temporanea, controllo aggiornamenti che risponde subito "non disponibile" (niente rete).
+    /// </summary>
+    public static MainWindowViewModel Main(TempData data, FakeDialogs? dialogs = null, ISessionHost? host = null, FakeShell? shell = null) =>
+        new(data.Store, host ?? new PlaceholderSessionHost(), dialogs ?? new FakeDialogs(), shell ?? new FakeShell())
+        {
+            Ui = new NullShellUi(),
+            VpnFactory = () => new LinuxWireGuard(new RecordingRunner(), Path.Combine(Path.GetDirectoryName(data.FilePath)!, "RdpManager.conf"), LinuxVpnBackend.NetworkManager),
+            UpdateCheck = _ => Task.FromResult(UpdateCheckResult.Unavailable),
+        };
 }

@@ -35,9 +35,17 @@ public sealed class RelayCommand : ICommand
 
     public event EventHandler? CanExecuteChanged;
 
-    public bool CanExecute(object? parameter) => _canExecute?.Invoke() ?? true;
+    /// <summary>Se restituisce vero il comando è spento (per esempio con l'app bloccata): non si può eseguire in nessun modo.</summary>
+    public Func<bool>? Disabled { get; set; }
 
-    public void Execute(object? parameter) => _execute();
+    public bool CanExecute(object? parameter) => !(Disabled?.Invoke() ?? false) && (_canExecute?.Invoke() ?? true);
+
+    public void Execute(object? parameter)
+    {
+        if (Disabled?.Invoke() ?? false)
+            return;
+        _execute();
+    }
 
     public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
 }

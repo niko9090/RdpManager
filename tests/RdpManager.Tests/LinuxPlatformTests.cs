@@ -247,19 +247,31 @@ public sealed class LinuxPlatformTests : IDisposable
     public async Task Connetti_NetworkManager_SequenzaEFileConf()
     {
         var conf = Path.Combine(_dir, "vpn", "RdpManager.conf");
-        var r = new FakeRunner();
-        var wg = new LinuxWireGuard(r, conf, LinuxVpnBackend.NetworkManager);
         var cfg = SampleConfig();
+        // Il .conf esiste solo durante l'import: NetworkManager ha la sua copia, la chiave non resta su disco.
+        // Quindi lo si legge mentre il comando di import gira.
+        string? textAtImport = null;
+        var r = new FakeRunner();
+        r.Handler = l =>
+        {
+            if (l.Contains(" import "))
+            {
+                textAtImport = File.ReadAllText(conf);
+                if (!OperatingSystem.IsWindows())
+                    Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(conf));
+            }
+            return new ProcessResult(0, "", "");
+        };
+        var wg = new LinuxWireGuard(r, conf, LinuxVpnBackend.NetworkManager);
         var res = await wg.ConnectAsync(cfg);
         Assert.True(res.Success);
         Assert.Equal(
             ["nmcli connection delete RdpManager", "nmcli connection import type wireguard file " + conf, "nmcli connection up RdpManager"],
             r.Calls);
-        var text = File.ReadAllText(conf);
-        Assert.DoesNotContain('\r', text);
-        Assert.Contains("PrivateKey = " + cfg.PrivateKey, text);
-        if (!OperatingSystem.IsWindows())
-            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(conf));
+        Assert.NotNull(textAtImport);
+        Assert.DoesNotContain('\r', textAtImport);
+        Assert.Contains("PrivateKey = " + cfg.PrivateKey, textAtImport);
+        Assert.False(File.Exists(conf), "la copia con la chiave privata va cancellata dopo l'import");
     }
 
     [Fact]

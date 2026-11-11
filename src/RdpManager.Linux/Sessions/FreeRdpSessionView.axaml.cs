@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 
 namespace RdpManager.Linux.Sessions;
 
@@ -8,6 +9,7 @@ namespace RdpManager.Linux.Sessions;
 public sealed partial class FreeRdpSessionView : UserControl
 {
     private bool _decided;
+    private bool _surfaceCreated;
 
     public FreeRdpSessionView()
     {
@@ -31,6 +33,7 @@ public sealed partial class FreeRdpSessionView : UserControl
         var host = new X11EmbedHost();
         host.Created += xid =>
         {
+            _surfaceCreated = true;
             // Si parte quando la superficie ha una dimensione vera (altrimenti /size sarebbe quella provvisoria).
             void TryStart()
             {
@@ -49,13 +52,23 @@ public sealed partial class FreeRdpSessionView : UserControl
         SurfaceHost.Children.Add(host);
 
         // Se dopo qualche secondo la superficie non è nata (X11 senza libX11, ecc.) si ripiega sulla finestra separata.
-        DispatcherTimer.RunOnce(() =>
+        // Il ripiego guarda se la superficie è nata, non se la sessione è già partita: una scheda in secondo piano non ha
+        // ancora dimensioni, ma la sua superficie c'è. Se la vista è uscita dalla finestra il ripiego non serve più.
+        void Fallback()
         {
-            if (!session.IsEmbedded)
+            if (_surfaceCreated || session.IsEmbedded)
+                return;
+            if (this.GetVisualRoot() is null)
+                return; // la vista non è più nella finestra: niente ripiego
+            if (!this.IsEffectivelyVisible)
             {
-                SurfaceHost.Children.Remove(host);
-                session.StartDetached();
+                // Scheda in secondo piano: la superficie nasce solo quando la scheda si vede. Si riguarda più tardi.
+                DispatcherTimer.RunOnce(Fallback, TimeSpan.FromSeconds(4));
+                return;
             }
-        }, TimeSpan.FromSeconds(4));
+            SurfaceHost.Children.Remove(host);
+            session.StartDetached();
+        }
+        DispatcherTimer.RunOnce(Fallback, TimeSpan.FromSeconds(4));
     }
 }
