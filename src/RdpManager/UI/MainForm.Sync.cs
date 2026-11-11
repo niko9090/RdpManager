@@ -132,7 +132,8 @@ public sealed partial class MainForm
 
     internal void ShowSyncAccount()
     {
-        using var dlg = new SyncAccountDialog(_sync, () => RunSyncAsync(manual: true), () => _lastSync, EnsureVpnAsync);
+        using var dlg = new SyncAccountDialog(_sync, () => RunSyncAsync(manual: true), () => _lastSync, EnsureVpnAsync,
+            importFile: path => ImportConfigFileAsync(path, Form.ActiveForm));
         ThemeManager.Apply(dlg);
         dlg.ShowDialog(this);
     }

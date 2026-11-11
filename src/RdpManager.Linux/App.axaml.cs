@@ -40,6 +40,7 @@ public sealed class App : Application
             sessions.CertificateDecider = prompt => shell.AskCertificateAsync(prompt);
             viewModel = new MainWindowViewModel(new ConnectionStore(), sessions, dialogs);
             _viewModel = viewModel;
+            viewModel.StartupConfigFile = Program.StartupConfigFile;
             viewModel.ExitRequested += (_, _) => _exiting = true; // prima del gestore della finestra, che chiude
             desktop.Exit += (_, _) =>
             {

@@ -18,13 +18,15 @@ internal sealed class SyncAccountDialog : TouchForm
     private readonly Button _syncButton = new() { Text = "Sincronizza ora", AutoSize = true };
     private readonly Button _signOut = new() { Text = "Esci dall'account", AutoSize = true };
     private readonly Func<Task<string>>? _afterSignIn;
+    private readonly Func<string, Task>? _importFile;
     private readonly Button _import = new() { Text = "Importa configurazione…", AutoSize = true };
     private string? _registrationCode;
     private bool _busy;
 
     public SyncAccountDialog(SyncService sync, Func<Task<SyncOutcome>> syncNow, Func<SyncOutcome?> lastOutcome,
-        Func<Task<string>>? afterSignIn = null)
+        Func<Task<string>>? afterSignIn = null, Func<string, Task>? importFile = null)
     {
+        _importFile = importFile;
         _afterSignIn = afterSignIn;
         _sync = sync;
         _syncNow = syncNow;
@@ -179,21 +181,32 @@ internal sealed class SyncAccountDialog : TouchForm
         }
     }
 
-    private void ImportConfig()
+    private async void ImportConfig()
     {
         if (_busy)
             return;
         using var open = new OpenFileDialog
         {
             Title = "Importa configurazione",
-            Filter = "Configurazione RdpManager (*.json)|*.json|Tutti i file (*.*)|*.*",
-            FileName = ClientConfig.FileName,
+            Filter = "File di configurazione (*.rdpmconfig;*.json;*.conf)|*.rdpmconfig;*.json;*.conf|Tutti i file (*.*)|*.*",
         };
         if (open.ShowDialog(this) != DialogResult.OK)
             return;
+        var path = open.FileName;
+        // .rdpmconfig e .conf: import completo (server, VPN, registrazione del PC, accensione), come «Carica file di configurazione».
+        if (_importFile is not null && !path.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+        {
+            SetBusy(true, "Carico il file di configurazione…");
+            try { await _importFile(path); }
+            finally { SetBusy(false); }
+            _server.Text = _sync.State.ServerUrl.Length > 0 ? _sync.State.ServerUrl : _server.Text;
+            if (ClientConfig.FindDefault(exeFolder: "") is { } saved)
+                Apply(saved);
+            return;
+        }
         try
         {
-            Apply(ClientConfig.Load(open.FileName));
+            Apply(ClientConfig.Load(path));
             _status.Text = "Configurazione importata: ora scrivi nome utente e password e premi «Registrati» (o «Accedi»).";
         }
         catch (Exception ex) when (ex is FormatException or FileNotFoundException)

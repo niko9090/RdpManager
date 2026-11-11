@@ -65,6 +65,13 @@ Prova da fuori LAN: `curl https://<tuo-dominio>:8443/health`. Con un'altra porta
 Prova completa: dall'app, *Strumenti -> Account e sincronizzazione -> Registrati*; a fine registrazione la VPN è
 accesa e `sudo /usr/local/bin/docker exec rdpm-sync wg show wg0` mostra il nuovo peer con un «latest handshake».
 
+**File di configurazione per i client (`.rdpmconfig`)**: invece di far compilare campi, si consegna un file con i valori veri del
+server (endpoint, chiave pubblica, codice di registrazione, DNS). Dal server:
+`docker exec rdpm-sync dotnet rdpm-sync.dll export-client-config --url https://<tuo-dominio>:8443 > RdpManager.rdpmconfig`
+(facoltativi: `--url-interno http://10.66.0.1:8787`, `--utente U --password P`, `--senza-chiave-al-server`). Dal PC di gestione,
+senza entrare nel NAS: `pwsh scripts/new-client-config.ps1` (legge i valori da `config/locale.json` e via ssh). Il file contiene
+il codice di registrazione: consegnalo in privato. Formato e uso nel README, sezione «File di configurazione unico».
+
 Impostazioni facoltative in `.env`: `RDPM_VPN_ENDPOINT` (il deploy lo scrive dal dominio di `config/locale.json`), `RDPM_VPN_DNS`,
 `RDPM_SYNC_OPEN_REGISTRATION=1` (registrazione libera, sconsigliata: chi si registra entra nella VPN).
 

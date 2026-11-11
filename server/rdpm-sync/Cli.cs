@@ -47,6 +47,8 @@ public static class Cli
                 }
                 output.WriteLine($"Account «{args[1]}» eliminato (con documento e token).");
                 return 0;
+            case "export-client-config":
+                return ExportClientConfig(args, options, output);
             case "--health" when args.Length == 1:
                 try
                 {
@@ -58,9 +60,43 @@ public static class Cli
                     return 1;
                 }
             default:
-                output.WriteLine("Comandi: crea-account <utente> | lista-account | elimina-account <utente> | --health");
+                output.WriteLine("Comandi: crea-account <utente> | lista-account | elimina-account <utente> | export-client-config --url <indirizzo> | --health");
                 return 2;
         }
+    }
+
+    /// <summary>
+    /// <c>export-client-config --url https://vpn.example.com:8443 [--url-interno http://10.66.0.1:8787] [--utente U --password P]
+    /// [--senza-chiave-al-server]</c>: stampa il .rdpmconfig con i valori del server (redirigi l'uscita su un file).
+    /// </summary>
+    private static int ExportClientConfig(string[] args, SyncOptions options, TextWriter output)
+    {
+        string? url = null, inside = null, user = null, password = null;
+        bool requestKey = true;
+        for (int i = 1; i < args.Length; i++)
+        {
+            string? Next() => i + 1 < args.Length ? args[++i] : null;
+            switch (args[i])
+            {
+                case "--url": url = Next(); break;
+                case "--url-interno": inside = Next(); break;
+                case "--utente": user = Next(); break;
+                case "--password": password = Next(); break;
+                case "--senza-chiave-al-server": requestKey = false; break;
+                default:
+                    output.WriteLine($"Opzione sconosciuta: {args[i]}");
+                    return 2;
+            }
+        }
+        var (json, errors) = ClientConfigExport.Build(options, url ?? "", inside, user, password, requestKey);
+        if (json is null)
+        {
+            foreach (var e in errors)
+                output.WriteLine(e);
+            return 2;
+        }
+        output.Write(json);
+        return 0;
     }
 
     private static string? ReadPassword(TextReader input, TextWriter output)

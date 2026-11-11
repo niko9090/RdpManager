@@ -8,4 +8,5 @@ Icon=rdpmanager
 Terminal=false
 Categories=Network;RemoteAccess;
 Keywords=rdp;remote;desktop;freerdp;
+MimeType=application/x-rdpmconfig;
 StartupWMClass=RdpManager.Linux

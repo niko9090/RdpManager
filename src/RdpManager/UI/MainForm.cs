@@ -110,6 +110,7 @@ public sealed partial class MainForm : Form
         Load += (_, _) => PlaceOnPreferredMonitor();
         Shown += (_, _) => ReopenSessions();
         Shown += (_, _) => ShowUpdateFailure();
+        Shown += (_, _) => RunPendingConfigFile();
         if (_backgroundChecks)
         {
             Shown += async (_, _) => await CheckReachabilityAsync(_doc.Connections.ToList());
@@ -249,6 +250,8 @@ public sealed partial class MainForm : Form
         tools.DropDownItems.Add(Item("Cerca &PC in rete…", Keys.None, (_, _) => ShowNetworkScan()));
         tools.DropDownItems.Add(Item("&VPN (WireGuard)…", Keys.None, (_, _) => ShowVpn()));
         tools.DropDownItems.Add(Item("Account e &sincronizzazione…", Keys.None, (_, _) => ShowSyncAccount()));
+        tools.DropDownItems.Add(Item("&Carica file di configurazione…", Keys.None,
+            async (_, _) => { if (PickConfigFile(this) is { } file) await ImportConfigFileAsync(file, this); }));
 
         var workspaces = new ToolStripMenuItem("Spazi di la&voro");
         workspaces.DropDownItems.Add("(caricamento)");
