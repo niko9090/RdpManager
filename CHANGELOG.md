@@ -1,5 +1,22 @@
 # Novità di RdpManager
 
+## 1.13.0 (2026-11-11)
+
+**Programma Linux alla pari con Windows**
+- Il programma per Linux ora ha le stesse funzioni della versione Windows: menu completo, selezione multipla, impostazioni delle cartelle, ricerca rapida, verifica dei PC raggiungibili, accensione a distanza e ricerca dei PC in rete.
+- Importa ed esporta file .rdp, .rdpm e CSV, testi rapidi, cronologia delle sessioni, PIN e blocco del programma.
+- Schede e finestre: sessione staccabile in una finestra, vista affiancata, schermo intero con barra, scelta del monitor, spazi di lavoro, icona nel vassoio e scorciatoia globale, funzioni per il tocco.
+- Avviso sul certificato del server con scelta «fidati / rifiuta».
+- Account di sincronizzazione, VPN WireGuard e aggiornamenti dal programma, come su Windows. Il confronto funzione per funzione è in docs/linux-parita.md.
+
+**Correzioni**
+- Sincronizzazione e VPN su Linux: corretti vari difetti emersi dalla revisione (sincronizzazione più sicura, una sola VPN attiva, gestione dei processi, account e impostazioni).
+- Il PIN non si può più aggirare; corretti l'avvio di FreeRDP, alcuni dialoghi e il rilevamento dell'inattività del sistema.
+- La chiave della VPN non resta più su disco: il file di configurazione viene cancellato dopo l'importazione.
+
+**Per chi sviluppa**
+- Le prove Linux sono più stabili e non usano più servizi veri (shell, VPN, controllo aggiornamenti).
+
 ## 1.12.4 (2026-11-10)
 
 **Correzioni**
