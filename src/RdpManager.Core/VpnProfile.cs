@@ -13,6 +13,8 @@ public sealed class VpnProfile
     public string Endpoint { get; set; } = VpnDefaults.DefaultEndpoint;
     public string ServerPublicKey { get; set; } = "";
     public string Dns { get; set; } = "";
+    public string AllowedIPs { get; set; } = VpnDefaults.Network;
+    public int PersistentKeepalive { get; set; } = VpnDefaults.Keepalive;
     public string PcName { get; set; } = "";
 
     public static string DefaultPath => Path.Combine(AppPaths.ConfigFolder, "vpn.json");
@@ -45,6 +47,8 @@ public sealed class VpnProfile
             Dns = Dns,
             PeerPublicKey = ServerPublicKey,
             Endpoint = Endpoint,
+            AllowedIPs = AllowedIPs.Length > 0 ? AllowedIPs : VpnDefaults.Network,
+            PersistentKeepalive = PersistentKeepalive,
         };
     }
 

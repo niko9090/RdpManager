@@ -24,11 +24,12 @@ trap 'rm -rf "$WORK"' EXIT
 
 # Albero di installazione comune: /opt/rdpmanager, /usr/bin/rdpmanager, .desktop, icona.
 ROOT="$WORK/root"
-mkdir -p "$ROOT/opt/rdpmanager" "$ROOT/usr/bin" "$ROOT/usr/share/applications" "$ROOT/usr/share/icons/hicolor/256x256/apps"
+mkdir -p "$ROOT/opt/rdpmanager" "$ROOT/usr/bin" "$ROOT/usr/share/applications" "$ROOT/usr/share/mime/packages" "$ROOT/usr/share/icons/hicolor/256x256/apps"
 cp -a "$PUBLISH/." "$ROOT/opt/rdpmanager/"
 find "$ROOT/opt/rdpmanager" -name '*.pdb' -delete
 ln -s "/opt/rdpmanager/$BIN" "$ROOT/usr/bin/rdpmanager"
 install -m 644 "$HERE/rdpmanager.desktop" "$ROOT/usr/share/applications/rdpmanager.desktop"
+install -m 644 "$HERE/rdpmanager-rdpmconfig.xml" "$ROOT/usr/share/mime/packages/rdpmanager-rdpmconfig.xml"
 install -m 644 "$HERE/rdpmanager.png" "$ROOT/usr/share/icons/hicolor/256x256/apps/rdpmanager.png"
 find "$ROOT" -type d -exec chmod 755 {} +
 find "$ROOT/opt/rdpmanager" -type f -exec chmod 644 {} +
@@ -95,6 +96,7 @@ cp -a $ROOT/. %{buildroot}/
 /opt/rdpmanager
 /usr/bin/rdpmanager
 /usr/share/applications/rdpmanager.desktop
+/usr/share/mime/packages/rdpmanager-rdpmconfig.xml
 /usr/share/icons/hicolor/256x256/apps/rdpmanager.png
 EOF
 rpmbuild -bb --quiet --define "_topdir $RPMTOP" --define "_rpmdir $RPMTOP/RPMS" "$RPMTOP/SPECS/rdpmanager.spec"
@@ -109,6 +111,8 @@ mkdir -p "$APPDIR/opt"
 cp -a "$ROOT/opt/rdpmanager" "$APPDIR/opt/rdpmanager"
 install -m 644 "$HERE/rdpmanager.desktop" "$APPDIR/rdpmanager.desktop"
 sed -i 's|^Exec=.*|Exec=AppRun %F|' "$APPDIR/rdpmanager.desktop"
+mkdir -p "$APPDIR/usr/share/mime/packages"
+install -m 644 "$HERE/rdpmanager-rdpmconfig.xml" "$APPDIR/usr/share/mime/packages/rdpmanager-rdpmconfig.xml"
 install -m 644 "$HERE/rdpmanager.png" "$APPDIR/rdpmanager.png"
 ln -s rdpmanager.png "$APPDIR/.DirIcon"
 cat > "$APPDIR/AppRun" <<'EOF'

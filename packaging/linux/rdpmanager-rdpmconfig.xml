@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-rdpmconfig">
+    <comment>File di configurazione RdpManager</comment>
+    <comment xml:lang="it">File di configurazione RdpManager</comment>
+    <glob pattern="*.rdpmconfig"/>
+    <icon name="rdpmanager"/>
+  </mime-type>
+</mime-info>

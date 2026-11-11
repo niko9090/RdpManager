@@ -51,6 +51,9 @@ internal static class Program
         int f = Array.FindIndex(args, a => a.Equals(UpdateJob.FailedArgument, StringComparison.OrdinalIgnoreCase));
         if (f >= 0 && f + 1 < args.Length)
             form.UpdateFailureMessage = args[f + 1];
+        // «RdpManager.exe file.rdpmconfig» (anche col doppio clic): il file di configurazione si importa appena si apre la finestra.
+        if (RdpmConfigFile.FindArgument(args) is { } configFile)
+            form.PendingConfigFile = configFile;
         ShutdownWatchdog.Enabled = true; // solo qui il cane da guardia della chiusura può far uscire il processo
         Application.Run(form);
     }

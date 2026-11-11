@@ -15,7 +15,7 @@ public sealed partial class MainForm
             open.Activate();
             return;
         }
-        _vpn = new VpnForm(CreateTunnel());
+        _vpn = new VpnForm(CreateTunnel(), importFile: (owner, path) => ImportConfigFileAsync(path, owner));
         _vpn.FormClosed += (_, _) => _vpn = null;
         _vpn.Show(this);
     }
@@ -29,6 +29,83 @@ public sealed partial class MainForm
             VpnPaths.InstalledHash(programData), VpnPaths.Status(programData),
             VpnPaths.InboxConf(programData, VpnDefaults.TunnelName));
     }
+
+    /// <summary>File di configurazione dato sulla riga di comando (<c>RdpManager.exe file.rdpmconfig</c>, doppio clic): si importa all'apertura.</summary>
+    internal string? PendingConfigFile { get; set; }
+
+    /// <summary>Chiede il file con la finestra «Apri» e lo importa; null se si annulla.</summary>
+    internal static string? PickConfigFile(IWin32Window owner)
+    {
+        using var open = new OpenFileDialog
+        {
+            Title = "Carica file di configurazione",
+            Filter = "File di configurazione RdpManager (*.rdpmconfig)|*.rdpmconfig|Configurazione WireGuard (*.conf)|*.conf|Tutti i file (*.*)|*.*",
+            CheckFileExists = true,
+        };
+        return open.ShowDialog(owner) == DialogResult.OK ? open.FileName : null;
+    }
+
+    private void RunPendingConfigFile()
+    {
+        if (PendingConfigFile is not { } path)
+            return;
+        PendingConfigFile = null;
+        BeginInvoke(async () => await ImportConfigFileAsync(path, this));
+    }
+
+    /// <summary>
+    /// Importa un file di configurazione: salva tutto, registra il PC col server se serve, accende la VPN
+    /// (servizio o inbox, nessun UAC in più di quelli già previsti) e mostra il riepilogo «Fatto».
+    /// </summary>
+    internal async Task ImportConfigFileAsync(string path, IWin32Window? owner = null)
+    {
+        owner ??= this;
+        ConfigImportReport report;
+        try
+        {
+            UseWaitCursor = true;
+            report = await ConfigFileImporter.ImportFileAsync(path, _sync, ConnectTunnelAsync, ct: _shutdownCts.Token);
+        }
+        catch (ConfigFileException ex)
+        {
+            MessageBox.Show(owner, "Il file di configurazione non è valido.\n\n" + ex.Message, "Configurazione", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        catch (FileNotFoundException ex)
+        {
+            MessageBox.Show(owner, ex.Message, "Configurazione", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        finally
+        {
+            if (!IsDisposed)
+                UseWaitCursor = false;
+        }
+        AppLog.Default?.Info("File di configurazione importato: " + (report.Complete ? "completo" : "da completare"));
+        if (_sync.SignedIn && !IsDisposed)
+            _ = RunSyncAsync(manual: false);
+        MessageBox.Show(owner, report.Text, "Configurazione: " + report.Title, MessageBoxButtons.OK,
+            report.Complete ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+    }
+
+    private static Task<string?> ConnectTunnelAsync(WireGuardConfig config, CancellationToken ct) => Task.Run<string?>(() =>
+    {
+        if (!Vpn.WireGuardNative.DllPresent)
+            return "manca wireguard.dll accanto al programma.";
+        try
+        {
+            CreateTunnel().Accendi(config);
+            return null;
+        }
+        catch (Exception ex) when (ex is Vpn.VpnException or ArgumentException or InvalidOperationException)
+        {
+            return ex.Message;
+        }
+    }, ct);
 
     /// <summary>
     /// VPN automatica: se questo PC non ha ancora un profilo e si è nell'account, lo ottiene dal server (chiavi create qui,

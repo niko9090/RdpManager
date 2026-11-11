@@ -46,6 +46,8 @@ public static class VpnProvisioning
         profile.Endpoint = grant.Endpoint;
         profile.ServerPublicKey = grant.ServerPublicKey;
         profile.Dns = grant.Dns;
+        profile.AllowedIPs = grant.AllowedIPs;
+        profile.PersistentKeepalive = grant.PersistentKeepalive;
         if (grant.Name.Length > 0)
             profile.PcName = grant.Name;
     }

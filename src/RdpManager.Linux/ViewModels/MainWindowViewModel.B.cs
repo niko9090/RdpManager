@@ -61,6 +61,7 @@ public sealed partial class MainWindowViewModel
         _sidebarVisible = _sidebarPinned;
         RaiseLayout();
         ReopenSessions();
+        _ = RunStartupConfigFileAsync();
         if (!background)
             return;
         _autoSync = true;
@@ -530,18 +531,55 @@ public sealed partial class MainWindowViewModel
     /// <summary>Il servizio di sincronizzazione (creato al primo uso).</summary>
     public SyncService SyncService => _sync ??= new SyncService(SyncState.PathFor(_store), Services.KdfSettings.SyncIterations);
 
+    /// <summary>Cartella dove l'import del file di configurazione salva <c>rdpmanager-config.json</c> (null = quella dell'app; nelle prove una temporanea).</summary>
+    public string? ConfigDataFolder { get; set; }
+
+    /// <summary>File di configurazione dato sulla riga di comando (<c>rdpmanager file.rdpmconfig</c>): si importa all'avvio.</summary>
+    public string? StartupConfigFile { get; set; }
+
+    /// <summary>
+    /// Importa un file di configurazione (.rdpmconfig o .conf WireGuard): salva tutto, registra il PC, accende la VPN
+    /// (<see cref="LinuxWireGuard.EnsureConnectedAsync"/>) e restituisce il riepilogo da mostrare.
+    /// </summary>
+    public async Task<string> ImportConfigFileAsync(string path)
+    {
+        var report = await LinuxConfigImport.ImportAsync(path, SyncService, VpnFactory(), VpnProfilePath, ConfigDataFolder, _shutdown.Token);
+        if (SyncService.SignedIn)
+            _ = RunSyncAsync(manual: false);
+        Notice(report.Split('\n')[0]);
+        return report;
+    }
+
+    /// <summary>Strumenti, Carica file di configurazione…: scelta del file, import e riepilogo.</summary>
+    public RelayCommand LoadConfigFileCommand => AsyncCmd(async () =>
+    {
+        var path = await Ui.PickFileAsync("Carica file di configurazione", "File di configurazione RdpManager", "*.rdpmconfig", "*.conf");
+        if (path is not null)
+            await Ui.ShowTextAsync("Configurazione", await ImportConfigFileAsync(path));
+    });
+
+    private async Task RunStartupConfigFileAsync()
+    {
+        if (StartupConfigFile is not { } path)
+            return;
+        StartupConfigFile = null;
+        try { await Ui.ShowTextAsync("Configurazione", await ImportConfigFileAsync(path)); }
+        catch (OperationCanceledException) { }
+    }
+
     /// <summary>Strumenti, Account e sincronizzazione (#60, #61, #62).</summary>
     public RelayCommand SyncAccountCommand => AsyncCmd(async () =>
     {
         var account = new AccountViewModel(SyncService, () => RunSyncAsync(manual: true), () => _lastSync, Ui, _dialogs,
-            () => VpnViewModel.EnsureAsync(SyncService, VpnFactory(), VpnProfilePath, _shutdown.Token));
+            () => VpnViewModel.EnsureAsync(SyncService, VpnFactory(), VpnProfilePath, _shutdown.Token),
+            importFile: ImportConfigFileAsync);
         await Ui.ShowAccountAsync(account);
     });
 
     /// <summary>Strumenti, VPN WireGuard (#63, #64, #65).</summary>
     public RelayCommand VpnCommand => AsyncCmd(async () =>
     {
-        var vpn = new VpnViewModel(VpnFactory(), SyncService, Ui, _dialogs, VpnProfilePath);
+        var vpn = new VpnViewModel(VpnFactory(), SyncService, Ui, _dialogs, VpnProfilePath, ConfigDataFolder);
         await vpn.RefreshStateAsync();
         try { await Ui.ShowVpnAsync(vpn); }
         finally { vpn.Persist(); }

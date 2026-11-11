@@ -20,8 +20,12 @@ public sealed class VpnViewModel : ViewModelBase
     private string _publicKey = "", _fragment = "", _status = "Spenta", _message = "";
     private bool _connected, _busy;
 
-    public VpnViewModel(LinuxWireGuard tunnel, SyncService? sync, IShellUi ui, IDialogService dialogs, string? profilePath = null)
+    private readonly string? _dataFolder;
+
+    public VpnViewModel(LinuxWireGuard tunnel, SyncService? sync, IShellUi ui, IDialogService dialogs, string? profilePath = null,
+        string? dataFolder = null)
     {
+        _dataFolder = dataFolder;
         _tunnel = tunnel;
         _sync = sync;
         _ui = ui;
@@ -41,7 +45,58 @@ public sealed class VpnViewModel : ViewModelBase
         CopyFragmentCommand = new RelayCommand(() => _ = _ui.SetClipboardTextAsync(Fragment), () => Fragment.Length > 0);
         ToggleCommand = new RelayCommand(() => _ = ToggleAsync(), () => !Busy);
         ProvisionCommand = new RelayCommand(() => _ = ProvisionAsync(), () => !Busy && _sync is { SignedIn: true });
+        ImportConfigCommand = new RelayCommand(() => _ = PickAndImportAsync(), () => !Busy && _sync is not null);
         RefreshKeys();
+    }
+
+    /// <summary>«Carica file di configurazione…»: il percorso normale, senza campi da compilare.</summary>
+    public RelayCommand ImportConfigCommand { get; }
+
+    public string ImportExplanation =>
+        "Per usare la VPN basta caricare il file di configurazione che ti ha dato chi gestisce il server: "
+        + "il programma registra questo PC e accende la VPN. Niente da compilare.";
+
+    private async Task PickAndImportAsync()
+    {
+        var path = await _ui.PickFileAsync("Carica file di configurazione", "File di configurazione RdpManager", "*.rdpmconfig", "*.conf");
+        if (path is not null)
+            await ImportConfigFileAsync(path);
+    }
+
+    /// <summary>
+    /// Importa un file .rdpmconfig (o un .conf WireGuard): salva server e profilo VPN, registra il PC e accende la VPN
+    /// con <see cref="LinuxWireGuard.EnsureConnectedAsync"/>. Il riepilogo finisce in <see cref="Message"/>.
+    /// </summary>
+    public async Task ImportConfigFileAsync(string path)
+    {
+        if (_sync is null || Busy)
+            return;
+        Persist();
+        Busy = true;
+        try
+        {
+            Message = await LinuxConfigImport.ImportAsync(path, _sync, _tunnel, _profilePath, _dataFolder);
+            var fresh = VpnProfile.Load(_profilePath);
+            _profile.PcName = fresh.PcName;
+            _profile.Address = fresh.Address;
+            _profile.Endpoint = fresh.Endpoint;
+            _profile.ServerPublicKey = fresh.ServerPublicKey;
+            _profile.Dns = fresh.Dns;
+            _profile.AllowedIPs = fresh.AllowedIPs;
+            _profile.PersistentKeepalive = fresh.PersistentKeepalive;
+            _profile.PrivateKeyProtected = fresh.PrivateKeyProtected;
+            PcName = _profile.PcName;
+            Address = _profile.Address;
+            Endpoint = _profile.Endpoint;
+            ServerPublicKey = _profile.ServerPublicKey;
+        }
+        finally
+        {
+            Busy = false;
+        }
+        try { RefreshKeys(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException) { }
+        await RefreshStateAsync();
     }
 
     public RelayCommand GenerateKeysCommand { get; }
@@ -74,6 +129,7 @@ public sealed class VpnViewModel : ViewModelBase
             GenerateKeysCommand.RaiseCanExecuteChanged();
             ToggleCommand.RaiseCanExecuteChanged();
             ProvisionCommand.RaiseCanExecuteChanged();
+            ImportConfigCommand.RaiseCanExecuteChanged();
         }
     }
 

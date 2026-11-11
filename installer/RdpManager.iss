@@ -55,6 +55,7 @@ WizardStyle=modern
 ; Dalla 1.6.1 l'app avvia invece il suo programma di aggiornamento, che aspetta la chiusura, installa senza
 ; /RELAUNCH e riapre da sé. In ogni caso InitializeSetup aspetta che RdpManager.exe sia davvero chiuso (con le
 ; sessioni connesse l'uscita può durare qualche secondo) e «force» chiude l'app se resta appesa.
+ChangesAssociations=yes
 CloseApplications=force
 RestartApplications=no
 
@@ -76,8 +77,15 @@ Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags
 ; Aggiornamento silenzioso avviato dall'app con «Aggiorna ora»: la riapre (riaprirà le sessioni salvate).
 Filename: "{app}\{#AppExe}"; Flags: nowait; Check: ShouldRelaunch
 
-; Nessuna sezione [Registry] e nessun [UninstallDelete]: i dati dell'utente in %APPDATA%\RdpManager
+; Associazione dei file di configurazione (.rdpmconfig) per l'utente corrente (HKCU, nessun diritto di amministratore):
+; il doppio clic apre «RdpManager.exe "file.rdpmconfig"», che importa la configurazione (server, VPN, registrazione).
+; La disinstallazione toglie solo queste chiavi. Nessun [UninstallDelete]: i dati dell'utente in %APPDATA%\RdpManager
 ; non vengono mai toccati.
+[Registry]
+Root: HKCU; Subkey: "Software\Classes\.rdpmconfig"; ValueType: string; ValueName: ""; ValueData: "RdpManager.ConfigFile"; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\Classes\RdpManager.ConfigFile"; ValueType: string; ValueName: ""; ValueData: "File di configurazione RdpManager"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\RdpManager.ConfigFile\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#AppExe},0"
+Root: HKCU; Subkey: "Software\Classes\RdpManager.ConfigFile\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExe}"" ""%1"""
 
 [Code]
 // Vero se il file si può aprire in scrittura esclusiva: un exe in esecuzione non lo consente.

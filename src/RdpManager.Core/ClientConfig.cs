@@ -64,6 +64,8 @@ public sealed record ClientConfig(string ServerUrl, string RegistrationCode, str
     {
         foreach (var folder in new[] { exeFolder ?? AppContext.BaseDirectory, dataFolder ?? DataFolder })
         {
+            if (folder.Length == 0)
+                continue; // cartella esclusa (per esempio «solo i dati dell'app»)
             var path = Path.Combine(folder, FileName);
             if (!File.Exists(path))
                 continue;

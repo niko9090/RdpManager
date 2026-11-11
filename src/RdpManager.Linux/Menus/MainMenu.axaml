@@ -105,6 +105,7 @@
         <MenuItem Header="Cerca _PC in rete…" Command="{Binding NetworkScanCommand}" />
         <MenuItem Header="_VPN (WireGuard)…" Command="{Binding VpnCommand}" />
         <MenuItem Header="Account e _sincronizzazione…" Command="{Binding SyncAccountCommand}" />
+        <MenuItem Header="_Carica file di configurazione…" Command="{Binding LoadConfigFileCommand}" />
       </MenuItem>
       <!-- ===== Zona blocco A: Aiuto (le voci Scorciatoie e Aggiornamenti sono del blocco B) ===== -->
       <MenuItem Header="A_iuto">

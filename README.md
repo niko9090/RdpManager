@@ -708,7 +708,72 @@ configurazione** (`rdpmanager-config.json`, vedi sotto): lo importi con **Import
 l'indirizzo e ricorda il codice. Senza file, se il server vuole il codice l'app lo chiede
 («Codice di registrazione (te lo dà chi gestisce il server)»).
 
+#### File di configurazione unico (`.rdpmconfig`): VPN e sincronizzazione senza compilare niente
+
+Per la VPN non c'è niente da compilare: chi gestisce il server prepara **un file `.rdpmconfig`** e tu lo carichi.
+
+- **Windows**: doppio clic sul file (l'installer associa l'estensione, per utente, senza amministratore), oppure
+  `RdpManager.exe percorso\file.rdpmconfig`, oppure **Strumenti → Carica file di configurazione…**, oppure il pulsante
+  **Carica file di configurazione…** in cima alla finestra **VPN** (i campi a mano sono nella sezione «Avanzate»).
+- **Linux**: `rdpmanager file.rdpmconfig` (i pacchetti .deb/.rpm/AppImage dichiarano il tipo `application/x-rdpmconfig`, quindi
+  il gestore di file lo apre con RdpManager), **Strumenti → Carica file di configurazione…**, oppure il pulsante nella finestra VPN.
+
+Il programma salva indirizzo del server e codice di registrazione, scrive il profilo VPN, **crea da solo la chiave privata del PC**
+(al server va solo la pubblica), registra il PC sul server, accende la VPN con i meccanismi di sempre (servizio/inbox su Windows,
+NetworkManager o wg-quick su Linux) e mostra un riepilogo **«Fatto»** (o «Da completare», con cosa manca). Accetta anche un
+normale `.conf` di WireGuard (con la sua chiave privata: viene cifrata nel profilo e, se il file sta nella cartella temporanea,
+cancellata dopo l'import). Un file scelto da te non viene mai cancellato di nascosto: il riepilogo ti ricorda che contiene dati riservati.
+
+Formato (JSON, i commenti `//` e le chiavi che cominciano con `_` sono ignorati; esempio senza segreti):
+
+```json
+{
+  "formato": "rdpmconfig",
+  "versione": 1,
+  "server": {
+    "url": "https://vpn.example.com:8443",
+    "urlInterno": "http://10.66.0.1:8787",
+    "codiceRegistrazione": "SOSTITUISCI-CON-IL-CODICE"
+  },
+  "account": { "utente": "mario", "password": "SOSTITUISCI-CON-LA-PASSWORD" },
+  "vpn": {
+    "endpoint": "vpn.example.com:51820",
+    "chiavePubblicaServer": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+    "rete": "10.66.0.0/24",
+    "allowedIPs": "10.66.0.0/24",
+    "dns": "10.66.0.1",
+    "keepalive": 25,
+    "richiediChiaveAlServer": true
+  }
+}
+```
+
+- `server.url` (pubblico, HTTPS) e `server.urlInterno` (dentro la VPN): il primo è quello usato per registrarsi, il secondo è il ripiego.
+- `server.codiceRegistrazione`: il codice d'invito del server. **Segreto**.
+- `account` (facoltativo): con utente e password il PC si registra e accede da solo (così parte anche la sincronizzazione).
+  Senza, il file prepara tutto e, dopo il primo accesso dalla finestra «Account», la VPN parte da sola. **Segreto**.
+- `vpn.richiediChiaveAlServer`: `true` = il programma genera la chiave e la registra sul server (consigliato); `false` = serve
+  un `indirizzo` (`"10.66.0.2/32"`) già registrato dall'amministratore. `rete` è il valore predefinito di `allowedIPs`.
+- Errori: il programma elenca in italiano tutto quello che non va (campo, valore e come si scrive giusto) e non cambia niente.
+
+Come si genera il file con i valori veri del server (lo fa chi gestisce il server, **non** si pubblica):
+
+```powershell
+# dal PC con config/locale.json e l'accesso ssh al Synology (come gli script di deploy):
+pwsh scripts/new-client-config.ps1                      # scrive artifacts/config-client/RdpManager.rdpmconfig
+pwsh scripts/new-client-config.ps1 -Nome Portatile-Anna -Cartella D:\consegna
+pwsh scripts/new-client-config.ps1 -Utente anna -Password "frase lunga"   # account già dentro il file
+pwsh scripts/new-client-config.ps1 -ChiavePubblicaServer <chiave>         # senza ssh
+```
+
+Lo script legge dominio, porte e codice da `config/locale.json`, la chiave pubblica del server WireGuard da `server.pub` sul NAS
+(via `ssh`, come `server/deploy-synology.ps1`) e, se il codice non è in `config/locale.json`, dal `.env` di rdpm-sync sul NAS.
+In alternativa, direttamente sul server: `docker exec rdpm-sync dotnet rdpm-sync.dll export-client-config --url https://vpn.example.com:8443 > RdpManager.rdpmconfig`
+(vedi `server/rdpm-sync/LEGGIMI.md`).
+
 #### File di configurazione del client (`rdpmanager-config.json`)
+
+(Formato più semplice, ancora valido: solo server, codice ed endpoint.)
 
 Lo prepara chi gestisce il server e lo consegna a chi installa. L'app lo carica da sola se lo trova **accanto
 all'eseguibile** (`RdpManager.exe`) o in **`%APPDATA%\RdpManager`**; altrimenti si usa **Importa configurazione…** nel

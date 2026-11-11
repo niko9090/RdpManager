@@ -18,11 +18,14 @@ public sealed class AccountViewModel : ViewModelBase
     private readonly IDialogService _dialogs;
     private string _server, _user, _password = "", _status = "";
     private string? _registrationCode;
+    private readonly Func<string, Task<string>>? _importFile;
     private bool _busy;
 
     public AccountViewModel(SyncService sync, Func<Task<SyncOutcome>> syncNow, Func<SyncOutcome?> lastOutcome,
-        IShellUi ui, IDialogService dialogs, Func<Task<string>>? afterSignIn = null, ClientConfig? defaultConfig = null)
+        IShellUi ui, IDialogService dialogs, Func<Task<string>>? afterSignIn = null, ClientConfig? defaultConfig = null,
+        Func<string, Task<string>>? importFile = null)
     {
+        _importFile = importFile;
         _sync = sync;
         _syncNow = syncNow;
         _lastOutcome = lastOutcome;
@@ -207,9 +210,21 @@ public sealed class AccountViewModel : ViewModelBase
     {
         if (Busy)
             return;
-        var path = await _ui.PickFileAsync("Importa configurazione", "Configurazione RdpManager (*.json)", "*.json");
+        var path = await _ui.PickFileAsync("Importa configurazione", "Configurazione RdpManager", "*.rdpmconfig", "*.json", "*.conf");
         if (path is null)
             return;
+        // .rdpmconfig e .conf: import completo (server, VPN, registrazione del PC, accensione).
+        if (_importFile is not null && !path.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+        {
+            SetBusy(true, "Carico il file di configurazione…");
+            string text;
+            try { text = await _importFile(path); }
+            finally { SetBusy(false); }
+            if (ClientConfig.FindDefault(exeFolder: "") is { } saved)
+                Apply(saved);
+            Status = text;
+            return;
+        }
         try
         {
             Apply(ClientConfig.Load(path));
