@@ -175,7 +175,7 @@ internal sealed class QuickTextsWindow : ToolWindow
         list.ItemTemplate = new Avalonia.Controls.Templates.FuncDataTemplate<QuickTextItem>((item, _) =>
             new TextBlock { Text = item?.Title, TextTrimming = Avalonia.Media.TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
 
-        var side = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Margin = new Thickness(0, 8, 0, 0) };
+        var side = DialogKit.Line(6); side.Margin = new Thickness(0, 8, 0, 0);
         side.Children.Add(Cmd("Nuovo", vm.NewCommand));
         side.Children.Add(Cmd("Elimina", vm.DeleteCommand));
         side.Children.Add(Cmd("Su", vm.MoveUpCommand));
@@ -267,7 +267,7 @@ internal sealed class CsvImportWindow : ToolWindow
             return p;
         });
         var folder = new TextBox { Width = 260 }.Bind(TextBox.TextProperty, nameof(vm.Folder), BindingMode.TwoWay);
-        var folderRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
+        var folderRow = DialogKit.Line(10);
         folderRow.Children.Add(DialogKit.Label("Cartella per le righe senza cartella"));
         folderRow.Children.Add(folder);
         folderRow.Children.Add(DialogKit.BoundLabel(nameof(vm.Summary), "muted"));
@@ -310,7 +310,7 @@ internal sealed class NetworkScanWindow : ToolWindow
 
         var folder = new AutoCompleteBox { ItemsSource = vm.Folders, Width = 280, MinimumPrefixLength = 0 }
             .Bind(AutoCompleteBox.TextProperty, nameof(vm.Folder), BindingMode.TwoWay);
-        var bottom = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(14, 8) };
+        var bottom = DialogKit.Line(8); bottom.Margin = new Thickness(14, 8);
         bottom.Children.Add(DialogKit.Label("Cartella:"));
         bottom.Children.Add(folder);
         bottom.Children.Add(new Button { Content = "Spunta tutti", Command = vm.CheckAllCommand });
@@ -332,7 +332,7 @@ internal sealed class NetworkScanWindow : ToolWindow
                     top.Children.Add(DialogKit.Label(empty, "error"));
                 top.Children.Add(DialogKit.Row("Rete", new ComboBox { ItemsSource = range.Networks, HorizontalAlignment = HorizontalAlignment.Stretch }
                     .Bind(SelectingItemsControl.SelectedItemProperty, nameof(range.Network), BindingMode.TwoWay), 90));
-                var line = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+                var line = DialogKit.Line(8);
                 line.Children.Add(DialogKit.Label("Intervallo:"));
                 line.Children.Add(new TextBox { Width = 260 }.Bind(TextBox.TextProperty, nameof(range.Range), BindingMode.TwoWay));
                 line.Children.Add(DialogKit.Label("Porta:"));
@@ -347,7 +347,7 @@ internal sealed class NetworkScanWindow : ToolWindow
                 break;
             case TailscaleTabViewModel ts:
                 top.Children.Add(DialogKit.Label(ts.Note, "muted"));
-                var tsLine = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+                var tsLine = DialogKit.Line(8);
                 tsLine.Children.Add(new Button { Content = "Leggi la rete Tailscale", Command = ts.ReadCommand });
                 tsLine.Children.Add(new CheckBox { Content = "Controlla se il Desktop remoto risponde (porta 3389)" }
                     .Bind(Avalonia.Controls.Primitives.ToggleButton.IsCheckedProperty, nameof(ts.CheckRdp), BindingMode.TwoWay));
@@ -371,8 +371,10 @@ internal sealed class NetworkScanWindow : ToolWindow
             return g;
         });
         var dock = new DockPanel();
-        DockPanel.SetDock(top, Dock.Top);
-        dock.Children.Add(top);
+        // Su una finestra bassa la parte in alto scorre, invece di uscire dal riquadro e coprire l'elenco.
+        var topScroll = new ScrollViewer { Content = top, VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled };
+        DockPanel.SetDock(topScroll, Dock.Top);
+        dock.Children.Add(topScroll);
         dock.Children.Add(list);
         return dock;
 

@@ -17,7 +17,7 @@ internal sealed class UpdateOfferForm : TouchForm
     {
         Text = "Aggiornamento di RdpManager";
         FormBorderStyle = FormBorderStyle.FixedToolWindow;
-        StartPosition = FormStartPosition.Manual;
+        StartPosition = FormStartPosition.CenterParent;
         ShowInTaskbar = false;
         Size = new Size(560, 420);
         Padding = new Padding(10);
@@ -90,7 +90,7 @@ internal sealed class UpdateOfferForm : TouchForm
         return string.Join("\r\n", lines).Trim();
     }
 
-    /// <summary>In basso a destra della finestra principale.</summary>
+    /// <summary>Al centro della finestra principale (come ogni dialogo: l'angolo copriva i pulsanti dell'elenco).</summary>
     public void PlaceOver(Rectangle owner) =>
-        Location = new Point(Math.Max(owner.Left, owner.Right - Width - 24), Math.Max(owner.Top, owner.Bottom - Height - 48));
+        Location = new Point(owner.X + (owner.Width - Width) / 2, owner.Y + (owner.Height - Height) / 2);
 }

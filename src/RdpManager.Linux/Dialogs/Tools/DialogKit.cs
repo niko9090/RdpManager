@@ -53,6 +53,13 @@ internal static class DialogKit
         return b;
     }
 
+    /// <summary>
+    /// Riga di controlli affiancati che va a capo se la finestra è stretta (schermi piccoli). Una riga con StackPanel
+    /// orizzontale non va a capo: i controlli oltre il bordo restavano tagliati o fuori dalla finestra.
+    /// </summary>
+    public static WrapPanel Line(double spacing = 8) =>
+        new() { Orientation = Orientation.Horizontal, ItemSpacing = spacing, LineSpacing = 6 };
+
     public static StackPanel Buttons(params Control[] buttons)
     {
         var p = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8 };
