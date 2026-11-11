@@ -1,15 +1,21 @@
 using System.Collections.ObjectModel;
 using System.Text.Json;
 using RdpManager.Core;
+using RdpManager.Linux.Services;
 using RdpManager.Linux.Sessions;
 
 namespace RdpManager.Linux.ViewModels;
 
-public sealed class MainWindowViewModel : ViewModelBase
+/// <summary>
+/// Modello della finestra principale. Diviso in tre file: questo (albero, sessioni, salvataggio),
+/// <c>MainWindowViewModel.A.cs</c> (comandi del blocco A) e <c>MainWindowViewModel.B.cs</c> (comandi del blocco B).
+/// </summary>
+public sealed partial class MainWindowViewModel : ViewModelBase
 {
     private readonly ConnectionStore _store;
     private readonly ISessionHost _sessions;
     private readonly IDialogService _dialogs;
+    private readonly IShellService _shell;
     private readonly HashSet<string> _expanded = new(StringComparer.CurrentCultureIgnoreCase);
     private string _searchText = "";
     private string _status = "";
@@ -18,24 +24,52 @@ public sealed class MainWindowViewModel : ViewModelBase
     private bool _canSave = true;
     private bool _treeFiltered;
 
-    public MainWindowViewModel(ConnectionStore store, ISessionHost sessions, IDialogService dialogs)
+    /// <param name="shell">Apre cartelle e pagine web (null = <c>xdg-open</c>); le prove ne passano uno finto.</param>
+    public MainWindowViewModel(ConnectionStore store, ISessionHost sessions, IDialogService dialogs, IShellService? shell = null)
     {
         _store = store;
         _sessions = sessions;
         _dialogs = dialogs;
+        _shell = shell ?? new XdgShellService();
 
         NewConnectionCommand = new RelayCommand(() => Run(NewConnectionAsync));
         NewFolderCommand = new RelayCommand(() => Run(NewFolderAsync));
-        EditCommand = new RelayCommand(() => Run(EditSelectedAsync), () => SelectedNode is not null);
-        DuplicateCommand = new RelayCommand(DuplicateSelected, () => SelectedNode?.Connection is not null);
-        DeleteCommand = new RelayCommand(() => Run(DeleteSelectedAsync), () => SelectedNode is not null);
-        ConnectCommand = new RelayCommand(ConnectSelected, () => SelectedNode?.Connection is not null);
+        EditCommand = new RelayCommand(() => Run(EditSelectedAsync), () => SelectedNode is not null && !HasMultiSelection);
+        DuplicateCommand = new RelayCommand(DuplicateSelected, () => SelectedNode?.Connection is not null && !HasMultiSelection);
+        DeleteCommand = new RelayCommand(() => Run(DeleteSelectedAsync), () => SelectedNode is not null || HasMultiSelection);
+        ConnectCommand = new RelayCommand(ConnectSelected, () => SelectedNode?.Connection is not null || HasMultiSelection);
         FavoriteCommand = new RelayCommand(ToggleFavorite, () => SelectedNode?.Connection is not null);
         ProfilesCommand = new RelayCommand(() => Run(ShowProfilesAsync));
         SettingsCommand = new RelayCommand(() => Run(ShowSettingsAsync));
         ClearSearchCommand = new RelayCommand(() => SearchText = "");
+        SearchCommand = new RelayCommand(() => FocusSearchRequested?.Invoke(this, EventArgs.Empty));
+        CloseCurrentTabCommand = new RelayCommand(() => { if (SelectedTab is { } t) CloseTab(t); }, () => SelectedTab is not null);
+        ExitCommand = new RelayCommand(() => ExitRequested?.Invoke(this, EventArgs.Empty));
+        InitBlockA();
+        // Da bloccata l'app non esegue nessun comando (né dai menu né dalle scorciatoie), tranne blocco, uscita e informazioni.
+        foreach (var c in new[]
+                 {
+                     NewConnectionCommand, NewFolderCommand, EditCommand, DuplicateCommand, DeleteCommand, ConnectCommand, FavoriteCommand,
+                     ProfilesCommand, SettingsCommand, ClearSearchCommand, SearchCommand, CloseCurrentTabCommand,
+                     ImportRdpCommand, ImportRdpmCommand, ImportCsvCommand, ExportRdpmCommand, OpenDataFolderCommand, ConnectFolderCommand,
+                     FolderSettingsCommand, ExportRdpFileCommand, WakeCommand, CheckReachabilityCommand, HistoryCommand, QuickSearchCommand,
+                     SortByNameCommand, QuickTextsCommand, NetworkScanCommand, OpenLogFolderCommand, MoveToFolderCommand, AssignProfileCommand,
+                 })
+            GateWhenLocked(c);
 
         Reload();
+        StartLockedIfNeeded();
+    }
+
+    private readonly List<RelayCommand> _gated = [];
+
+    /// <summary>Spegne il comando mentre l'app è bloccata.</summary>
+    private RelayCommand GateWhenLocked(RelayCommand command)
+    {
+        command.Disabled = () => IsLocked;
+        if (!_gated.Contains(command))
+            _gated.Add(command);
+        return command;
     }
 
     public ConnectionsDocument Document { get; private set; } = new();
@@ -54,6 +88,18 @@ public sealed class MainWindowViewModel : ViewModelBase
     public RelayCommand ProfilesCommand { get; }
     public RelayCommand SettingsCommand { get; }
     public RelayCommand ClearSearchCommand { get; }
+    public RelayCommand SearchCommand { get; }
+    public RelayCommand CloseCurrentTabCommand { get; }
+    public RelayCommand ExitCommand { get; }
+
+    /// <summary>Il menu chiede di portare il cursore nel campo di ricerca.</summary>
+    public event EventHandler? FocusSearchRequested;
+
+    /// <summary>Il menu chiede di chiudere l'applicazione.</summary>
+    public event EventHandler? ExitRequested;
+
+    /// <summary>Comando di una voce di menu non ancora realizzata su Linux: resta disabilitato finché il blocco non lo sostituisce.</summary>
+    internal static RelayCommand Placeholder() => new(() => { }, () => false);
 
     public string SearchText
     {
@@ -70,15 +116,29 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             if (!Set(ref _selectedNode, value))
                 return;
-            EditCommand.RaiseCanExecuteChanged();
-            DuplicateCommand.RaiseCanExecuteChanged();
-            DeleteCommand.RaiseCanExecuteChanged();
-            ConnectCommand.RaiseCanExecuteChanged();
-            FavoriteCommand.RaiseCanExecuteChanged();
+            RaiseSelectionCommands();
         }
     }
 
-    public SessionTabViewModel? SelectedTab { get => _selectedTab; set => Set(ref _selectedTab, value); }
+    private void RaiseSelectionCommands()
+    {
+        EditCommand.RaiseCanExecuteChanged();
+        DuplicateCommand.RaiseCanExecuteChanged();
+        DeleteCommand.RaiseCanExecuteChanged();
+        ConnectCommand.RaiseCanExecuteChanged();
+        FavoriteCommand.RaiseCanExecuteChanged();
+        RaiseBlockASelectionCommands();
+    }
+
+    public SessionTabViewModel? SelectedTab
+    {
+        get => _selectedTab;
+        set
+        {
+            if (Set(ref _selectedTab, value))
+                CloseCurrentTabCommand.RaiseCanExecuteChanged();
+        }
+    }
 
     public bool HasTabs => Tabs.Count > 0;
 
@@ -137,10 +197,11 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
 
         int visible = 0;
-        foreach (var c in Document.InDisplayOrder(Document.Connections.Where(c => c.Matches(query))))
+        foreach (var c in Document.InDisplayOrder(Document.Connections.Where(c => MatchesSearch(c, query))))
         {
             visible++;
             var node = TreeNodeViewModel.ForConnection(c);
+            node.Reachability = _reach.GetValueOrDefault(c.Id);
             (c.Group.Length > 0 && folders.TryGetValue(c.Group, out var f) ? f.Children : (ICollection<TreeNodeViewModel>)roots).Add(node);
         }
         VisibleConnectionCount = visible;
@@ -153,9 +214,20 @@ public sealed class MainWindowViewModel : ViewModelBase
             Roots.Add(n);
 
         SelectedNode = selectedKey is null ? null : Flatten(Roots).FirstOrDefault(n => n.Key == selectedKey);
+        KeepSelectionAfterRebuild();
         OnPropertyChanged(nameof(VisibleConnectionCount));
         OnPropertyChanged(nameof(NoResults));
+        RefreshQuickLists();
     }
+
+    /// <summary>
+    /// Ricerca nell'albero (#11): tutte le parole devono comparire in nome, host, utente, dominio, cartella o etichetta
+    /// (come in Windows), oppure somigliare a nome, host, etichetta o cartella anche con un refuso (<see cref="FuzzySearch"/>).
+    /// </summary>
+    internal static bool MatchesSearch(RdpConnection c, string query) =>
+        query.Length == 0 || c.Matches(query)
+        // Con una cifra nella ricerca (indirizzi IP, porte) la tolleranza ai refusi darebbe vicini sbagliati: non si usa.
+        || (!query.Any(char.IsDigit) && FuzzySearch.Score(query, [c.DisplayName, c.Host, c.Label, c.Group, c.Username]) > 0);
 
     /// <summary>Toglie le cartelle senza risultati; vero se la cartella va rimossa.</summary>
     private static bool Prune(TreeNodeViewModel folder)
@@ -181,6 +253,8 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     public async Task NewConnectionAsync()
     {
+        if (IsLocked)
+            return;
         var connection = new RdpConnection { Group = SelectedNode?.FolderPath ?? "" };
         var editor = new ConnectionEditViewModel(Document, connection, isNew: true);
         if (!await _dialogs.EditConnectionAsync(editor))
@@ -193,6 +267,8 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     public async Task NewFolderAsync()
     {
+        if (IsLocked)
+            return;
         var parent = SelectedNode?.FolderPath ?? "";
         var name = await _dialogs.PromptAsync("Nuova cartella",
             parent.Length > 0 ? $"Nome della cartella (dentro «{parent}»)" : "Nome della cartella", "");
@@ -207,7 +283,9 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     public async Task EditSelectedAsync()
     {
-        if (SelectedNode is not { } node)
+        if (IsLocked)
+            return;
+        if (SelectedNode is not { } node || HasMultiSelection)
             return;
         if (node.Connection is { } c)
         {
@@ -227,7 +305,11 @@ public sealed class MainWindowViewModel : ViewModelBase
             var name = await _dialogs.PromptAsync("Rinomina cartella", "Nuovo nome", node.Title);
             var newPath = Document.RenameFolder(node.FolderPath, name);
             if (newPath is null)
+            {
+                if (!string.IsNullOrWhiteSpace(name))
+                    StatusMessage = "Non posso rinominare la cartella: esiste già una cartella con quel nome.";
                 return;
+            }
             _expanded.Add(newPath);
             Save();
             RebuildTree();
@@ -236,6 +318,8 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     public void DuplicateSelected()
     {
+        if (IsLocked)
+            return;
         if (SelectedNode?.Connection is not { } c)
             return;
         var copy = c.Duplicate();
@@ -247,11 +331,18 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     public async Task DeleteSelectedAsync()
     {
+        if (IsLocked)
+            return;
+        if (HasMultiSelection)
+        {
+            await DeleteGroupAsync();
+            return;
+        }
         if (SelectedNode is not { } node)
             return;
         if (node.Connection is { } c)
         {
-            if (!await _dialogs.ConfirmAsync("Elimina connessione", $"Eliminare la connessione «{c.DisplayName}»?"))
+            if (!await _dialogs.ConfirmDestructiveAsync("Elimina connessione", $"Eliminare la connessione «{c.DisplayName}»?"))
                 return;
             Document.Connections.Remove(c);
         }
@@ -261,7 +352,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             var message = inside == 0
                 ? $"Eliminare la cartella «{node.FolderPath}»?"
                 : $"Eliminare la cartella «{node.FolderPath}»? Le {inside} connessioni contenute non vengono cancellate: passano alla cartella superiore.";
-            if (!await _dialogs.ConfirmAsync("Elimina cartella", message))
+            if (!await _dialogs.ConfirmDestructiveAsync("Elimina cartella", message))
                 return;
             Document.DeleteFolder(node.FolderPath);
         }
@@ -271,6 +362,8 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     public void ToggleFavorite()
     {
+        if (IsLocked)
+            return;
         if (SelectedNode?.Connection is not { } c)
             return;
         c.IsFavorite = !c.IsFavorite;
@@ -282,18 +375,23 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     public async Task ShowProfilesAsync()
     {
+        if (IsLocked)
+            return;
         await _dialogs.ShowProfilesAsync(new ProfilesViewModel(Document, Save, _dialogs));
         RebuildTree();
     }
 
     public async Task ShowSettingsAsync()
     {
-        var settings = new SettingsViewModel(Document.Settings, _store.FilePath);
+        if (IsLocked)
+            return;
+        var settings = new SettingsViewModel(Document.Settings, _store.FilePath, _shell, _dialogs);
         if (!await _dialogs.ShowSettingsAsync(settings))
             return;
         settings.Apply();
         Save();
         RebuildTree();
+        LogSetup.ApplySettings(Document.Settings);
         SettingsChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -304,12 +402,19 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     public void ConnectSelected()
     {
-        if (SelectedNode?.Connection is { } c)
+        if (IsLocked)
+            return;
+        if (HasMultiSelection)
+            ConnectGroup();
+        else if (SelectedNode?.Connection is { } c)
             Connect(c);
     }
 
     public void Connect(RdpConnection connection)
     {
+        // Da bloccata l'app non apre sessioni nuove.
+        if (IsLocked)
+            return;
         var resolved = Document.WithResolvedCredentials(connection);
         var session = _sessions.Open(resolved);
         var tab = new SessionTabViewModel(session, CloseTab);
@@ -322,12 +427,15 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             Document.MarkConnected(connection.Id, DateTime.UtcNow);
             Save();
+            RecordHistoryStart(connection, session);
+            RefreshQuickLists();
         }
         StatusMessage = _sessions.IsAvailable ? $"Connessione a «{connection.DisplayName}» aperta." : _sessions.UnavailableReason ?? "";
     }
 
     private void CloseTab(SessionTabViewModel tab)
     {
+        MarkClosedByUser(tab.Session);
         tab.Session.Close();
         RemoveTab(tab); // se la sessione non ha segnalato la chiusura
     }
@@ -345,6 +453,9 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     // --- Salvataggio ---
 
+    /// <summary>Dopo ogni salvataggio riuscito (la sincronizzazione automatica del blocco B si aggancia qui).</summary>
+    partial void AfterSave();
+
     /// <summary>Salva il documento; falso (con messaggio nella barra di stato) se non è possibile o non riesce.</summary>
     public bool Save()
     {
@@ -356,9 +467,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         try
         {
             _store.Save(Document);
+            AfterSave();
             return true;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.Cryptography.CryptographicException)
         {
             StatusMessage = $"Salvataggio non riuscito: {ex.Message}";
             return false;

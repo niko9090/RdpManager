@@ -14,6 +14,8 @@ public sealed class FileKeySecretStore : ISecretStore
     private const int NonceSize = 12;
     private const int TagSize = 16;
     private readonly string _keyPath;
+    private const int KeySize = 32;
+    private readonly object _keyLock = new();
     private byte[]? _key;
 
     public FileKeySecretStore(string? keyPath = null)
@@ -49,11 +51,35 @@ public sealed class FileKeySecretStore : ISecretStore
     {
         if (_key is not null)
             return _key;
+        lock (_keyLock)
+            return _key ??= LoadOrCreateKey();
+    }
+
+    private byte[] LoadOrCreateKey()
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                return ReadOrCreate();
+            }
+            catch (Exception ex) when (ex is IOException or InvalidDataException && attempt < 5)
+            {
+                Thread.Sleep(20 * (attempt + 1)); // un altro processo la sta scrivendo o la tiene aperta
+            }
+        }
+    }
+
+    private static byte[] Validate(byte[] key) =>
+        key.Length == KeySize ? key : throw new InvalidDataException("La chiave dei segreti non è valida (attesi 32 byte).");
+
+    private byte[] ReadOrCreate()
+    {
         if (File.Exists(_keyPath))
-            return _key = File.ReadAllBytes(_keyPath);
+            return Validate(File.ReadAllBytes(_keyPath));
 
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(_keyPath))!);
-        var key = RandomNumberGenerator.GetBytes(32);
+        var key = RandomNumberGenerator.GetBytes(KeySize);
         var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write };
         if (!OperatingSystem.IsWindows())
             options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
@@ -64,8 +90,8 @@ public sealed class FileKeySecretStore : ISecretStore
         }
         catch (IOException) when (File.Exists(_keyPath))
         {
-            return _key = File.ReadAllBytes(_keyPath); // creata nel frattempo da un altro processo
+            return Validate(File.ReadAllBytes(_keyPath)); // creata nel frattempo da un altro processo
         }
-        return _key = key;
+        return key;
     }
 }

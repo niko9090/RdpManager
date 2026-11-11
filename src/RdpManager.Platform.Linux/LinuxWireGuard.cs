@@ -97,35 +97,92 @@ public sealed class LinuxWireGuard
         return _backend.Value;
     }
 
+    private readonly SemaphoreSlim _gate = new(1, 1);
+
+    /// <summary>Accende la VPN (un solo comando alla volta su questa istanza).</summary>
     public async Task<LinuxVpnResult> ConnectAsync(WireGuardConfig config, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(config);
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            return await ConnectCoreAsync(config, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Accende la VPN solo se è spenta: il controllo è dentro il semaforo, così più richieste insieme
+    /// (sessioni, VPN automatica, pannello) non la accendono due volte.
+    /// </summary>
+    public async Task<LinuxVpnResult> EnsureConnectedAsync(WireGuardConfig config, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            if (await IsConnectedAsync(ct).ConfigureAwait(false))
+                return new LinuxVpnResult(true, "VPN già connessa.");
+            return await ConnectCoreAsync(config, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private async Task<LinuxVpnResult> ConnectCoreAsync(WireGuardConfig config, CancellationToken ct)
+    {
         var errors = config.Validate();
         if (errors.Count > 0)
             return new LinuxVpnResult(false, string.Join(" ", errors));
 
-        WriteConf(config);
         if (await GetBackendAsync(ct).ConfigureAwait(false) == LinuxVpnBackend.NetworkManager)
         {
-            // Si reimporta ogni volta: la configurazione può essere cambiata. Se non esiste, la delete fallisce e va bene.
-            await RunAsync(LinuxWireGuardCommands.NmDelete(), ct).ConfigureAwait(false);
-            var import = await RunAsync(LinuxWireGuardCommands.NmImport(_confPath), ct).ConfigureAwait(false);
-            if (!import.Success)
-                return Fail("Importazione in NetworkManager non riuscita", import);
+            WriteConf(config, _confPath);
+            try
+            {
+                // Si reimporta ogni volta: la configurazione può essere cambiata. Se non esiste, la delete fallisce e va bene.
+                await RunAsync(LinuxWireGuardCommands.NmDelete(), ct).ConfigureAwait(false);
+                var import = await RunAsync(LinuxWireGuardCommands.NmImport(_confPath), ct).ConfigureAwait(false);
+                if (!import.Success)
+                    return Fail("Importazione in NetworkManager non riuscita", import);
+            }
+            finally
+            {
+                TryDelete(_confPath); // NetworkManager ha la sua copia: la chiave privata non resta su disco
+            }
             var up = await RunAsync(LinuxWireGuardCommands.NmUp(), ct).ConfigureAwait(false);
             return up.Success ? new LinuxVpnResult(true, "VPN connessa.") : Fail("Connessione non riuscita", up);
         }
-        var wg = await RunAsync(LinuxWireGuardCommands.WgQuickUp(_confPath), ct).ConfigureAwait(false);
+        var wgPath = WgQuickConfPath();
+        WriteConf(config, wgPath);
+        var wg = await RunAsync(LinuxWireGuardCommands.WgQuickUp(wgPath), ct).ConfigureAwait(false);
+        if (!wg.Success)
+            TryDelete(wgPath);
         return wg.Success ? new LinuxVpnResult(true, "VPN connessa.") : Fail("wg-quick up non riuscito", wg);
     }
 
     public async Task<LinuxVpnResult> DisconnectAsync(CancellationToken ct = default)
     {
-        var cmd = await GetBackendAsync(ct).ConfigureAwait(false) == LinuxVpnBackend.NetworkManager
-            ? LinuxWireGuardCommands.NmDown()
-            : LinuxWireGuardCommands.WgQuickDown(_confPath);
-        var r = await RunAsync(cmd, ct).ConfigureAwait(false);
-        return r.Success ? new LinuxVpnResult(true, "VPN disconnessa.") : Fail("Disconnessione non riuscita", r);
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var nm = await GetBackendAsync(ct).ConfigureAwait(false) == LinuxVpnBackend.NetworkManager;
+            var wgPath = WgQuickConfPath();
+            var cmd = nm ? LinuxWireGuardCommands.NmDown() : LinuxWireGuardCommands.WgQuickDown(wgPath);
+            var r = await RunAsync(cmd, ct).ConfigureAwait(false);
+            if (!nm)
+                TryDelete(wgPath);
+            return r.Success ? new LinuxVpnResult(true, "VPN disconnessa.") : Fail("Disconnessione non riuscita", r);
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
 
     public async Task<bool> IsConnectedAsync(CancellationToken ct = default)
@@ -138,18 +195,37 @@ public sealed class LinuxWireGuard
         return (await RunAsync(LinuxWireGuardCommands.LinkStatus(), ct).ConfigureAwait(false)).Success;
     }
 
-    /// <summary>Scrive il .conf con permessi 0600 (contiene la chiave privata).</summary>
-    public void WriteConf(WireGuardConfig config)
+    /// <summary>Dove sta il .conf per wg-quick: in $XDG_RUNTIME_DIR (in memoria, solo dell'utente) se c'è, altrimenti il percorso predefinito.</summary>
+    private string WgQuickConfPath()
     {
-        var dir = Path.GetDirectoryName(_confPath);
+        var runtime = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
+        if (string.IsNullOrEmpty(runtime) || !Path.IsPathRooted(runtime))
+            return _confPath;
+        return Path.Combine(runtime, "rdpmanager", Path.GetFileName(_confPath));
+    }
+
+    /// <summary>Scrive il .conf con permessi 0600 (contiene la chiave privata), anche se il file esisteva già con permessi più larghi.</summary>
+    public void WriteConf(WireGuardConfig config) => WriteConf(config, _confPath);
+
+    private static void WriteConf(WireGuardConfig config, string path)
+    {
+        var dir = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(dir))
             Directory.CreateDirectory(dir);
         var options = new FileStreamOptions { Mode = FileMode.Create, Access = FileAccess.Write, Share = FileShare.None };
         if (!OperatingSystem.IsWindows())
             options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
-        using var fs = new FileStream(_confPath, options);
+        using var fs = new FileStream(path, options);
+        if (!OperatingSystem.IsWindows())
+            File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
         using var w = new StreamWriter(fs, new System.Text.UTF8Encoding(false));
         w.Write(LinuxWireGuardCommands.ConfText(config));
+    }
+
+    private static void TryDelete(string path)
+    {
+        try { File.Delete(path); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 
     private Task<ProcessResult> RunAsync(LinuxCommand c, CancellationToken ct) => _runner.RunAsync(c.FileName, c.Arguments, null, ct);

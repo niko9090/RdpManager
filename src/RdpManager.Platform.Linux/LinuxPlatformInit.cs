@@ -18,4 +18,9 @@ public static class LinuxPlatformInit
 
     /// <summary>Il gestore VPN per Linux (NetworkManager se disponibile, altrimenti wg-quick con pkexec).</summary>
     public static LinuxWireGuard CreateVpn(IProcessRunner? runner = null) => new(runner);
+
+    private static readonly Lazy<LinuxWireGuard> SharedVpn = new(() => new LinuxWireGuard());
+
+    /// <summary>Il gestore VPN unico del programma: sessioni, VPN automatica e pannello lo condividono (un solo semaforo).</summary>
+    public static LinuxWireGuard Vpn => SharedVpn.Value;
 }

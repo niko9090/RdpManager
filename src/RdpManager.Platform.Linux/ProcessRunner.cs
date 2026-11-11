@@ -27,9 +27,10 @@ public sealed class SystemProcessRunner : IProcessRunner
         };
         foreach (var a in arguments)
             psi.ArgumentList.Add(a);
+        Process? p = null;
         try
         {
-            using var p = Process.Start(psi) ?? throw new InvalidOperationException("Avvio non riuscito: " + fileName);
+            p = Process.Start(psi) ?? throw new InvalidOperationException("Avvio non riuscito: " + fileName);
             if (stdin is not null)
             {
                 await p.StandardInput.WriteAsync(stdin.AsMemory(), ct).ConfigureAwait(false);
@@ -40,10 +41,21 @@ public sealed class SystemProcessRunner : IProcessRunner
             await p.WaitForExitAsync(ct).ConfigureAwait(false);
             return new ProcessResult(p.ExitCode, await outTask.ConfigureAwait(false), await errTask.ConfigureAwait(false));
         }
+        catch (OperationCanceledException)
+        {
+            // Annullato: il programma esterno non deve restare vivo.
+            try { if (p is { HasExited: false }) p.Kill(entireProcessTree: true); }
+            catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { }
+            throw;
+        }
         catch (System.ComponentModel.Win32Exception ex)
         {
             // Programma non installato: esito di errore, non eccezione.
             return new ProcessResult(127, "", ex.Message);
+        }
+        finally
+        {
+            p?.Dispose();
         }
     }
 }
