@@ -429,7 +429,10 @@ public class BlockBViewModelTests
         var runner = new RecordingRunner();
         vm.Input = new RemoteInput(runner, DisplayServerKind.X11, n => n == "xdotool");
         ui.Clipboard = "segreto";
-        var host = new FreeRdpSessionHost(isInstalled: n => n == "xfreerdp3");
+        var host = new FreeRdpSessionHost(
+            isInstalled: n => n == "xfreerdp3",
+            vpnProfile: () => null,
+            vpn: () => new LinuxWireGuard(new RecordingRunner(), Path.Combine(Path.GetDirectoryName(data.FilePath)!, "RdpManager.conf"), LinuxVpnBackend.NetworkManager));
         var withSession = new MainWindowViewModel(data.Store, host, new FakeDialogs()) { Ui = ui, Input = vm.Input };
         withSession.Connect(withSession.Document.Connections[0]);
         await withSession.PasteAsTypingAsync();
