@@ -1,5 +1,21 @@
 # Novità di RdpManager
 
+## 1.14.0 (2026-11-11)
+
+**File di configurazione unico (.rdpmconfig)**
+- Un solo file contiene server di sincronizzazione, codice di registrazione e VPN. Si carica con un pulsante o con un doppio clic sul file, su Windows e Linux, senza riempire campi a mano. I campi manuali restano in «Avanzate».
+- L'installer di Windows e i pacchetti Linux associano il tipo di file .rdpmconfig al programma, così il doppio clic lo apre.
+- Il file si crea con uno script (scripts/new-client-config.ps1) o con il nuovo comando del server rdpm-sync export-client-config.
+
+**Finestre e dialoghi più ordinati (Windows e Linux)**
+- Le tendine pensate per il dito non si accavallano più.
+- Le finestre non sono più grandi dello schermo: si centrano e restano dentro lo schermo.
+- La finestra degli aggiornamenti non finisce più in un angolo.
+- Su Linux le misure fisse sono sostituite da misure che si adattano alla finestra.
+
+**Per chi sviluppa**
+- Nuove prove per il file di configurazione e per la disposizione delle finestre.
+
 ## 1.13.0 (2026-11-11)
 
 **Programma Linux alla pari con Windows**
