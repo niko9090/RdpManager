@@ -115,9 +115,26 @@ mkdir -p "$APPDIR/usr/share/mime/packages"
 install -m 644 "$HERE/rdpmanager-rdpmconfig.xml" "$APPDIR/usr/share/mime/packages/rdpmanager-rdpmconfig.xml"
 install -m 644 "$HERE/rdpmanager.png" "$APPDIR/rdpmanager.png"
 ln -s rdpmanager.png "$APPDIR/.DirIcon"
+# Avalonia carica libICE.so.6 e libSM.so.6, che su un Ubuntu minimale (22.04/24.04) mancano: le porto nell'AppImage
+# accanto al binario (.NET cerca lì per prime). Le prendo dal sistema di costruzione, altrimenti scarico i pacchetti.
+LIBDIR_SYS=/usr/lib/x86_64-linux-gnu
+for lib in libICE.so.6 libSM.so.6; do
+  if [[ ! -e "$LIBDIR_SYS/$lib" ]]; then
+    ( cd "$WORK" && apt-get download libice6 libsm6 > /dev/null 2>&1 && for d in libice6_*.deb libsm6_*.deb; do dpkg-deb -x "$d" "$WORK/libs"; done ) || true
+    [[ -e "$WORK/libs$LIBDIR_SYS/$lib" ]] && LIBDIR_SYS="$WORK/libs$LIBDIR_SYS"
+  fi
+  [[ -e "$LIBDIR_SYS/$lib" ]] || { echo "Manca $lib per l'AppImage (apt-get install libice6 libsm6)" >&2; exit 1; }
+  cp -L "$LIBDIR_SYS/$lib" "$APPDIR/opt/rdpmanager/$lib"
+  chmod 755 "$APPDIR/opt/rdpmanager/$lib"
+done
 cat > "$APPDIR/AppRun" <<'EOF'
 #!/bin/sh
 HERE="$(dirname "$(readlink -f "$0")")"
+PATH="$PATH:/sbin:/usr/sbin"
+# Senza ICU .NET termina subito («Couldn't find a valid ICU package»): in quel caso modalità invariante.
+if [ -z "${DOTNET_SYSTEM_GLOBALIZATION_INVARIANT:-}" ] && ! ldconfig -p 2>/dev/null | grep -q 'libicuuc\.so'; then
+  export DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
+fi
 exec "$HERE/opt/rdpmanager/RdpManager.Linux" "$@"
 EOF
 chmod 755 "$APPDIR/AppRun"
