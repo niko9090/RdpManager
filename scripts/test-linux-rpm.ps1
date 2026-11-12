@@ -87,7 +87,7 @@ $dir = Split-Path $Rpm -Parent
 $name = Split-Path $Rpm -Leaf
 $inner = @"
 set -e
-dnf -y -q install /pkg/$name xorg-x11-server-Xvfb
+dnf -y -q install /pkg/$name xorg-x11-server-Xvfb < /dev/null
 rpm -V rdpmanager || true
 echo '--- ldd (librerie mancanti) ---'
 miss=`$(ldd /opt/rdpmanager/libhostfxr.so /opt/rdpmanager/libcoreclr.so 2>&1 | grep 'not found' || true)
@@ -95,7 +95,7 @@ if [ -n "`$miss" ]; then echo "`$miss"; echo 'LIBRERIE MANCANTI'; exit 3; fi
 test -x /usr/bin/rdpmanager
 echo '--- avvio sotto xvfb ---'
 set +e
-timeout $Secondi xvfb-run -a rdpmanager > /tmp/out.log 2>&1
+timeout $Secondi xvfb-run -a rdpmanager > /tmp/out.log 2>&1 < /dev/null
 code=`$?
 set -e
 cat /tmp/out.log
@@ -105,7 +105,8 @@ echo "Terminato subito con codice `$code"; exit 4
 $inner = $inner -replace "`r", ''
 Write-Host "docker run $Immagine ..." -ForegroundColor Cyan
 $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-& docker run --rm -v "${dir}:/pkg:ro" $Immagine bash -c $inner 2>&1 | ForEach-Object { Write-Host $_ }
+# Lo script passa da stdin: come argomento di bash -c PowerShell perde le virgolette doppie e [ -n "$miss" ] diventa sempre vero.
+$inner | & docker run --rm -i -v "${dir}:/pkg:ro" $Immagine bash -s 2>&1 | ForEach-Object { Write-Host $_ }
 $code = $LASTEXITCODE
 $ErrorActionPreference = $prev
 if ($code -ne 0) { Write-Host "`nKO: prova in Fedora fallita (codice $code)" -ForegroundColor Red; exit 1 }
