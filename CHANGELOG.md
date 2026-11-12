@@ -1,5 +1,13 @@
 # Novità di RdpManager
 
+## 1.14.3 (2026-11-12)
+
+**Correzione dell'aggiornamento automatico che tornava alla versione precedente**
+- Durante l'aggiornamento automatico l'installer ora chiude da solo il programma rimasto aperto (dopo 60 secondi, solo quello della cartella installata) e riprova a fermare la VPN, così l'aggiornamento non torna più alla versione precedente.
+- Se hai la 1.13.0 o precedente e l'aggiornamento torna indietro: spegni la VPN, chiudi RdpManager e lancia a mano RdpManager-Setup-1.14.3.exe scaricato da GitHub.
+- I registri sono in %LOCALAPPDATA%\RdpManager\logs (aggiornamento.log, setup-*.log).
+- Su Linux non cambia niente.
+
 ## 1.14.2 (2026-11-12)
 
 **Correzione dell'aggiornamento bloccato dalla copia di riserva**
