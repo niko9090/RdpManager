@@ -1,5 +1,12 @@
 # Novità di RdpManager
 
+## 1.14.2 (2026-11-12)
+
+**Correzione dell'aggiornamento bloccato dalla copia di riserva**
+- L'aggiornamento dal programma si bloccava con "Non riesco a preparare la copia di riserva… Access to the path 'Accessibility.dll' is denied". Ora la VPN viene spenta prima di preparare la copia di riserva, la copia legge anche i file in uso, toglie la sola lettura e, se la copia vecchia è ancora occupata, ne crea una nuova invece di fermarsi.
+- Vale dagli aggiornamenti successivi a questa versione: per passare alla 1.14.2 da una versione che dà quell'errore, lanciare a mano RdpManager-Setup-1.14.2.exe (spegne da solo la VPN).
+- Su Linux non cambia niente.
+
 ## 1.14.1 (2026-11-12)
 
 **Correzione dell'aggiornamento con la VPN accesa**
