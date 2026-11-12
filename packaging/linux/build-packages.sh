@@ -53,7 +53,7 @@ Installed-Size: $SIZE_KB
 Section: net
 Priority: optional
 Homepage: https://github.com/niko9090/RdpManager
-Depends: freerdp3-x11 | freerdp2-x11, libsecret-1-0, libx11-6, libfontconfig1
+Depends: freerdp3-x11 | freerdp2-x11, libsecret-1-0, libx11-6, libfontconfig1, libice6, libsm6, libssl3t64 | libssl3, libicu78 | libicu76 | libicu74 | libicu72 | libicu70 | libicu67 | libicu66
 Recommends: wireguard-tools
 Description: Gestore di connessioni Desktop remoto (RDP) in schede
  RdpManager organizza le connessioni RDP in cartelle e le apre in schede,
@@ -76,6 +76,12 @@ BuildArch:      x86_64
 AutoReqProv:    no
 Requires:       freerdp
 Requires:       libsecret
+Requires:       libicu
+Requires:       openssl-libs
+Requires:       libX11
+Requires:       libICE
+Requires:       libSM
+Requires:       fontconfig
 Recommends:     wireguard-tools
 
 %global debug_package %{nil}
