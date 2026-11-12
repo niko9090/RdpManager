@@ -3,8 +3,8 @@
 #
 # Sistema provato di default (container Docker, immagine ufficiale): ubuntu:24.04; con -Images anche ubuntu:22.04 e debian:12
 # (Linux Mint 21/22 sono basati su Ubuntu 22.04/24.04). Senza Docker usa un chroot Ubuntu 24.04 creato in WSL con debootstrap.
-# Il .deb si prende da -Deb, altrimenti da dist\ (versione di src\Directory.Build.props); se manca, o con -Build,
-# si costruiscono i pacchetti con scripts/build-linux.ps1.
+# Il .deb si prende da -Deb, altrimenti da dist\ (versione di src\Directory.Build.props); ma senza -Deb
+# i pacchetti si ricostruiscono sempre con scripts/build-linux.ps1.
 #
 # Uso:   powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-linux-install.ps1
 #        ... -Deb C:\percorso\rdpmanager_1.14.3_amd64.deb -Images ubuntu:24.04,debian:12
@@ -26,11 +26,11 @@ if (-not $Deb) {
     $text = [IO.File]::ReadAllText((Join-Path $root 'src\Directory.Build.props'), [Text.Encoding]::UTF8)
     $version = [regex]::Match($text, '<Version>([^<]+)</Version>').Groups[1].Value.Trim()
     $Deb = Join-Path $root "dist\rdpmanager_${version}_amd64.deb"
-    if ($Build -or -not (Test-Path $Deb)) {
-        Write-Host 'Costruisco i pacchetti Linux...' -ForegroundColor Cyan
-        & (Join-Path $PSScriptRoot 'build-linux.ps1')
-        if ($LASTEXITCODE -ne 0) { Write-Host 'Costruzione non riuscita'; exit 2 }
-    }
+    # Ricostruisco sempre dai sorgenti attuali (un .deb già in dist\ della stessa versione può essere vecchio); -Build resta per compatibilità.
+    if (Test-Path $Deb) { Remove-Item -LiteralPath $Deb -Force }
+    Write-Host 'Costruisco i pacchetti Linux...' -ForegroundColor Cyan
+    & (Join-Path $PSScriptRoot 'build-linux.ps1')
+    if ($LASTEXITCODE -ne 0) { Write-Host 'Costruzione non riuscita'; exit 2 }
 }
 if (-not (Test-Path $Deb)) { Write-Host "Manca il pacchetto: $Deb"; exit 2 }
 $Deb = (Resolve-Path $Deb).Path
