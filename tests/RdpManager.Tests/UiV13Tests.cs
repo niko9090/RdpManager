@@ -158,6 +158,7 @@ public sealed class UiV13Tests : IDisposable
         File.WriteAllText(Path.Combine(install, "runtimes", "libreria.dll"), "dll finta");
         form.InstallDirOverride = install;
         form.UpdateRunnerFolder = Path.Combine(_dir, "update-runner");
+        form.VpnStopper = null; // la prova non deve toccare un servizio vero
     }
 
     private PendingUpdate PrepareVerified(MainForm form, string version = "9.9.9")

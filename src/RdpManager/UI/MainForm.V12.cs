@@ -845,6 +845,10 @@ public sealed partial class MainForm
     private string InstallDir => InstallDirOverride ?? Path.GetDirectoryName(Path.GetFullPath(Application.ExecutablePath))!;
     private string RunnerBackupDir => Path.Combine(UpdateRunnerFolder, "riserva");
     private bool _runnerReady, _installerStarted;
+    private string? _backupDirUsed;
+
+    /// <summary>Come fermare il servizio della VPN prima della copia di riserva (le prove lo sostituiscono).</summary>
+    internal Func<Action<string>, bool>? VpnStopper { get; set; } = RdpManager.Vpn.VpnServiceStopper.StopSystemService;
 
     /// <summary>
     /// Copia la cartella installata in update-runner\riserva: da lì parte il programma di aggiornamento (fuori dalla
@@ -860,7 +864,9 @@ public sealed partial class MainForm
             if (!quiet)
                 ShowNotice("Preparazione dell'aggiornamento…");
             AppLog.Default?.Info("Aggiornamento: copia di riserva della versione in uso");
-            FolderBackup.Copy(InstallDir, RunnerBackupDir);
+            // Prima si ferma il servizio della VPN, poi si copia: ritenta, e se la vecchia riserva è in uso ne usa una nuova.
+            _backupDirUsed = FolderBackup.Prepare(InstallDir, RunnerBackupDir, VpnStopper,
+                line => AppLog.Default?.Info("Aggiornamento: " + line));
             _runnerReady = true;
             return true;
         }
@@ -886,7 +892,7 @@ public sealed partial class MainForm
         var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture);
         var data = string.Equals(Path.GetFullPath(_store.FilePath), Path.GetFullPath(ConnectionStore.DefaultPath), StringComparison.OrdinalIgnoreCase)
             ? null : Path.GetFullPath(_store.FilePath);
-        return new UpdateJob(Environment.ProcessId, installer, ready.Sha256, InstallDir, RunnerBackupDir,
+        return new UpdateJob(Environment.ProcessId, installer, ready.Sha256, InstallDir, _backupDirUsed ?? RunnerBackupDir,
             ready.Release.Version, AppInfo.Version,
             Path.Combine(AppLog.DefaultDirectory, "aggiornamento.log"),
             Path.Combine(AppLog.DefaultDirectory, $"setup-{ready.Release.Version.ToString(3)}-{stamp}.log"),

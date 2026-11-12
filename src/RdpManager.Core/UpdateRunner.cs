@@ -267,6 +267,90 @@ public static class FolderBackup
     }
 
     /// <summary>
+    /// Prepara la copia di riserva in modo robusto (difetto della 1.14.1: «Access to the path 'Accessibility.dll' is denied»,
+    /// perché la vecchia copia era in uso, per esempio dal servizio della VPN o da un'app avviata da lì, e non si poteva cancellare).
+    /// 1) ferma il servizio della VPN (<paramref name="stopVpn"/>), che altrimenti tiene in uso exe e DLL;
+    /// 2) svuota la destinazione togliendo la sola lettura e riprovando; se è ancora in uso, o se l'app gira proprio da lì,
+    /// usa una cartella nuova accanto («riserva-data»), invece di rinunciare all'aggiornamento;
+    /// 3) legge i file di origine consentendo agli altri di tenerli aperti (exe e DLL in uso si copiano lo stesso).
+    /// Un file che non si riesce a copiare NON si salta: la copia è anche il programma di aggiornamento e la via di ritorno,
+    /// quindi una riserva incompleta renderebbe l'aggiornamento senza rete (l'errore resta, con il nome del file).
+    /// Restituisce la cartella usata, da passare al programma di aggiornamento.
+    /// </summary>
+    public static string Prepare(string source, string destination, Func<Action<string>, bool>? stopVpn, Action<string> log,
+        int attempts = 3, Action<TimeSpan>? sleep = null, string? stamp = null)
+    {
+        if (!Directory.Exists(source))
+            throw new DirectoryNotFoundException("Cartella non trovata: " + source);
+        sleep ??= Thread.Sleep;
+        if (stopVpn is not null && !stopVpn(log))
+            log("Il servizio della VPN non si è fermato: provo comunque a preparare la copia di riserva");
+
+        var chosen = destination;
+        if (IsSameOrInside(source, destination) || !TryClear(destination, attempts, sleep, log))
+        {
+            stamp ??= DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+            chosen = destination + "-" + stamp;
+            log($"La cartella di riserva {destination} non è utilizzabile (in uso): uso {chosen}");
+            if (!TryClear(chosen, attempts, sleep, log))
+                throw new IOException("Non riesco a svuotare nemmeno la cartella di riserva alternativa: " + chosen);
+        }
+        CopyInto(source, chosen);
+        RemoveOldAlternatives(destination, chosen, log);
+        return chosen;
+    }
+
+    /// <summary>Vero se <paramref name="source"/> è <paramref name="folder"/> o sta dentro (l'app gira dalla copia di riserva).</summary>
+    private static bool IsSameOrInside(string source, string folder)
+    {
+        var s = Path.TrimEndingDirectorySeparator(Path.GetFullPath(source)) + Path.DirectorySeparatorChar;
+        var f = Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder)) + Path.DirectorySeparatorChar;
+        return s.StartsWith(f, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Cancella la cartella (anche file di sola lettura), riprovando; falso se qualcosa resta in uso.</summary>
+    private static bool TryClear(string folder, int attempts, Action<TimeSpan> sleep, Action<string> log)
+    {
+        for (var i = 1; i <= attempts; i++)
+        {
+            try
+            {
+                if (!Directory.Exists(folder))
+                    return true;
+                foreach (var file in Directory.GetFiles(folder, "*", SearchOption.AllDirectories))
+                    File.SetAttributes(file, FileAttributes.Normal);
+                Directory.Delete(folder, recursive: true);
+                return true;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                log($"Svuotare {folder} non riesce (tentativo {i} di {attempts}): {ex.Message}");
+                if (i < attempts)
+                    sleep(TimeSpan.FromMilliseconds(500));
+            }
+        }
+        return false;
+    }
+
+    private static void RemoveOldAlternatives(string destination, string keep, Action<string> log)
+    {
+        try
+        {
+            var parent = Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(Path.GetFullPath(destination)));
+            if (parent is null || !Directory.Exists(parent))
+                return;
+            var name = Path.GetFileName(Path.TrimEndingDirectorySeparator(destination));
+            foreach (var dir in Directory.GetDirectories(parent, name + "-*"))
+                if (!string.Equals(Path.GetFullPath(dir), Path.GetFullPath(keep), StringComparison.OrdinalIgnoreCase))
+                    TryClear(dir, 1, _ => { }, _ => { }); // se è in uso resta: la prossima volta
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            log("Pulizia delle vecchie copie di riserva non riuscita: " + ex.Message);
+        }
+    }
+
+    /// <summary>
     /// Rende <paramref name="target"/> uguale a <paramref name="backup"/>: toglie i file che nella copia non ci sono
     /// (aggiunti da un'installazione a metà) e rimette tutti gli altri.
     /// </summary>
@@ -300,7 +384,13 @@ public static class FolderBackup
             var dest = Path.Combine(destination, Path.GetRelativePath(source, file));
             if (File.Exists(dest))
                 File.SetAttributes(dest, FileAttributes.Normal);
-            File.Copy(file, dest, overwrite: true);
+            // Lettura che lascia gli altri liberi di tenere il file aperto (exe e DLL in uso da un servizio o da un'app).
+            using var input = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var output = new FileStream(dest, FileMode.Create, FileAccess.Write, FileShare.None);
+            input.CopyTo(output);
+            output.Flush();
+            output.Dispose();
+            File.SetLastWriteTimeUtc(dest, File.GetLastWriteTimeUtc(file));
         }
     }
 }
