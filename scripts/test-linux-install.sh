@@ -30,6 +30,10 @@ if [[ -n "$MISSING" ]]; then echo "$MISSING"; echo "FALLITO: librerie native man
 export HOME=/tmp/prova-home; mkdir -p "$HOME"
 timeout 8 xvfb-run -a /usr/bin/rdpmanager > /tmp/avvio.log 2>&1
 RC=$?
+if grep -q 'No usable version of libssl' /tmp/avvio.log; then
+  head -20 /tmp/avvio.log
+  echo "FALLITO: libssl non trovata dal runtime .NET"; exit 1
+fi
 if [[ $RC -ne 124 ]]; then
   head -20 /tmp/avvio.log
   echo "FALLITO: l'app è terminata da sola (codice $RC)"; exit 1
