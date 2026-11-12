@@ -9,6 +9,7 @@
     RdpManagerVpn (src/RdpManagerVpn) e server/rdpm-sync hanno la propria <Version> nel csproj, che ha la precedenza.
   -->
   <PropertyGroup>
+    <!-- Versione precedente: 1.14.1 -->
     <Version>1.14.2</Version>
     <AssemblyVersion>$(Version).0</AssemblyVersion>
     <FileVersion>$(Version).0</FileVersion>
