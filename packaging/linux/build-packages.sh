@@ -73,7 +73,11 @@ cat > "$DEBROOT/usr/share/lintian/overrides/rdpmanager" <<'EOF'
 # Programma autonomo (.NET self-contained) con le sue librerie: sta in /opt/rdpmanager, come da FHS per software di terzi.
 rdpmanager: dir-or-file-in-opt
 rdpmanager: no-manual-page
+# SkiaSharp include freetype, libpng, libjpeg ed expat compilate dentro la libreria: è la distribuzione ufficiale di SkiaSharp.
+rdpmanager: embedded-library
 EOF
+# Nel .deb le librerie .so non devono essere eseguibili (lintian: shared-library-is-executable); si caricano lo stesso.
+find "$DEBROOT/opt/rdpmanager" -type f -name '*.so*' -exec chmod 644 {} +
 cat > "$DEBROOT/usr/share/metainfo/rdpmanager.metainfo.xml" <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
@@ -104,7 +108,7 @@ Installed-Size: $SIZE_KB
 Section: net
 Priority: optional
 Homepage: https://github.com/niko9090/RdpManager
-Depends: freerdp3-x11 | freerdp2-x11, libsecret-1-0, libx11-6, libfontconfig1, libice6, libsm6, libssl3t64 | libssl3, libicu78 | libicu76 | libicu74 | libicu72 | libicu70 | libicu67 | libicu66
+Depends: libc6, freerdp3-x11 | freerdp2-x11, libsecret-1-0, libx11-6, libfontconfig1, libice6, libsm6, libssl3t64 | libssl3, libicu78 | libicu76 | libicu74 | libicu72 | libicu70 | libicu67 | libicu66
 Recommends: wireguard-tools
 Description: Gestore di connessioni Desktop remoto (RDP) in schede
  RdpManager organizza le connessioni RDP in cartelle e le apre in schede,
