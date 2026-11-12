@@ -155,6 +155,12 @@ public interface IUpdateEnvironment
     /// <summary>Rimette la cartella <paramref name="target"/> uguale alla copia <paramref name="backup"/>.</summary>
     void Restore(string backup, string target);
     void Launch(string exePath, IReadOnlyList<string> arguments);
+    /// <summary>
+    /// Ferma il servizio Windows della VPN (che gira da RdpManager.exe nella cartella installata e ne tiene in uso i file:
+    /// l'installer non potrebbe sostituirli e annullerebbe tutto). Non fa nulla se il servizio non c'è o è già fermo;
+    /// vero se alla fine non gira più.
+    /// </summary>
+    bool StopVpnService(Action<string> log);
 }
 
 /// <summary>Il programma di aggiornamento vero e proprio: sequenza dei passi e ritorno alla versione di prima.</summary>
@@ -217,6 +223,11 @@ public static class UpdateRunner
 
         if (!env.FileExists(Path.Combine(job.BackupDir, UpdateJob.ExeName)) || env.FileVersion(Path.Combine(job.BackupDir, UpdateJob.ExeName)) is null)
             return Fail(UpdateRunOutcome.NoBackup, "la copia di riserva della versione in uso non è completa, quindi non ho installato nulla.", restore: false);
+
+        // Il servizio della VPN usa i file della cartella installata: va fermato prima, altrimenti l'installer li trova in
+        // uso, fallisce e si torna alla versione di prima (difetto della 1.14.0 con la VPN accesa).
+        if (!env.StopVpnService(log))
+            log("Il servizio della VPN non si è fermato: provo comunque a installare");
 
         log($"Avvio dell'installer: {Path.GetFileName(job.InstallerPath)} {job.InstallerArguments()}");
         int? code = env.RunInstaller(job.InstallerPath, job.InstallerArguments(), InstallerTimeout);
@@ -353,6 +364,11 @@ public sealed class SystemUpdateEnvironment : IUpdateEnvironment
     }
 
     public void Restore(string backup, string target) => FolderBackup.Restore(backup, target);
+
+    /// <summary>Come fermare il servizio della VPN (la imposta il programma Windows, che conosce il gestore dei servizi); senza, non si fa nulla.</summary>
+    public Func<Action<string>, bool>? VpnStopper { get; init; }
+
+    public bool StopVpnService(Action<string> log) => VpnStopper?.Invoke(log) ?? true;
 
     public void Launch(string exePath, IReadOnlyList<string> arguments)
     {

@@ -42,7 +42,7 @@ internal sealed class UpdateProgressForm : TouchForm
         {
             try
             {
-                var result = await Task.Run(() => UpdateRunner.Run(job, new SystemUpdateEnvironment(), Log));
+                var result = await Task.Run(() => UpdateRunner.Run(job, new SystemUpdateEnvironment { VpnStopper = RdpManager.Vpn.VpnServiceStopper.StopSystemService }, Log));
                 Log("Esito: " + result.Outcome);
             }
             catch (Exception ex)
