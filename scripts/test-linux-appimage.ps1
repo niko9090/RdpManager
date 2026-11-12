@@ -2,7 +2,7 @@
 # deve partire (resta viva sotto Xvfb) senza «Unhandled exception». Exit 0 solo se parte.
 #
 # Uso:   powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-linux-appimage.ps1 [-AppImage <file>] [-Image ubuntu:24.04] [-Seconds 15]
-# Senza -AppImage usa dist\RdpManager-<versione>-x86_64.AppImage; se manca la costruisce con scripts/build-linux.ps1.
+# Senza -AppImage usa dist\RdpManager-<versione>-x86_64.AppImage; la ricostruisce sempre con scripts/build-linux.ps1 (mai un pacchetto vecchio).
 # Senza Docker ripiega su WSL (Ubuntu), meno pulito perché la distro WSL ha già i suoi pacchetti.
 
 param(
@@ -19,11 +19,11 @@ if (-not $AppImage) {
     $text = [IO.File]::ReadAllText((Join-Path $root 'src\Directory.Build.props'), [Text.Encoding]::UTF8)
     $version = [regex]::Match($text, '<Version>([^<]+)</Version>').Groups[1].Value.Trim()
     $AppImage = Join-Path $root "dist\RdpManager-$version-x86_64.AppImage"
-    if (-not (Test-Path $AppImage)) {
-        Write-Host "AppImage mancante: la costruisco ($AppImage)" -ForegroundColor Cyan
-        & (Join-Path $PSScriptRoot 'build-linux.ps1')
-        if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne $null) { throw "build-linux.ps1 non riuscito ($LASTEXITCODE)" }
-    }
+    # Ricostruisco sempre dai sorgenti attuali: una AppImage già in dist\ (stessa versione) può essere di una build vecchia.
+    if (Test-Path $AppImage) { Remove-Item -LiteralPath $AppImage -Force }
+    Write-Host "Costruisco l'AppImage dai sorgenti attuali ($AppImage)" -ForegroundColor Cyan
+    & (Join-Path $PSScriptRoot 'build-linux.ps1')
+    if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne $null) { throw "build-linux.ps1 non riuscito ($LASTEXITCODE)" }
 }
 if (-not (Test-Path $AppImage)) { throw "AppImage non trovata: $AppImage" }
 $AppImage = (Resolve-Path $AppImage).Path
