@@ -52,6 +52,7 @@ public sealed class V161CoreTests : IDisposable
             _installed = false;
         }
         public void Launch(string exePath, IReadOnlyList<string> arguments) { Steps.Add("launch"); Launched.Add((exePath, arguments)); }
+        public bool StopVpnService(Action<string> log) { Steps.Add("stop-vpn"); return true; }
     }
 
     private UpdateJob Job(bool simulate = false, bool relaunch = true, string? data = null) => new(

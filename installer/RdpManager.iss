@@ -104,8 +104,23 @@ begin
   end;
 end;
 
-// Prima di installare: se RdpManager si sta ancora chiudendo (sessioni che si disconnettono) lo aspetta fino a
-// 60 secondi, così l'installazione non trova i file in uso. Se resta aperto ci pensa CloseApplications.
+// Il servizio Windows della VPN (RdpManagerVpn) è RdpManager.exe --vpn-service dalla cartella installata: finché gira
+// tiene in uso RdpManager.exe e le librerie, l'installazione non può sostituirli e si annulla (rollback), anche
+// con CloseApplications. Gli utenti hanno il permesso di fermarlo senza UAC; «net stop» aspetta che sia fermo.
+// Se il servizio non c'è o è già fermo non succede nulla (il codice di uscita si ignora).
+procedure StopVpnService;
+var
+  ResultCode: Integer;
+begin
+  if Exec(ExpandConstant('{sys}\net.exe'), 'stop RdpManagerVpn', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+    Log(Format('net stop RdpManagerVpn: codice %d', [ResultCode]))
+  else
+    Log('net stop RdpManagerVpn: non avviato');
+end;
+
+// Prima di installare: ferma il servizio della VPN; se RdpManager si sta ancora chiudendo (sessioni che si
+// disconnettono) lo aspetta fino a 60 secondi, così l'installazione non trova i file in uso. Se resta aperto ci pensa
+// CloseApplications.
 function InitializeSetup: Boolean;
 var
   Exe: String;
@@ -113,7 +128,8 @@ var
 begin
   Result := True;
   if not WizardSilent then
-    Exit; // installazione a mano: CloseApplications chiede all'utente
+    Exit; // installazione a mano: CloseApplications chiede all'utente; il servizio si ferma in PrepareToInstall
+  StopVpnService;
   Exe := ExpandConstant('{localappdata}\Programs\{#AppName}\{#AppExe}');
   Waited := 0;
   while (not FileIsFree(Exe)) and (Waited < 60000) do
@@ -123,6 +139,13 @@ begin
   end;
   if Waited > 0 then
     Log(Format('Atteso %d ms la chiusura di RdpManager', [Waited]));
+end;
+
+// Installazione a mano: dopo il clic su «Installa» (e non prima, così «Annulla» non spegne la VPN) si ferma il servizio.
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  Result := '';
+  StopVpnService;
 end;
 
 // Vero se l'installer è stato avviato con /RELAUNCH=1 (o /RELAUNCH): solo allora l'app si riapre da sola.
