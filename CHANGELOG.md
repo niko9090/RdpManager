@@ -1,5 +1,12 @@
 # Novità di RdpManager
 
+## 1.14.1 (2026-11-12)
+
+**Correzione dell'aggiornamento con la VPN accesa**
+- L'aggiornamento falliva e tornava alla versione precedente se la VPN era accesa. Ora l'installazione ferma prima il servizio VPN di Windows (RdpManagerVpn), sia dall'aggiornamento automatico sia con l'installer lanciato a mano.
+- Dopo l'aggiornamento la VPN va riaccesa dal programma.
+- Su Linux non cambia niente.
+
 ## 1.14.0 (2026-11-11)
 
 **File di configurazione unico (.rdpmconfig)**
