@@ -118,9 +118,28 @@ begin
     Log('net stop RdpManagerVpn: non avviato');
 end;
 
+// Chiude i processi RdpManager.exe che girano DALLA CARTELLA INSTALLATA e tengono in uso i file da sostituire: l'app
+// vecchia rimasta appesa dopo l'uscita, o un'istanza lanciata a parte. Si filtra per percorso: il programma di
+// aggiornamento è anch'esso un RdpManager.exe (nella copia di riserva) e NON va fermato, quindi mai per nome.
+// Il servizio della VPN (SYSTEM) non si può fermare da qui: per quello c'è StopVpnService. Chi aggiorna dalla 1.13.0
+// non ha un programma di aggiornamento che li chiuda: lo fa l'installer, qui.
+procedure CloseInstalledProcesses(const AppDir: String);
+var
+  ResultCode: Integer;
+  Params: String;
+begin
+  Params := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Get-Process RdpManager -ErrorAction SilentlyContinue | ' +
+    'Where-Object { $_.Path -like ''' + AppDir + '\*'' } | ForEach-Object { Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }"';
+  if Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'), Params, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+    Log(Format('Chiusi i RdpManager.exe rimasti nella cartella installata: codice %d', [ResultCode]))
+  else
+    Log('Chiusura dei RdpManager.exe rimasti: PowerShell non avviato');
+end;
+
 // Prima di installare: ferma il servizio della VPN; se RdpManager si sta ancora chiudendo (sessioni che si
-// disconnettono) lo aspetta fino a 60 secondi, così l'installazione non trova i file in uso. Se resta aperto ci pensa
-// CloseApplications.
+// disconnettono) lo aspetta fino a 60 secondi, così l'installazione non trova i file in uso. Se dopo l'attesa il file
+// è ancora in uso (processo appeso, servizio che non si ferma al primo colpo) chiude i processi rimasti nella cartella
+// installata, riprova a fermare il servizio e aspetta ancora fino a 20 secondi; lo stato finale resta nel log.
 function InitializeSetup: Boolean;
 var
   Exe: String;
@@ -139,6 +158,21 @@ begin
   end;
   if Waited > 0 then
     Log(Format('Atteso %d ms la chiusura di RdpManager', [Waited]));
+  if not FileIsFree(Exe) then
+  begin
+    CloseInstalledProcesses(ExpandConstant('{localappdata}\Programs\{#AppName}'));
+    StopVpnService;
+    Waited := 0;
+    while (not FileIsFree(Exe)) and (Waited < 20000) do
+    begin
+      Sleep(500);
+      Waited := Waited + 500;
+    end;
+    if FileIsFree(Exe) then
+      Log(Format('RdpManager.exe libero dopo la chiusura forzata (atteso altri %d ms)', [Waited]))
+    else
+      Log('RdpManager.exe risulta ancora in uso: l''installazione puo fallire');
+  end;
 end;
 
 // Installazione a mano: dopo il clic su «Installa» (e non prima, così «Annulla» non spegne la VPN) si ferma il servizio.
