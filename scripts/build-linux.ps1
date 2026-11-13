@@ -40,7 +40,8 @@ function Invoke-Wsl([string[]]$extra, [string]$script) {
     $ErrorActionPreference = 'Continue'
     try {
         $wslTmp = (& wsl.exe @wslArgs -- wslpath -a ($tmp -replace '\\', '/') | Out-String).Trim()
-        & wsl.exe @wslArgs @extra -- bash $wslTmp 2>&1 | ForEach-Object { Write-Host $_ }
+        $script:wslLog = New-Object System.Collections.Generic.List[string]
+        & wsl.exe @wslArgs @extra -- bash $wslTmp 2>&1 | ForEach-Object { $line = "$_"; $script:wslLog.Add($line); Write-Host $line }
         return $LASTEXITCODE
     }
     finally {
@@ -85,7 +86,16 @@ $src = $script.Substring(0, $script.LastIndexOf('/'))
 $run = "set -e; D=`$(mktemp -d /tmp/rdpmanager-pkg.XXXXXX); trap 'rm -rf `$D' EXIT; tr -d '\r' < '$script' > `$D/build-packages.sh; " +
        "cp -f '$src/rdpmanager.desktop' '$src/rdpmanager.png' '$src/rdpmanager-rdpmconfig.xml' `$D/; " +
        "bash `$D/build-packages.sh '$wslPublish' '$Version' '$wslDist' '$wslTools'"
-if ((Invoke-Wsl @() $run) -ne 0) { throw 'Costruzione dei pacchetti Linux non riuscita' }
+$rc = Invoke-Wsl @() $run
+if ($rc -ne 0) {
+    # Il log completo della costruzione resta su disco (artifacts\build-linux.log) e la coda finisce nel messaggio d'errore:
+    # chi vede solo l'eccezione (cancello di unione, CI) trova subito la riga vera.
+    $logFile = Join-Path $root 'artifacts\build-linux.log'
+    $all = @($script:wslLog)
+    try { [IO.File]::WriteAllLines($logFile, [string[]]$all, (New-Object Text.UTF8Encoding($false))) } catch { }
+    $tail = ($all | Select-Object -Last 40) -join "`n"
+    throw "Costruzione dei pacchetti Linux non riuscita (codice $rc). Log completo: $logFile`n--- ultime righe ---`n$tail"
+}
 
 $files = @(
     "rdpmanager_${Version}_amd64.deb",
