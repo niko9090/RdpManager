@@ -7,6 +7,8 @@ artifacts/
 TestResults/
 .sierradeck/
 .claude/
+# Cartelle temporanee dei rilasci
+.tmp_rel_*/
 
 # Configurazione locale: dati personali (dominio, NAS, rete). Mai su GitHub; il modello e config/locale.example.json
 config/locale.json
