@@ -133,7 +133,7 @@ Requires:       freerdp
 Requires:       libsecret
 Requires:       libicu
 Requires:       krb5-libs
-Requires:       openssl-libs
+Requires:       (openssl-libs < 1:4 or openssl3-libs)
 Requires:       libX11
 Requires:       libICE
 Requires:       libSM
