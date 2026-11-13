@@ -66,11 +66,23 @@ if ((Invoke-Wsl @() $check) -ne 0) {
 }
 
 # Pubblicazione self-contained linux-x64.
-$publish = Join-Path $root 'artifacts\publish-linux'
-if (Test-Path $publish) { Remove-Item -Recurse -Force $publish }
-dotnet publish (Join-Path $root 'src\RdpManager.Linux\RdpManager.Linux.csproj') -c Release -r linux-x64 --self-contained -p:PublishSingleFile=false -p:DebugType=none -o $publish
-if ($LASTEXITCODE -ne 0) { throw "dotnet publish (linux-x64) non riuscito ($LASTEXITCODE)" }
-if (-not (Test-Path (Join-Path $publish 'RdpManager.Linux'))) { throw "Manca RdpManager.Linux in $publish" }
+# Ogni esecuzione ha la sua cartella di pubblicazione (build parallele, per esempio le prove Linux del cancello di unione,
+# non si svuotano a vicenda i file) e la toglie alla fine. Le cartelle obj\ dei progetti invece sono condivise:
+# dotnet publish si serializza con un mutex di sistema (con nome, per cartella del progetto), l'attesa è bloccante.
+$publish = Join-Path $root ('artifacts\publish-linux-' + [guid]::NewGuid().ToString('N').Substring(0, 12))
+$mutexKey = [BitConverter]::ToString([Security.Cryptography.SHA1]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes($root.ToLowerInvariant()))).Replace('-', '')
+$mutex = New-Object System.Threading.Mutex($false, "Global\RdpManagerBuildLinux-$mutexKey")
+$locked = $false
+try {
+    try { $locked = $mutex.WaitOne() } catch [System.Threading.AbandonedMutexException] { $locked = $true }
+    dotnet publish (Join-Path $root 'src\RdpManager.Linux\RdpManager.Linux.csproj') -c Release -r linux-x64 --self-contained -p:PublishSingleFile=false -p:DebugType=none -o $publish
+    if ($LASTEXITCODE -ne 0) { throw "dotnet publish (linux-x64) non riuscito ($LASTEXITCODE)" }
+    if (-not (Test-Path (Join-Path $publish 'RdpManager.Linux'))) { throw "Manca RdpManager.Linux in $publish" }
+}
+finally {
+    if ($locked) { $mutex.ReleaseMutex() }
+    $mutex.Dispose()
+}
 
 $dist = Join-Path $root 'dist'
 $tools = Join-Path $root 'artifacts\tools'
@@ -87,6 +99,7 @@ $run = "set -e; D=`$(mktemp -d /tmp/rdpmanager-pkg.XXXXXX); trap 'rm -rf `$D' EX
        "cp -f '$src/rdpmanager.desktop' '$src/rdpmanager.png' '$src/rdpmanager-rdpmconfig.xml' `$D/; " +
        "bash `$D/build-packages.sh '$wslPublish' '$Version' '$wslDist' '$wslTools'"
 $rc = Invoke-Wsl @() $run
+Remove-Item -LiteralPath $publish -Recurse -Force -ErrorAction SilentlyContinue
 if ($rc -ne 0) {
     # Il log completo della costruzione resta su disco (artifacts\build-linux.log) e la coda finisce nel messaggio d'errore:
     # chi vede solo l'eccezione (cancello di unione, CI) trova subito la riga vera.

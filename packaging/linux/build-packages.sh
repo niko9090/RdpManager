@@ -163,9 +163,10 @@ chmod 755 "$APPDIR/AppRun"
 
 TOOL="$TOOLS/appimagetool-x86_64.AppImage"
 if [[ ! -x "$TOOL" ]]; then
-  curl -fsSL --retry 3 -o "$TOOL.part" "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
-  mv "$TOOL.part" "$TOOL"
-  chmod 755 "$TOOL"
+  # Nome temporaneo unico: due costruzioni in parallelo non scrivono lo stesso .part.
+  curl -fsSL --retry 3 -o "$TOOL.$$.part" "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
+  chmod 755 "$TOOL.$$.part"
+  mv -f "$TOOL.$$.part" "$TOOL"
 fi
 APPIMAGE="$OUT/RdpManager-${VERSION}-x86_64.AppImage"
 rm -f "$APPIMAGE"
@@ -175,9 +176,12 @@ chmod 755 "$APPIMAGE"
 
 # ---------- consegna in dist ----------
 deliver() {
-  local src=$1 dst="$DIST/$(basename "$1")" i
+  # Copia in un nome temporaneo unico dentro dist e poi rinomina (atomico sullo stesso filesystem): chi legge in
+  # parallelo vede il pacchetto vecchio intero o quello nuovo intero, mai assente o a metà.
+  local src=$1 dst="$DIST/$(basename "$1")" i tmp="$DIST/.$(basename "$1").$$.part"
   for i in 1 2 3 4 5 6; do
-    if rm -f "$dst" 2> "$WORK/deliver.err" && cp -f "$src" "$dst" 2>> "$WORK/deliver.err"; then return 0; fi
+    if cp -f "$src" "$tmp" 2> "$WORK/deliver.err" && mv -f "$tmp" "$dst" 2>> "$WORK/deliver.err"; then return 0; fi
+    rm -f "$tmp" 2> /dev/null || true
     echo "Consegna di $(basename "$dst") non riuscita (tentativo $i/6): $(tr '\n' ' ' < "$WORK/deliver.err")" >&2
     sleep 2
   done

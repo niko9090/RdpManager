@@ -68,6 +68,21 @@ public class LinuxPackagingTests
     }
 
     [Fact]
+    public void LinuxBuildIsSafeWhenRunInParallel()
+    {
+        // Le prove Linux del cancello di unione ricostruiscono insieme: niente cartella di publish condivisa,
+        // dotnet publish serializzato da un mutex di sistema, consegna in dist con rinomina atomica.
+        var build = Read("scripts", "build-linux.ps1");
+        Assert.Contains("publish-linux-' + [guid]::NewGuid()", build);
+        Assert.DoesNotContain("'artifacts\\publish-linux'", build);
+        Assert.Contains("Global\\RdpManagerBuildLinux-", build);
+        Assert.Contains("WaitOne()", build);
+        var script = Read("packaging", "linux", "build-packages.sh");
+        Assert.Contains("mv -f \"$tmp\" \"$dst\"", script);
+        Assert.Contains("$TOOL.$$.part", script);
+    }
+
+    [Fact]
     public void ReleaseScriptsShipLinuxPackagesWithChecksums()
     {
         var installer = Read("build-installer.ps1");
