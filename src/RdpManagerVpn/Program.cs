@@ -9,6 +9,8 @@ internal static class Program
     private const string InstallArg = "--installa-servizio";
     private const string RemoveArg = "--rimuovi";
     private const string RemoveAllArg = "--tutto";
+    private const string ConfigureArg = "--configura";
+    internal const string ApplyProfileArg = "--applica-profilo";
 
     [STAThread]
     private static int Main(string[] args)
@@ -26,6 +28,22 @@ internal static class Program
         // il rilancio con UAC resta solo come ultima risorsa (versione portatile, servizio mancante).
         if (args.Length > 0 && (args[0].Equals(InstallArg, StringComparison.OrdinalIgnoreCase) || args[0].Equals(RemoveArg, StringComparison.OrdinalIgnoreCase)))
             return RunAdminCommand(args, exePath, programData);
+
+        // «--applica-profilo <file>»: passo con UAC lanciato dall'icona (installa vpn.conf protetto e il servizio).
+        if (args.Length > 1 && args[0].Equals(ApplyProfileArg, StringComparison.OrdinalIgnoreCase))
+            return IsAdministrator() ? ClientProfileInstaller.RunApplyCommand(args[1], exePath, programData) : 5;
+
+        // «--configura <file>» (lo usa l'installer) o un file .rdpmconfig come argomento (doppio clic): si applica e si mostra il riepilogo.
+        string? configFile = args.Length > 1 && args[0].Equals(ConfigureArg, StringComparison.OrdinalIgnoreCase)
+            ? args[1]
+            : RdpManager.Core.RdpmConfigFile.FindArgument(args);
+        if (configFile is not null)
+        {
+            Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            return ConfigCommand.RunAsync(configFile, exePath, programData).GetAwaiter().GetResult();
+        }
 
         using var single = new Mutex(true, @"Local\RdpManagerVPN.Tray", out bool first);
         if (!first)
