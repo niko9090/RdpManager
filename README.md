@@ -509,8 +509,9 @@ WireGuard più icona nell'area di notifica). Funziona anche dove RdpManager non 
 uguale per tutti i PC e senza segreti dentro**: `dist\RdpManagerVPN-Setup.exe`. Si configura con il file `.rdpmconfig`
 preparato da chi gestisce il server (vedi «File di configurazione unico»).
 
-**Dove si trova.** Non è ancora tra gli allegati delle release: si costruisce con `build-vpn-client.ps1` (serve Inno Setup 6)
-e si consegna `dist\RdpManagerVPN-Setup.exe`.
+**Dove si trova.** Nella pagina **Releases** di GitHub (https://github.com/niko9090/RdpManager/releases), tra i file
+della release: **`RdpManagerVPN-Setup.exe`** (il suo SHA256 è in `SHA256SUMS.txt`). `scripts/release.ps1` lo costruisce e lo
+allega a ogni release. Per costruirlo a mano serve Inno Setup 6:
 
 ```powershell
 powershell -NoProfile -File build-vpn-client.ps1

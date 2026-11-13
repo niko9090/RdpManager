@@ -93,5 +93,7 @@ public class LinuxPackagingTests
         Assert.Contains("x86_64.rpm", installer);
         var release = Read("scripts", "release.ps1");
         Assert.Contains("$linux", release);
+        Assert.Contains("RdpManagerVPN-Setup.exe", release);
+        Assert.Contains("build-vpn-client.ps1", release);
     }
 }
