@@ -49,6 +49,61 @@ DEBROOT="$WORK/deb"
 mkdir -p "$DEBROOT"
 cp -a "$ROOT/." "$DEBROOT/"
 mkdir -p "$DEBROOT/DEBIAN"
+chmod 755 "$DEBROOT/DEBIAN"
+# Documentazione richiesta da Debian Policy (senza copyright e changelog lintian dà errore e i gestori grafici
+# mostrano il pacchetto come non conforme): copyright, changelog compresso, override lintian per /opt.
+DEBDOC="$DEBROOT/usr/share/doc/rdpmanager"
+mkdir -p "$DEBDOC" "$DEBROOT/usr/share/lintian/overrides" "$DEBROOT/usr/share/metainfo"
+chmod 755 "$DEBROOT/usr/share/doc" "$DEBDOC" "$DEBROOT/usr/share/lintian" "$DEBROOT/usr/share/lintian/overrides" "$DEBROOT/usr/share/metainfo"
+cat > "$DEBDOC/copyright" <<EOF
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: RdpManager
+Source: https://github.com/niko9090/RdpManager
+
+Files: *
+Copyright: 2024-2026 niko9090
+License: Proprietary
+ Programma distribuito in forma binaria. Include componenti di terze parti
+ (runtime .NET, Avalonia e altre librerie) con le rispettive licenze.
+EOF
+{
+  echo "rdpmanager ($VERSION) stable; urgency=medium"
+  echo
+  echo "  * Versione $VERSION."
+  echo "    Novità e correzioni: https://github.com/niko9090/RdpManager/releases"
+  echo
+  echo " -- niko9090 <noreply@github.com>  $(date -R)"
+} | gzip -9n > "$DEBDOC/changelog.gz"
+cat > "$DEBROOT/usr/share/lintian/overrides/rdpmanager" <<'EOF'
+# Programma autonomo (.NET self-contained) con le sue librerie: sta in /opt/rdpmanager, come da FHS per software di terzi.
+rdpmanager: dir-or-file-in-opt
+rdpmanager: no-manual-page
+# SkiaSharp include freetype, libpng, libjpeg ed expat compilate dentro la libreria: è la distribuzione ufficiale di SkiaSharp.
+rdpmanager: embedded-library
+EOF
+# Nel .deb le librerie .so non devono essere eseguibili (lintian: shared-library-is-executable); si caricano lo stesso.
+find "$DEBROOT/opt/rdpmanager" -type f -name '*.so*' -exec chmod 644 {} +
+cat > "$DEBROOT/usr/share/metainfo/rdpmanager.metainfo.xml" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>rdpmanager.desktop</id>
+  <name>RdpManager</name>
+  <summary>Gestore di connessioni Desktop remoto (RDP) in schede</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>LicenseRef-proprietary</project_license>
+  <description>
+    <p>RdpManager organizza le connessioni RDP in cartelle e le apre in schede, usando FreeRDP.</p>
+  </description>
+  <url type="homepage">https://github.com/niko9090/RdpManager</url>
+  <launchable type="desktop-id">rdpmanager.desktop</launchable>
+  <provides><binary>rdpmanager</binary></provides>
+</component>
+EOF
+chmod 644 "$DEBDOC/copyright" "$DEBDOC/changelog.gz" "$DEBROOT/usr/share/lintian/overrides/rdpmanager" "$DEBROOT/usr/share/metainfo/rdpmanager.metainfo.xml"
+SIZE_KB=$(du -sk --exclude=DEBIAN "$DEBROOT" | cut -f1)
+# md5sums di tutti i file regolari (dpkg --verify e i gestori grafici li usano per controllare l'installazione).
+( cd "$DEBROOT" && find . -path ./DEBIAN -prune -o -type f -print | sed 's|^\./||' | LC_ALL=C sort | xargs -d '\n' md5sum > DEBIAN/md5sums )
+chmod 644 "$DEBROOT/DEBIAN/md5sums"
 cat > "$DEBROOT/DEBIAN/control" <<EOF
 Package: rdpmanager
 Version: $VERSION
@@ -58,7 +113,7 @@ Installed-Size: $SIZE_KB
 Section: net
 Priority: optional
 Homepage: https://github.com/niko9090/RdpManager
-Depends: freerdp3-x11 | freerdp2-x11, libsecret-1-0, libx11-6, libfontconfig1, libice6, libsm6, libssl3t64 | libssl3, libicu78 | libicu76 | libicu74 | libicu72 | libicu70 | libicu67 | libicu66
+Depends: libc6, freerdp3-x11 | freerdp2-x11, libsecret-1-0, libx11-6, libfontconfig1, libice6, libsm6, libssl3t64 | libssl3, libicu78 | libicu76 | libicu74 | libicu72 | libicu70 | libicu67 | libicu66
 Recommends: wireguard-tools
 Description: Gestore di connessioni Desktop remoto (RDP) in schede
  RdpManager organizza le connessioni RDP in cartelle e le apre in schede,
