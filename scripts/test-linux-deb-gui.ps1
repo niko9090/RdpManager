@@ -7,7 +7,7 @@
 # i pacchetti si ricostruiscono sempre con scripts/build-linux.ps1. Docker Desktop, se spento, si avvia da solo.
 #
 # Uso:   powershell -NoProfile -File scripts/test-linux-deb-gui.ps1
-#        ... -Deb C:\percorso\rdpmanager_1.14.3_amd64.deb -Images ubuntu:24.04,debian:12
+#        ... -Deb C:\percorso\rdpmanager_1.14.4_amd64.deb -Images ubuntu:24.04,debian:12
 # Non installa nulla su Windows: tutto avviene dentro i container.
 
 param(

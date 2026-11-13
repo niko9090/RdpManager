@@ -7,7 +7,7 @@
 # i pacchetti si ricostruiscono sempre con scripts/build-linux.ps1.
 #
 # Uso:   powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-linux-install.ps1
-#        ... -Deb C:\percorso\rdpmanager_1.14.3_amd64.deb -Images ubuntu:24.04,debian:12
+#        ... -Deb C:\percorso\rdpmanager_1.14.4_amd64.deb -Images ubuntu:24.04,debian:12
 #        ... -Build        (ricostruisce prima)
 # Non installa nulla su Windows: tutto avviene dentro i container / il chroot WSL.
 

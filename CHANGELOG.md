@@ -1,5 +1,15 @@
 # Novità di RdpManager
 
+## 1.14.4 (2026-11-13)
+
+**Pacchetti Linux: installazione più affidabile**
+- Il .deb si installa con doppio clic dal Gestore applicazioni: il pacchetto è conforme (lintian) e dichiara le dipendenze (libc6, freerdp, ...).
+- Il .rpm dichiara tutte le dipendenze del runtime; su Fedora 45 richiede OpenSSL 3, quindi non compare più «No usable version of libssl».
+- L'AppImage parte anche su sistemi minimi.
+- La costruzione dei pacchetti Linux è più robusta.
+- Nuove prove automatiche per .deb (anche grafico), .rpm e AppImage.
+- Su Windows non cambia niente.
+
 ## 1.14.3 (2026-11-12)
 
 **Correzione dell'aggiornamento automatico che tornava alla versione precedente**
