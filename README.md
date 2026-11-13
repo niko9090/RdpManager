@@ -504,26 +504,52 @@ acceso; per la scheda Tailscale serve Tailscale installato e connesso (e, per il
 
 ## Installer del client VPN per un PC cliente
 
-`build-vpn-client.ps1` costruisce un installer di **RdpManager VPN** (servizio Windows con il tunnel WireGuard più icona
-nell'area di notifica) con il profilo del PC già dentro: sul PC cliente basta avviarlo, senza dati da inserire.
+**RdpManager VPN** è la parte VPN da installare sul PC che deve ricevere il desktop remoto (servizio Windows con il tunnel
+WireGuard più icona nell'area di notifica). Funziona anche dove RdpManager non è installato. L'installer è **uno solo,
+uguale per tutti i PC e senza segreti dentro**: `dist\RdpManagerVPN-Setup.exe`. Si configura con il file `.rdpmconfig`
+preparato da chi gestisce il server (vedi «File di configurazione unico»).
+
+**Dove si trova.** Non è ancora tra gli allegati delle release: si costruisce con `build-vpn-client.ps1` (serve Inno Setup 6)
+e si consegna `dist\RdpManagerVPN-Setup.exe`.
 
 ```powershell
-# profilo WireGuard del PC (.conf, come lo crea crea-profilo-client.sh sul server) e nome del PC
-powershell -NoProfile -File build-vpn-client.ps1 -Profilo C:\profili\ufficio1.conf -Nome ufficio1
-# risultato: dist\RdpManagerVPN-Setup-ufficio1.exe
+powershell -NoProfile -File build-vpn-client.ps1
+# risultato: dist\RdpManagerVPN-Setup.exe (generico)
 ```
 
-Serve Inno Setup 6. Per provare lo script senza un profilo vero c'è `tests\fixtures\vpn-esempio.conf` (chiavi finte).
-L'installer chiede l'amministratore, installa in `Program Files\RdpManager VPN`, copia il profilo come `vpn.conf`
-leggibile solo da SYSTEM e amministratori, registra e avvia il servizio, mette l'icona nell'avvio automatico di Windows
-(voce `RdpManagerVPN` in HKCU\...\Run) e la avvia. Dal menu dell'icona si disattivano l'avvio con Windows e la
-riconnessione automatica. **Disinstallazione** da *App installate*: ferma e rimuove servizio, avvio automatico, file,
-profilo e `%ProgramData%\RdpManagerVPN`. L'installer contiene la chiave privata del PC: va consegnato solo a quel cliente.
-Non provato su un PC vero (installazione, servizio, disinstallazione): solo la compilazione.
+**Come si usa sul PC da raggiungere**
 
-*Da fare:* far accettare a `RdpManagerVpn` le credenziali dell'account al primo avvio (stesso giro di «VPN automatica»
-di RdpManager) invece del profilo incorporato: oggi l'installer resta con il profilo del PC già dentro, quindi il profilo
-va ancora creato (a mano con `crea-profilo-client.sh`, oppure da un PC con RdpManager) e il suo peer registrato sul server.
+1. Scarica `RdpManagerVPN-Setup.exe` e mettigli **accanto il file `.rdpmconfig`** (ne basta uno nella stessa cartella).
+2. Doppio clic sull'installer e conferma l'autorizzazione di amministratore. Al termine compare il riepilogo
+   **«Fatto»** oppure **«Da completare»** con cosa manca, in italiano.
+
+Altri due modi per dare il file:
+
+- parametro `/CONFIG="C:\percorso\file.rdpmconfig"` (anche con `/SILENT`);
+- niente file: al primo avvio l'icona chiede di sceglierlo; la voce di menu **«Carica file di configurazione…»** serve anche
+  dopo, per cambiare configurazione.
+
+Cosa fa con il file (stesso codice di RdpManager, in `RdpManager.Core`): controlla il file (se ci sono errori li elenca tutti
+e non cambia niente), **crea la chiave sul PC** (la privata resta qui: nello stato dell'utente cifrata, e in `vpn.conf` leggibile
+solo da SYSTEM e amministratori; al server va solo la pubblica), **registra il PC sul server** con il codice di registrazione o
+l'account del file (con il solo codice il PC si crea un account suo, `pc-<nome>`), scrive il profilo, avvia il servizio e accende il
+tunnel. Rilanciarlo con lo stesso file riusa chiave e indirizzo. Il file `.rdpmconfig` contiene segreti: l'installer non lo copia
+né lo cancella, cancellalo tu dopo l'uso.
+
+Installa in `Program Files\RdpManager VPN`, mette l'icona nell'avvio automatico di Windows (voce `RdpManagerVPN` in
+HKCU\...\Run) e la avvia. Dal menu dell'icona si disattivano l'avvio con Windows e la riconnessione automatica.
+**Associazione `.rdpmconfig`:** RdpManager VPN la prende solo se nessun altro programma l'ha già (se c'è RdpManager, resta a
+lui). **Disinstallazione** da *App installate*: ferma e rimuove servizio, avvio automatico, file, profilo e
+`%ProgramData%\RdpManagerVPN`.
+
+*Modalità vecchia (un installer per PC, con il profilo `.conf` dentro):*
+`build-vpn-client.ps1 -Profilo C:\profili\ufficio1.conf -Nome ufficio1` produce `dist\RdpManagerVPN-Setup-ufficio1.exe`, che
+contiene la chiave privata di quel PC e va consegnato solo a quel cliente (per provare c'è `tests\fixtures\vpn-esempio.conf`,
+chiavi finte).
+
+*Non provato:* installazione, servizio, accensione del tunnel, UAC, associazione dei file e disinstallazione su un PC vero
+(coperti solo la compilazione dell'installer e i test automatici di lettura/applicazione del file con server finto); il
+rilevamento del file accanto all'installer e `/CONFIG` (script Inno, mai eseguito).
 
 ## Pubblicare a mano (cartella o eseguibile unico)
 

@@ -34,7 +34,9 @@ internal sealed class TrayApp : ApplicationContext
         TryApplyAutoStart(_settings.AvviaConWindows);
 
         var menu = new ContextMenuStrip();
-        menu.Items.AddRange([_statusItem, _ipItem, new ToolStripSeparator(), _toggleItem, new ToolStripSeparator(),
+        var loadConfigItem = new ToolStripMenuItem("Carica file di configurazione…");
+        loadConfigItem.Click += (_, _) => LoadConfigFile();
+        menu.Items.AddRange([_statusItem, _ipItem, new ToolStripSeparator(), _toggleItem, loadConfigItem, new ToolStripSeparator(),
             _autoStartItem, _reconnectItem, new ToolStripSeparator(), new ToolStripMenuItem("Esci", null, (_, _) => ExitApp())]);
         _toggleItem.Click += (_, _) => ToggleConnection();
         _autoStartItem.Click += (_, _) => SetAutoStart(!_settings.AvviaConWindows);
@@ -49,6 +51,45 @@ internal sealed class TrayApp : ApplicationContext
         if (_settings.AvviaConWindows && _control.Exists(ClientPaths.ServiceName) && _control.Query(ClientPaths.ServiceName) == TunnelState.Spento)
             TryStart();
         Refresh();
+
+        // primo avvio, nessun profilo su questo PC: si chiede il file di configurazione (una volta sola per avvio dell'icona)
+        if (ClientProfile.Load(ClientPaths.ProfileCandidates(Path.GetDirectoryName(exePath)!, programData)) is { Config: null, Path: null })
+        {
+            _firstRun = new System.Windows.Forms.Timer { Interval = 1500 };
+            _firstRun.Tick += (_, _) =>
+            {
+                _firstRun.Stop();
+                var answer = MessageBox.Show("RdpManager VPN non è ancora configurata su questo PC.\n\nScegli il file di configurazione (.rdpmconfig) che ti ha dato chi gestisce il server.",
+                    "RdpManager VPN", MessageBoxButtons.OKCancel, MessageBoxIcon.Information);
+                if (answer == DialogResult.OK)
+                    LoadConfigFile();
+            };
+            _firstRun.Start();
+        }
+    }
+
+    private System.Windows.Forms.Timer? _firstRun;
+    private bool _loading;
+
+    /// <summary>«Carica file di configurazione…»: sceglie il file, lo applica (chiave, registrazione, servizio, tunnel) e mostra il riepilogo.</summary>
+    private async void LoadConfigFile()
+    {
+        if (_loading || ConfigCommand.PickFile() is not { } path)
+            return;
+        _loading = true;
+        try
+        {
+            await ConfigCommand.RunAsync(path, _exePath, _programData);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or Win32Exception)
+        {
+            MessageBox.Show("Configurazione non riuscita: " + ex.Message, "RdpManager VPN", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+        finally
+        {
+            _loading = false;
+            Refresh();
+        }
     }
 
     private bool ServiceInstalled => _control.Exists(ClientPaths.ServiceName);

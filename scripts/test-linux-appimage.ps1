@@ -55,9 +55,18 @@ timeout 10 ./app.AppImage --appimage-version 2>&1 | head -3
 echo "== avvio con --appimage-extract-and-run sotto Xvfb per $SECS s"
 export HOME=$W
 Xvfb :99 -screen 0 1024x768x24 >/dev/null 2>&1 &
-sleep 2
-DISPLAY=:99 timeout "$SECS" ./app.AppImage --appimage-extract-and-run > out.log 2>&1
-rc=$?
+# Aspetto che Xvfb accetti connessioni (un sleep fisso non basta se la macchina e' carica: Avalonia muore all'avvio senza display).
+for i in $(seq 1 60); do [ -S /tmp/.X11-unix/X99 ] && break; sleep 0.5; done
+sleep 1
+rc=1
+for attempt in 1 2; do
+  rm -rf squashfs-root
+  DISPLAY=:99 timeout "$SECS" ./app.AppImage --appimage-extract-and-run > out.log 2>&1
+  rc=$?
+  [ $rc -eq 124 ] && break
+  echo "-- tentativo $attempt terminato da solo (codice $rc), log:"; head -c 3000 out.log
+  sleep 3
+done
 head -c 3000 out.log
 if [ $rc -ne 124 ]; then echo "FALLITO: il programma e' terminato da solo (codice $rc) invece di restare in esecuzione"; exit 1; fi
 if grep -q 'Unhandled exception' out.log; then echo "FALLITO: eccezione non gestita"; exit 1; fi
