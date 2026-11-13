@@ -132,6 +132,7 @@ AutoReqProv:    no
 Requires:       freerdp
 Requires:       libsecret
 Requires:       libicu
+Requires:       krb5-libs
 Requires:       openssl-libs
 Requires:       libX11
 Requires:       libICE
@@ -151,6 +152,16 @@ usando FreeRDP. Programma autonomo: non richiede .NET installato.
 %install
 mkdir -p %{buildroot}
 cp -a $ROOT/. %{buildroot}/
+
+%post
+update-desktop-database -q /usr/share/applications >/dev/null 2>&1 || :
+update-mime-database /usr/share/mime >/dev/null 2>&1 || :
+gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor >/dev/null 2>&1 || :
+
+%postun
+update-desktop-database -q /usr/share/applications >/dev/null 2>&1 || :
+update-mime-database /usr/share/mime >/dev/null 2>&1 || :
+gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor >/dev/null 2>&1 || :
 
 %files
 %defattr(-,root,root,-)
