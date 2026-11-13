@@ -6,7 +6,7 @@
 #
 # Passi: controlli → <Version> in src\Directory.Build.props → build → test → pubblicazione + installer (build-installer.ps1)
 # → commit «Versione X.Y.Z» (se la versione è cambiata) → tag vX.Y.Z → push di main e del tag
-# → gh release create con l'installer, l'eseguibile portatile, i pacchetti Linux (.deb, .rpm, AppImage, costruiti in WSL) e SHA256SUMS.txt (serve all'aggiornamento con un clic).
+# → gh release create con l'installer, l'eseguibile portatile, i pacchetti Linux (.deb, .rpm, AppImage, costruiti in WSL) l'installer VPN generico RdpManagerVPN-Setup.exe (build-vpn-client.ps1) e SHA256SUMS.txt (serve all'aggiornamento con un clic).
 # Si ferma senza fare nulla se ci sono modifiche non salvate, se non si è su main o se il tag esiste già.
 
 param(
@@ -35,6 +35,7 @@ function Get-ReleaseNotes([string]$ver) {
            "**Installazione:** scarica ed esegui RdpManager-Setup-$ver.exe (per utente, non servono diritti di amministratore; si installa sopra la versione precedente).`n" +
            "RdpManager-$ver-win-x64.exe è la versione portatile, senza installazione.`n" +
            "**Linux (x86_64):** rdpmanager_${ver}_amd64.deb (Ubuntu, Debian, Mint), rdpmanager-$ver-1.x86_64.rpm (Fedora, openSUSE) oppure RdpManager-$ver-x86_64.AppImage (chmod +x e avvio, senza installazione). Serve FreeRDP.`n" +
+           "RdpManagerVPN-Setup.exe — da installare sui PC da raggiungere: mettigli accanto il file .rdpmconfig e fai doppio clic.`n" +
            "Le connessioni salvate in %APPDATA%\RdpManager restano anche aggiornando o disinstallando."
 }
 
@@ -92,6 +93,7 @@ try {
     Run 'Build' { dotnet build RdpManager.sln -c Release -nologo }
     Run 'Test' { dotnet test RdpManager.sln -c Release --no-build -nologo }
     Run 'Pubblicazione e installer' { powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'build-installer.ps1') -ExpectedVersion $tag }
+    Run 'Installer VPN generico' { powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'build-vpn-client.ps1') }
 }
 catch {
     if ($changed) { git checkout -- $csprojPath }   # nessuna modifica lasciata a metà
@@ -103,14 +105,20 @@ $portable = Join-Path $root "dist\RdpManager-$Version-win-x64.exe"
 $sums = Join-Path $root 'dist\SHA256SUMS.txt'
 $linux = @("rdpmanager_${Version}_amd64.deb", "rdpmanager-${Version}-1.x86_64.rpm", "RdpManager-${Version}-x86_64.AppImage") |
     ForEach-Object { Join-Path $root "dist\$_" }
-foreach ($f in (@($setup, $portable, $sums) + $linux)) { if (-not (Test-Path $f)) { throw "Manca $f" } }
+$vpnSetup = Join-Path $root 'dist\RdpManagerVPN-Setup.exe'
+foreach ($f in (@($setup, $portable, $sums, $vpnSetup) + $linux)) { if (-not (Test-Path $f)) { throw "Manca $f" } }
+
+# build-installer.ps1 non conosce l'installer VPN: la sua riga si aggiunge a SHA256SUMS.txt (senza duplicarla).
+$sumLines = @([IO.File]::ReadAllLines($sums) | Where-Object { $_ -and $_ -notmatch '  RdpManagerVPN-Setup\.exe$' })
+$sumLines += '{0}  {1}' -f (Get-FileHash -Algorithm SHA256 -LiteralPath $vpnSetup).Hash.ToLowerInvariant(), 'RdpManagerVPN-Setup.exe'
+[IO.File]::WriteAllText($sums, (($sumLines -join "`n") + "`n"), (New-Object Text.UTF8Encoding($false)))
 
 # SHA256SUMS.txt deve descrivere proprio i file che si pubblicano: l'app rifiuta un installer con hash diverso.
 $expected = @{}
 foreach ($line in [IO.File]::ReadAllLines($sums)) {
     if ($line -match '^([0-9a-f]{64})  (.+)$') { $expected[$Matches[2]] = $Matches[1] }
 }
-foreach ($f in (@($setup, $portable) + $linux)) {
+foreach ($f in (@($setup, $portable, $vpnSetup) + $linux)) {
     $name = Split-Path $f -Leaf
     $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $f).Hash.ToLowerInvariant()
     if ($expected[$name] -ne $hash) { throw "SHA256SUMS.txt non corrisponde a $name" }
@@ -131,7 +139,7 @@ if (-not $Notes) {
 # Le note passano da un file UTF-8: come argomento, PowerShell 5.1 rovinerebbe a capo, virgolette e accenti.
 $notesFile = Join-Path $env:TEMP "RdpManager-note-$Version.md"
 [IO.File]::WriteAllText($notesFile, $Notes, (New-Object Text.UTF8Encoding($false)))
-Run "Release $tag" { gh release create $tag $setup $portable $linux $sums --repo $repo --title "RdpManager $Version" --notes-file $notesFile --verify-tag }
+Run "Release $tag" { gh release create $tag $setup $portable $linux $vpnSetup $sums --repo $repo --title "RdpManager $Version" --notes-file $notesFile --verify-tag }
 Remove-Item $notesFile -ErrorAction SilentlyContinue
 
 Write-Host ""
