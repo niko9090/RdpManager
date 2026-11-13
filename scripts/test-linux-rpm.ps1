@@ -25,11 +25,11 @@ if (-not $Rpm) {
     $text = [IO.File]::ReadAllText((Join-Path $root 'src\Directory.Build.props'), [Text.Encoding]::UTF8)
     $ver = [regex]::Match($text, '<Version>([^<]+)</Version>').Groups[1].Value.Trim()
     $Rpm = Join-Path $root "dist\rdpmanager-$ver-1.x86_64.rpm"
-    if (-not (Test-Path $Rpm)) {
-        Write-Host "Manca ${Rpm}: lo costruisco..." -ForegroundColor Cyan
-        & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'build-linux.ps1') -Version $ver
-        if ($LASTEXITCODE -ne 0) { throw 'build-linux.ps1 non riuscito' }
-    }
+    # Ricostruisco sempre dai sorgenti attuali: un rpm gia in dist\ (stessa versione) puo essere di una build vecchia.
+    if (Test-Path $Rpm) { Remove-Item -LiteralPath $Rpm -Force }
+    Write-Host "Costruisco l'rpm dai sorgenti attuali ($Rpm)..." -ForegroundColor Cyan
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'build-linux.ps1') -Version $ver
+    if ($LASTEXITCODE -ne 0) { throw 'build-linux.ps1 non riuscito' }
 }
 if (-not (Test-Path $Rpm)) { throw "rpm non trovato: $Rpm" }
 $Rpm = (Resolve-Path $Rpm).Path
@@ -48,8 +48,9 @@ else {
     $req = (Wsl "rpm -qpR '$wslRpm'").Out
     $lst = (Wsl "rpm -qplv '$wslRpm'").Out
     $scr = (Wsl "rpm -qp --scripts '$wslRpm'").Out
-    foreach ($n in 'freerdp', 'libsecret', 'libicu', 'krb5-libs', 'openssl-libs', 'libX11', 'fontconfig') {
-        if ($req -match "(?m)^$([regex]::Escape($n))\b") { Ok "Requires $n" } else { Ko "Requires mancante: $n" }
+    foreach ($n in 'freerdp', 'libsecret', 'libicu', 'krb5-libs', 'openssl3-libs', 'libX11', 'fontconfig') {
+        # openssl3-libs compare nella dipendenza condizionale «(openssl-libs < 1:4 or openssl3-libs)»: Fedora 45 ha solo OpenSSL 4, che .NET 8 non usa.
+        if ($req -match "(?m)^\(?$([regex]::Escape($n))\b" -or $req -match "or $([regex]::Escape($n))\)") { Ok "Requires $n" } else { Ko "Requires mancante: $n" }
     }
     foreach ($p in 'rdpmanager/RdpManager.Linux', 'usr/bin/rdpmanager', 'rdpmanager.desktop', 'rdpmanager-rdpmconfig.xml', 'rdpmanager.png') {
         if ($lst -match [regex]::Escape($p)) { Ok "file $p" } else { Ko "file mancante nel pacchetto: $p" }
@@ -99,6 +100,7 @@ timeout $Secondi xvfb-run -a rdpmanager > /tmp/out.log 2>&1 < /dev/null
 code=`$?
 set -e
 cat /tmp/out.log
+if grep -q 'No usable version of libssl' /tmp/out.log; then echo 'LIBSSL NON TROVATA'; ls /usr/lib64/libssl* /usr/lib64/libcrypto*; exit 5; fi
 if [ `$code -eq 124 ]; then echo 'VIVO dopo $Secondi s'; exit 0; fi
 echo "Terminato subito con codice `$code"; exit 4
 "@

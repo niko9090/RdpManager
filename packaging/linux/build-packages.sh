@@ -6,7 +6,7 @@ set -euo pipefail
 
 PUBLISH=$(readlink -f "$1")
 VERSION=$2
-OUT=$(readlink -f "$3")
+DIST=$(readlink -f "$3")
 TOOLS=$(readlink -f "$4")
 HERE=$(cd "$(dirname "$0")" && pwd)
 BIN=RdpManager.Linux
@@ -16,11 +16,16 @@ BIN=RdpManager.Linux
 for t in dpkg-deb rpmbuild mksquashfs curl; do
   command -v "$t" > /dev/null || { echo "Manca il comando $t" >&2; exit 1; }
 done
-mkdir -p "$OUT" "$TOOLS"
+mkdir -p "$DIST" "$TOOLS"
 
 # Lavoro su un filesystem Linux (non /mnt/c): servono permessi e collegamenti simbolici veri.
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
+# I pacchetti nascono in una cartella Linux e finiscono in dist\ (di solito su /mnt/c) solo alla fine, con nuovi tentativi:
+# su /mnt/c cancellare o sovrascrivere un file aperto da un altro processo (Windows, o un'app avviata da lì) fallisce con
+# «Device or resource busy» e, sotto «set -e», faceva morire tutta la costruzione senza dire quale file.
+OUT="$WORK/out"
+mkdir -p "$OUT"
 
 # Albero di installazione comune: /opt/rdpmanager, /usr/bin/rdpmanager, .desktop, icona.
 ROOT="$WORK/root"
@@ -78,7 +83,7 @@ Requires:       freerdp
 Requires:       libsecret
 Requires:       libicu
 Requires:       krb5-libs
-Requires:       openssl-libs
+Requires:       (openssl-libs < 1:4 or openssl3-libs)
 Requires:       libX11
 Requires:       libICE
 Requires:       libSM
@@ -158,9 +163,10 @@ chmod 755 "$APPDIR/AppRun"
 
 TOOL="$TOOLS/appimagetool-x86_64.AppImage"
 if [[ ! -x "$TOOL" ]]; then
-  curl -fsSL --retry 3 -o "$TOOL.part" "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
-  mv "$TOOL.part" "$TOOL"
-  chmod 755 "$TOOL"
+  # Nome temporaneo unico: due costruzioni in parallelo non scrivono lo stesso .part.
+  curl -fsSL --retry 3 -o "$TOOL.$$.part" "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
+  chmod 755 "$TOOL.$$.part"
+  mv -f "$TOOL.$$.part" "$TOOL"
 fi
 APPIMAGE="$OUT/RdpManager-${VERSION}-x86_64.AppImage"
 rm -f "$APPIMAGE"
@@ -168,4 +174,21 @@ ARCH=x86_64 "$TOOL" --appimage-extract-and-run --no-appstream "$APPDIR" "$APPIMA
   || { cat "$WORK/appimagetool.log" >&2; exit 1; }
 chmod 755 "$APPIMAGE"
 
-ls -l "$DEB" "$RPM" "$APPIMAGE"
+# ---------- consegna in dist ----------
+deliver() {
+  # Copia in un nome temporaneo unico dentro dist e poi rinomina (atomico sullo stesso filesystem): chi legge in
+  # parallelo vede il pacchetto vecchio intero o quello nuovo intero, mai assente o a metà.
+  local src=$1 dst="$DIST/$(basename "$1")" i tmp="$DIST/.$(basename "$1").$$.part"
+  for i in 1 2 3 4 5 6; do
+    if cp -f "$src" "$tmp" 2> "$WORK/deliver.err" && mv -f "$tmp" "$dst" 2>> "$WORK/deliver.err"; then return 0; fi
+    rm -f "$tmp" 2> /dev/null || true
+    echo "Consegna di $(basename "$dst") non riuscita (tentativo $i/6): $(tr '\n' ' ' < "$WORK/deliver.err")" >&2
+    sleep 2
+  done
+  echo "ERRORE: impossibile scrivere $dst (file aperto da un altro processo?)" >&2
+  ls -l "$dst" >&2 || true
+  { command -v fuser > /dev/null && fuser -v "$dst" >&2; } || true
+  return 1
+}
+for f in "$DEB" "$RPM" "$APPIMAGE"; do deliver "$f"; done
+ls -l "$DIST/$(basename "$DEB")" "$DIST/$(basename "$RPM")" "$DIST/$(basename "$APPIMAGE")"
