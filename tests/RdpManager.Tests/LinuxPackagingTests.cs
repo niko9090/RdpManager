@@ -58,7 +58,8 @@ public class LinuxPackagingTests
     {
         var script = Read("packaging", "linux", "build-packages.sh");
         Assert.StartsWith("#!/usr/bin/env bash", script);
-        Assert.Contains("Depends: freerdp3-x11 | freerdp2-x11", script);
+        // libc6 è dichiarata per prima di proposito: lintian e il Centro Software la vogliono esplicita.
+        Assert.Contains("Depends: libc6, freerdp3-x11 | freerdp2-x11", script);
         Assert.Contains("libsecret-1-0", script);
         Assert.Contains("Recommends: wireguard-tools", script);
         Assert.Contains("Requires:       freerdp", script);
