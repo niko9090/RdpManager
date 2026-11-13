@@ -1,5 +1,13 @@
 # Novità di RdpManager
 
+## 1.15.0 (2026-11-13)
+
+**Un solo installatore VPN per tutti i PC da raggiungere**
+- Nuovo installatore unico RdpManagerVPN-Setup.exe: si configura col file .rdpmconfig, quindi non serve più un installer diverso per ogni PC.
+- L'installatore VPN viene ora allegato a ogni versione su GitHub, insieme al file SHA256SUMS per controllarne l'integrità.
+- La prova dell'AppImage su Linux è più stabile: attende che lo schermo virtuale (Xvfb) sia pronto e, se serve, riprova una volta.
+- Dipendenze dei pacchetti .rpm e .deb corrette.
+
 ## 1.14.4 (2026-11-13)
 
 **Pacchetti Linux: installazione più affidabile**
