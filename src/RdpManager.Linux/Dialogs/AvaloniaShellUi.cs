@@ -135,9 +135,16 @@ public sealed class AvaloniaShellUi : IShellUi
         return await window.ShowDialogTracked<bool>(RequireOwner());
     }
 
-    public async Task<bool> OfferUpdateAsync(ReleaseInfo release, string currentVersion)
+    public IUpdateProgressView ShowUpdateProgress(ReleaseInfo release)
     {
-        var open = new Button { Content = "Apri la pagina della release", IsDefault = true, MinWidth = 200 };
+        var view = new AvaloniaUpdateProgress(release);
+        view.Open(RequireOwner());
+        return view;
+    }
+
+    public async Task<bool> OfferUpdateAsync(ReleaseInfo release, string currentVersion, bool canInstall = false)
+    {
+        var open = new Button { Content = canInstall ? "Installa ora" : "Apri la pagina della release", IsDefault = true, MinWidth = 200 };
         open.Classes.Add("accent");
         var later = new Button { Content = "Più tardi", IsCancel = true, MinWidth = 96 };
         var window = new Window
@@ -156,7 +163,13 @@ public sealed class AvaloniaShellUi : IShellUi
         var children = new List<Control>
         {
             new TextBlock { Text = $"È disponibile RdpManager {release.Version.ToString(3)}", FontSize = 18, FontWeight = FontWeight.SemiBold },
-            new TextBlock { Text = $"Stai usando la versione {currentVersion}. Su Linux l'aggiornamento si scarica dalla pagina della release su GitHub.", TextWrapping = TextWrapping.Wrap },
+            new TextBlock
+            {
+                Text = canInstall
+                    ? $"Stai usando la versione {currentVersion}. L'aggiornamento viene scaricato, verificato e installato; poi RdpManager si riapre (le sessioni aperte si chiudono)."
+                    : $"Stai usando la versione {currentVersion}. Questa installazione non si aggiorna da sola: l'aggiornamento si scarica dalla pagina della release su GitHub.",
+                TextWrapping = TextWrapping.Wrap,
+            },
         };
         if (notes.Length > 0)
             children.Add(new TextBlock { Text = notes, TextWrapping = TextWrapping.Wrap, Opacity = 0.75 });

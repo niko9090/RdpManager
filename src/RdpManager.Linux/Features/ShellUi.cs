@@ -24,8 +24,14 @@ public interface IShellUi
     /// <summary>Avviso certificato: vero se l'utente si fida e vuole continuare.</summary>
     Task<bool> AskCertificateAsync(CertificatePrompt prompt);
 
-    /// <summary>Avviso di una nuova versione: vero se l'utente vuole aprire la pagina della release.</summary>
-    Task<bool> OfferUpdateAsync(ReleaseInfo release, string currentVersion);
+    /// <summary>
+    /// Avviso di una nuova versione: vero se l'utente accetta. Con <paramref name="canInstall"/> si offre l'installazione
+    /// automatica («Installa ora»); senza, solo l'apertura della pagina della release.
+    /// </summary>
+    Task<bool> OfferUpdateAsync(ReleaseInfo release, string currentVersion, bool canInstall = false);
+
+    /// <summary>Finestra di avanzamento dello scaricamento; si chiude con Dispose. «Annulla» scatta <see cref="IUpdateProgressView.Cancelled"/>.</summary>
+    IUpdateProgressView ShowUpdateProgress(ReleaseInfo release);
 
     /// <summary>Selettore di file; null se annullato.</summary>
     Task<string?> PickFileAsync(string title, string filterName, params string[] patterns);
@@ -42,6 +48,30 @@ public interface IShellUi
 
     /// <summary>Panoramica delle sessioni: restituisce la scheda scelta, o null.</summary>
     Task<SessionTabViewModel?> ShowOverviewAsync(IReadOnlyList<SessionTabViewModel> tabs, SessionTabViewModel? selected);
+}
+
+/// <summary>Avanzamento dello scaricamento di un aggiornamento (come UpdateProgressForm su Windows).</summary>
+public interface IUpdateProgressView : IDisposable
+{
+    /// <summary>Scatta se l'utente preme «Annulla».</summary>
+    CancellationToken Cancelled { get; }
+
+    /// <summary>Avanzamento da 0 a 1.</summary>
+    void Report(double fraction);
+
+    void SetText(string text);
+}
+
+/// <summary>Avanzamento senza finestra (prove).</summary>
+public sealed class NullUpdateProgress : IUpdateProgressView
+{
+    public CancellationToken Cancelled { get; set; }
+    public double Last { get; private set; }
+    public string Text { get; private set; } = "";
+    public bool Disposed { get; private set; }
+    public void Report(double fraction) => Last = fraction;
+    public void SetText(string text) => Text = text;
+    public void Dispose() => Disposed = true;
 }
 
 /// <summary>Cosa mostrare nell'avviso sul certificato del server.</summary>
@@ -78,10 +108,21 @@ public class NullShellUi : IShellUi
         return Task.FromResult(CertificateAnswer);
     }
 
-    public virtual Task<bool> OfferUpdateAsync(ReleaseInfo release, string currentVersion)
+    public List<bool> OffersCanInstall { get; } = [];
+    public List<NullUpdateProgress> Progresses { get; } = [];
+
+    public virtual Task<bool> OfferUpdateAsync(ReleaseInfo release, string currentVersion, bool canInstall = false)
     {
         Offers.Add(release);
+        OffersCanInstall.Add(canInstall);
         return Task.FromResult(OfferAnswer);
+    }
+
+    public virtual IUpdateProgressView ShowUpdateProgress(ReleaseInfo release)
+    {
+        var p = new NullUpdateProgress();
+        Progresses.Add(p);
+        return p;
     }
 
     public virtual Task<string?> PickFileAsync(string title, string filterName, params string[] patterns) => Task.FromResult(FileAnswer);
