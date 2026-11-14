@@ -1,0 +1,58 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!--
+    Stili comuni delle finestre di dialogo, uguali a quelli di Windows (SettingsDialog: Group, Note, Caption).
+    Gruppo = titolo in grassetto + contenuto rientrato di 14 + 18 di spazio sotto; nota = testo attenuato sotto l'opzione.
+  -->
+  <Style Selector="StackPanel.group">
+    <Setter Property="Spacing" Value="4" />
+    <Setter Property="Margin" Value="0,0,0,18" />
+  </Style>
+  <Style Selector="StackPanel.groupBody">
+    <Setter Property="Spacing" Value="4" />
+    <Setter Property="Margin" Value="14,0,0,0" />
+  </Style>
+  <Style Selector="TextBlock.groupTitle">
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Margin" Value="0,0,0,2" />
+  </Style>
+  <Style Selector="TextBlock.note">
+    <Setter Property="Foreground" Value="{DynamicResource AppMutedBrush}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="MaxWidth" Value="460" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+    <Setter Property="Margin" Value="0,0,0,8" />
+  </Style>
+  <Style Selector="TextBlock.caption">
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Margin" Value="0,0,8,0" />
+  </Style>
+  <!-- Riga di un modulo: etichetta a sinistra nel colore normale del testo (come le Label di Windows). -->
+  <Style Selector="TextBlock.rowLabel">
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="Margin" Value="0,0,10,0" />
+  </Style>
+  <!-- Il «?» con la spiegazione (si apre anche col dito, non solo col mouse sopra), come l'aiuto di Windows. -->
+  <Style Selector="Button.help">
+    <Setter Property="Content" Value="?" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}" />
+    <Setter Property="MinWidth" Value="32" />
+    <Setter Property="Padding" Value="6,0" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TextBlock.helpText">
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="MaxWidth" Value="340" />
+  </Style>
+  <Style Selector="TextBlock.pageTitle">
+    <Setter Property="FontSize" Value="21" />
+    <Setter Property="FontWeight" Value="Bold" />
+  </Style>
+  <Style Selector="TextBlock.pageSubtitle">
+    <Setter Property="Foreground" Value="{DynamicResource AppMutedBrush}" />
+  </Style>
+</Styles>

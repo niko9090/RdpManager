@@ -3,22 +3,26 @@
         xmlns:f="using:RdpManager.Linux.Features"
         x:Class="RdpManager.Linux.Dialogs.WorkspacesWindow"
         x:DataType="f:WorkspacesViewModel"
-        Title="Spazi di lavoro" Width="560" Height="480" MinWidth="420" MinHeight="360"
+        Title="Spazi di lavoro" Width="620" Height="460" MinWidth="420" MinHeight="360"
         WindowStartupLocation="CenterOwner">
-  <DockPanel Margin="20">
-    <Button DockPanel.Dock="Bottom" Content="Chiudi" Click="OnClose" IsCancel="True" HorizontalAlignment="Right" MinWidth="96" Margin="0,12,0,0" />
+  <Window.Styles>
+    <StyleInclude Source="avares://RdpManager.Linux/Dialogs/DialogStyles.axaml" />
+  </Window.Styles>
 
-    <StackPanel DockPanel.Dock="Bottom" Spacing="6" Margin="0,12,0,0">
-      <TextBlock Classes="label" Text="Scorciatoia per riaprire lo spazio (per esempio Ctrl+Alt+Maiusc+1; vuota = nessuna)" />
-      <Grid ColumnDefinitions="*,Auto">
-        <TextBox Text="{Binding Shortcut}" />
-        <Button Grid.Column="1" Content="Imposta" Command="{Binding ApplyShortcutCommand}" Margin="6,0,0,0" />
-      </Grid>
-      <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Classes="muted" />
-      <WrapPanel>
-        <Button Classes="accent" Content="Apri" Command="{Binding OpenCommand}" Margin="0,0,6,0" />
-        <Button Classes="danger" Content="Elimina" Command="{Binding DeleteCommand}" />
-      </WrapPanel>
+  <!-- Come il dialogo di Windows (WorkspacesDialog): nota, elenco con i pulsanti accanto (Rinomina…, Scorciatoia…, Elimina, Su, Giù), Chiudi. -->
+  <DockPanel Margin="16">
+    <Button DockPanel.Dock="Bottom" Content="Chiudi" Click="OnClose" IsCancel="True" HorizontalAlignment="Right" MinWidth="96" Margin="0,10,0,0" />
+
+    <TextBlock DockPanel.Dock="Top" Classes="note" MaxWidth="520" Text="{Binding Intro}" />
+    <TextBlock DockPanel.Dock="Bottom" Text="{Binding Message}" TextWrapping="Wrap" Classes="muted" Margin="0,8,0,0" />
+
+    <StackPanel DockPanel.Dock="Right" Spacing="6" Margin="10,0,0,0">
+      <Button Content="Rinomina…" Command="{Binding RenameCommand}" HorizontalAlignment="Stretch" MinWidth="104" />
+      <Button Content="Scorciatoia…" Command="{Binding ShortcutCommand}" HorizontalAlignment="Stretch" />
+      <Button Content="Elimina" Command="{Binding DeleteCommand}" HorizontalAlignment="Stretch" />
+      <Button Content="Su" Command="{Binding MoveUpCommand}" HorizontalAlignment="Stretch" />
+      <Button Content="Giù" Command="{Binding MoveDownCommand}" HorizontalAlignment="Stretch" />
+      <Button Classes="accent" Content="Apri" Command="{Binding OpenCommand}" HorizontalAlignment="Stretch" Margin="0,10,0,0" />
     </StackPanel>
 
     <Grid>
@@ -26,7 +30,7 @@
         <ListBox.ItemTemplate>
           <DataTemplate x:DataType="f:WorkspaceItem">
             <StackPanel Margin="4">
-              <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding Name}" />
               <TextBlock Text="{Binding Summary}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
             </StackPanel>
           </DataTemplate>

@@ -36,15 +36,18 @@ public sealed class ToccoPageViewModel : SettingsPageViewModel
         _session = Choices.Pick(SessionChoices, settings.SessionTouch);
         var map = settings.GestureMap;
         Gestures = Enum.GetValues<TouchGesture>().Select(g => new GestureSettingItem(g, map.ActionFor(g))).ToList();
+        ResetGesturesCommand = new RelayCommand(ResetGestures);
     }
 
-    public override string Title => "Tocco";
+    public override string Title => "Tocco e gesti";
+
+    public override string Subtitle => "Il dito dentro le sessioni remote";
 
     public static IReadOnlyList<ChoiceItem<TouchMode>> ModeChoices { get; } =
     [
         new(TouchMode.Auto, "Automatica (se c'è uno schermo touch)"),
         new(TouchMode.On, "Sempre attiva"),
-        new(TouchMode.Off, "Disattivata"),
+        new(TouchMode.Off, "Spenta"),
     ];
 
     public static IReadOnlyList<ChoiceItem<SessionTouchMode>> SessionChoices { get; } =
@@ -61,8 +64,22 @@ public sealed class ToccoPageViewModel : SettingsPageViewModel
 
     public IReadOnlyList<GestureSettingItem> Gestures { get; }
 
-    public string Note => "La modalità tocco ingrandisce righe, schede, menu e pulsanti. I gesti a più dita valgono nella finestra dell'applicazione; "
-        + "dentro una sessione incorporata (finestra di FreeRDP) il tocco arriva al programma remoto così com'è: FreeRDP non inoltra il multitocco in modo uniforme.";
+    public RelayCommand ResetGesturesCommand { get; }
+
+    /// <summary>Rimette i gesti come da predefinito («Ripristina predefiniti»).</summary>
+    public void ResetGestures()
+    {
+        var map = TouchGestureMap.Default;
+        foreach (var g in Gestures)
+            g.Action = ActionChoices.First(c => c.Value == map.ActionFor(g.Gesture));
+    }
+
+    public string ModeNote => "Righe, schede, menu e pulsanti più grandi.";
+
+    public string Note => "Si cambia anche dalla barra della sessione. Dentro una sessione incorporata (finestra di FreeRDP) il tocco arriva "
+        + "al programma remoto così com'è: FreeRDP non inoltra il multitocco in modo uniforme.";
+
+    public string GesturesNote => "Valgono nella finestra principale su uno schermo touch. Le azioni «scheda» e «barra» riguardano RdpManager, le altre il PC remoto.";
 
     public override void Apply()
     {

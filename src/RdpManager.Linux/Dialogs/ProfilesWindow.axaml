@@ -6,10 +6,16 @@
         x:DataType="vm:ProfilesViewModel"
         Title="Profili di credenziali" Width="700" Height="460" MinWidth="460" MinHeight="380"
         WindowStartupLocation="CenterOwner">
+  <Window.Styles>
+    <StyleInclude Source="avares://RdpManager.Linux/Dialogs/DialogStyles.axaml" />
+  </Window.Styles>
 
-  <Grid ColumnDefinitions="240,*" Margin="20">
+  <!-- Windows apre un dialogo per ogni modifica (Nuovo…, Modifica…, Elimina); qui la modifica sta accanto all'elenco, con le stesse etichette e la stessa nota. -->
+  <DockPanel Margin="16">
+  <TextBlock DockPanel.Dock="Top" Classes="note" MaxWidth="640" Text="Un profilo tiene utente, dominio e password una volta sola: nella modifica di una connessione si sceglie in «Credenziali». Cambiando il profilo cambiano tutte le connessioni che lo usano." />
+  <Grid ColumnDefinitions="240,*">
     <DockPanel Margin="0,0,20,0">
-      <Button DockPanel.Dock="Bottom" Content="Nuovo profilo" Command="{Binding NewCommand}" Margin="0,10,0,0" HorizontalAlignment="Stretch" />
+      <Button DockPanel.Dock="Bottom" Content="Nuovo" Command="{Binding NewCommand}" Margin="0,10,0,0" HorizontalAlignment="Stretch" />
       <ListBox ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" Background="Transparent">
         <ListBox.ItemTemplate>
           <DataTemplate x:DataType="core:CredentialProfile">
@@ -31,13 +37,14 @@
 
       <ScrollViewer>
         <StackPanel Spacing="10">
-          <TextBlock Classes="section" Margin="0,0,0,4" Text="Dettagli del profilo" />
-          <Grid ColumnDefinitions="110,*"><TextBlock Classes="label" Text="Nome" /><TextBox Grid.Column="1" Text="{Binding Name}" /></Grid>
-          <Grid ColumnDefinitions="110,*"><TextBlock Classes="label" Text="Utente" /><TextBox Grid.Column="1" Text="{Binding Username}" /></Grid>
-          <Grid ColumnDefinitions="110,*"><TextBlock Classes="label" Text="Dominio" /><TextBox Grid.Column="1" Text="{Binding Domain}" /></Grid>
-          <Grid ColumnDefinitions="110,*"><TextBlock Classes="label" Text="Password" /><TextBox Grid.Column="1" Text="{Binding Password}" PasswordChar="●" Watermark="Vuota = non cambiare quella salvata" /></Grid>
+          <Grid ColumnDefinitions="110,*"><TextBlock Classes="rowLabel" Text="Nome" /><TextBox Grid.Column="1" Text="{Binding Name}" /></Grid>
+          <Grid ColumnDefinitions="110,*"><TextBlock Classes="rowLabel" Text="Utente" /><TextBox Grid.Column="1" Text="{Binding Username}" /></Grid>
+          <Grid ColumnDefinitions="110,*"><TextBlock Classes="rowLabel" Text="Dominio" /><TextBox Grid.Column="1" Text="{Binding Domain}" /></Grid>
+          <Grid ColumnDefinitions="110,*"><TextBlock Classes="rowLabel" Text="Password" /><TextBox Grid.Column="1" Text="{Binding Password}" PasswordChar="●" Watermark="Vuota = non cambiare quella salvata" /></Grid>
+          <Grid ColumnDefinitions="110,*"><TextBlock Grid.Column="1" Classes="note" MaxWidth="300" Margin="0" Text="Facoltativa. Viene salvata cifrata, solo per il tuo utente." /></Grid>
         </StackPanel>
       </ScrollViewer>
     </DockPanel>
   </Grid>
+  </DockPanel>
 </Window>

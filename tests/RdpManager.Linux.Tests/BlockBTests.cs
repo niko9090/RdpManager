@@ -669,7 +669,7 @@ public class BlockBSettingsPageTests
     public void Le_pagine_del_blocco_B_non_sono_piu_segnaposto()
     {
         var pages = new SettingsViewModel(new AppSettings(), "x.json").Pages;
-        foreach (var title in new[] { "Area di notifica", "Monitor", "Tocco", "Scorciatoie", "Aggiornamenti" })
+        foreach (var title in new[] { "Generale", "Schermo intero", "Tocco e gesti", "Scorciatoie", "Aggiornamenti" })
             Assert.IsNotAssignableFrom<PlaceholderSettingsPageViewModel>(pages.First(p => p.Title == title));
     }
 }

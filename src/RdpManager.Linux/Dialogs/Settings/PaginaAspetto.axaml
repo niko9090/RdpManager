@@ -3,9 +3,34 @@
              xmlns:vm="using:RdpManager.Linux.ViewModels.Settings"
              x:Class="RdpManager.Linux.Dialogs.Settings.PaginaAspetto"
              x:DataType="vm:AspettoPageViewModel">
-  <!-- Pagina Impostazioni «Aspetto» (blocco A). -->
-  <StackPanel Spacing="10">
-    <TextBlock Classes="section" Margin="0,0,0,4" Text="Aspetto" />
-    <Grid ColumnDefinitions="170,*"><TextBlock Classes="label" Text="Tema" /><ComboBox Grid.Column="1" ItemsSource="{Binding ThemeChoices}" SelectedItem="{Binding Theme}" HorizontalAlignment="Stretch" /></Grid>
+  <!-- Pagina «Aspetto» (come Windows): tema dei colori, modalità tocco, barra laterale della finestra. -->
+  <StackPanel>
+    <StackPanel Classes="group">
+      <TextBlock Classes="groupTitle" Text="Tema dei colori" />
+      <StackPanel Classes="groupBody">
+        <WrapPanel Orientation="Horizontal">
+          <TextBlock Classes="caption" Text="Tema" />
+          <ComboBox Width="200" ItemsSource="{Binding ThemeChoices}" SelectedItem="{Binding Theme}" />
+        </WrapPanel>
+        <TextBlock Classes="note" Text="«Come il sistema» segue la modalità chiara o scura del sistema." />
+      </StackPanel>
+    </StackPanel>
+
+    <StackPanel Classes="group">
+      <TextBlock Classes="groupTitle" Text="Modalità tocco" />
+      <StackPanel Classes="groupBody">
+        <ComboBox Width="320" ItemsSource="{x:Static vm:ToccoPageViewModel.ModeChoices}" SelectedItem="{Binding Touch.Mode}" />
+        <TextBlock Classes="note" Text="{Binding Touch.ModeNote}" />
+      </StackPanel>
+    </StackPanel>
+
+    <StackPanel Classes="group">
+      <TextBlock Classes="groupTitle" Text="Barra laterale della finestra" />
+      <StackPanel Classes="groupBody">
+        <RadioButton GroupName="sidebar" Content="Fissa" IsChecked="{Binding Display.SidebarPinned}" />
+        <RadioButton GroupName="sidebar" Content="A comparsa (bordo sinistro)" IsChecked="{Binding Display.SidebarAutoHide}" />
+        <TextBlock Classes="note" Text="A schermo intero vale la barra della scheda «Schermo intero»." />
+      </StackPanel>
+    </StackPanel>
   </StackPanel>
 </UserControl>

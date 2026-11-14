@@ -11,21 +11,21 @@ public static class Choices
     public static IReadOnlyList<ChoiceItem<Core.ResolutionMode>> Resolution { get; } =
     [
         new(Core.ResolutionMode.FitToWindow, "Adatta alla finestra"),
-        new(Core.ResolutionMode.Fixed, "Risoluzione fissa"),
+        new(Core.ResolutionMode.Fixed, "Fissa"),
     ];
 
     public static IReadOnlyList<ChoiceItem<Core.AudioMode>> Audio { get; } =
     [
-        new(Core.AudioMode.Local, "Riproduci su questo computer"),
-        new(Core.AudioMode.Remote, "Lascia sul computer remoto"),
+        new(Core.AudioMode.Local, "Su questo PC"),
+        new(Core.AudioMode.Remote, "Sul PC remoto"),
         new(Core.AudioMode.None, "Nessun audio"),
     ];
 
     public static IReadOnlyList<ChoiceItem<Core.QualityProfile>> Quality { get; } =
     [
-        new(Core.QualityProfile.Automatic, "Automatica"),
-        new(Core.QualityProfile.LocalNetwork, "Rete locale"),
-        new(Core.QualityProfile.SlowConnection, "Connessione lenta"),
+        new(Core.QualityProfile.Automatic, "Automatica (misura la rete)"),
+        new(Core.QualityProfile.LocalNetwork, "Rete locale (tutti gli effetti)"),
+        new(Core.QualityProfile.SlowConnection, "Connessione lenta (leggera)"),
     ];
 
     public static IReadOnlyList<ChoiceItem<Core.AppTheme>> Theme { get; } =

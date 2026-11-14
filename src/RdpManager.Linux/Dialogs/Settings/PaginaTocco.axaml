@@ -3,23 +3,32 @@
              xmlns:vm="using:RdpManager.Linux.ViewModels.Settings"
              x:Class="RdpManager.Linux.Dialogs.Settings.PaginaTocco"
              x:DataType="vm:ToccoPageViewModel">
-  <!-- Pagina Impostazioni «Tocco» (blocco B). -->
-  <StackPanel Spacing="10">
-    <TextBlock Classes="section" Margin="0,0,0,4" Text="Tocco" />
-    <Grid ColumnDefinitions="170,*"><TextBlock Classes="label" Text="Modalità tocco" /><ComboBox Grid.Column="1" ItemsSource="{x:Static vm:ToccoPageViewModel.ModeChoices}" SelectedItem="{Binding Mode}" HorizontalAlignment="Stretch" /></Grid>
-    <Grid ColumnDefinitions="170,*"><TextBlock Classes="label" Text="Dito nella sessione" /><ComboBox Grid.Column="1" ItemsSource="{x:Static vm:ToccoPageViewModel.SessionChoices}" SelectedItem="{Binding SessionMode}" HorizontalAlignment="Stretch" /></Grid>
-    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding Note}" />
+  <!-- Pagina «Tocco e gesti» (come Windows). La modalità tocco dell'app è nella pagina «Aspetto». -->
+  <StackPanel>
+    <StackPanel Classes="group">
+      <TextBlock Classes="groupTitle" Text="Dito dentro la sessione remota" />
+      <StackPanel Classes="groupBody">
+        <ComboBox MinWidth="280" HorizontalAlignment="Left" ItemsSource="{x:Static vm:ToccoPageViewModel.SessionChoices}" SelectedItem="{Binding SessionMode}" />
+        <TextBlock Classes="note" Text="{Binding Note}" />
+      </StackPanel>
+    </StackPanel>
 
-    <TextBlock Classes="section" Text="Gesti a più dita" />
-    <ItemsControl ItemsSource="{Binding Gestures}">
-      <ItemsControl.ItemTemplate>
-        <DataTemplate x:DataType="vm:GestureSettingItem">
-          <Grid ColumnDefinitions="220,*" Margin="0,3">
-            <TextBlock Classes="label" Text="{Binding Name}" />
-            <ComboBox Grid.Column="1" ItemsSource="{Binding Choices}" SelectedItem="{Binding Action}" HorizontalAlignment="Stretch" />
-          </Grid>
-        </DataTemplate>
-      </ItemsControl.ItemTemplate>
-    </ItemsControl>
+    <StackPanel Classes="group">
+      <TextBlock Classes="groupTitle" Text="Gesti a più dita" />
+      <StackPanel Classes="groupBody">
+        <ItemsControl ItemsSource="{Binding Gestures}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:GestureSettingItem">
+              <Grid ColumnDefinitions="220,300" Margin="0,3">
+                <TextBlock Classes="label" Text="{Binding Name}" Foreground="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+                <ComboBox Grid.Column="1" ItemsSource="{Binding Choices}" SelectedItem="{Binding Action}" HorizontalAlignment="Stretch" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Button Content="Ripristina predefiniti" Command="{Binding ResetGesturesCommand}" HorizontalAlignment="Left" />
+        <TextBlock Classes="note" Text="{Binding GesturesNote}" />
+      </StackPanel>
+    </StackPanel>
   </StackPanel>
 </UserControl>

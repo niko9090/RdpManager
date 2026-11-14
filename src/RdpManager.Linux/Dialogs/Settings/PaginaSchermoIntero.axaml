@@ -1,0 +1,71 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:RdpManager.Linux.ViewModels.Settings"
+             x:Class="RdpManager.Linux.Dialogs.Settings.PaginaSchermoIntero"
+             x:DataType="vm:SchermoInteroPageViewModel">
+  <!-- Pagina «Schermo intero» (come Windows): monitor, barra a schermo intero, sezioni della barra. -->
+  <StackPanel>
+    <StackPanel Classes="group">
+      <TextBlock Classes="groupTitle" Text="Monitor" />
+      <StackPanel Classes="groupBody">
+        <ComboBox Width="320" ItemsSource="{Binding Display.MonitorChoices}" SelectedItem="{Binding Display.Monitor}" />
+        <TextBlock Classes="note" Text="{Binding Display.Note}" />
+      </StackPanel>
+    </StackPanel>
+
+    <StackPanel Classes="group">
+      <TextBlock Classes="groupTitle" Text="Barra a schermo intero" />
+      <StackPanel Classes="groupBody">
+        <WrapPanel Orientation="Horizontal">
+          <TextBlock Classes="caption" Text="Posizione" />
+          <ComboBox Width="200" ItemsSource="{x:Static vm:MonitorPageViewModel.BarPositionChoices}" SelectedItem="{Binding Display.BarPositionChoice}" />
+        </WrapPanel>
+        <WrapPanel Orientation="Horizontal">
+          <TextBlock Classes="caption" Text="Modalità" />
+          <ComboBox Width="260" ItemsSource="{x:Static vm:MonitorPageViewModel.BarModeChoices}" SelectedItem="{Binding Display.BarModeChoice}" />
+        </WrapPanel>
+        <WrapPanel Orientation="Horizontal">
+          <TextBlock Classes="caption" Text="Larghezza" />
+          <NumericUpDown Width="140" Increment="10" FormatString="0"
+                         Minimum="{x:Static vm:MonitorPageViewModel.MinBarWidth}" Maximum="{x:Static vm:MonitorPageViewModel.MaxBarWidth}"
+                         Value="{Binding Display.BarWidth}" />
+          <TextBlock Classes="caption" Margin="8,0,0,0" Text="pixel (in basso: altezza)" />
+        </WrapPanel>
+        <TextBlock Classes="note" Text="Si cambia anche trascinando il bordo della barra." />
+        <WrapPanel Orientation="Horizontal">
+          <TextBlock Classes="caption" Text="Ritardo di comparsa" />
+          <NumericUpDown Width="140" Increment="50" Minimum="0" FormatString="0"
+                         Maximum="{x:Static vm:MonitorPageViewModel.MaxBarDelay}"
+                         Value="{Binding Display.BarDelay}" IsEnabled="{Binding Display.BarDelayEnabled}" />
+          <TextBlock Classes="caption" Margin="8,0,0,0" Text="millisecondi sul bordo" />
+        </WrapPanel>
+        <TextBlock Classes="note" Text="In alto non c'è niente: la parte alta dello schermo resta della sessione. Con la barra fissa la sessione si restringe e non viene coperta; a comparsa o nascosta la barra si apre sopra la sessione." />
+      </StackPanel>
+    </StackPanel>
+
+    <StackPanel Classes="group">
+      <TextBlock Classes="groupTitle" Text="Sezioni della barra" />
+      <StackPanel Classes="groupBody">
+        <TextBlock Classes="note" Text="Spunta quelle da mostrare; l'ordine è quello dell'elenco (Su e Giù lo cambiano)." />
+        <WrapPanel Orientation="Horizontal" ItemSpacing="8">
+          <ListBox Width="300" Height="200" ItemsSource="{Binding Display.Sections}" SelectedItem="{Binding Display.SelectedSection}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:BarSectionItem">
+                <CheckBox Content="{Binding Text}" IsChecked="{Binding Visible}" />
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <StackPanel Spacing="4" VerticalAlignment="Top">
+            <Button Content="Su" Command="{Binding Display.MoveUpCommand}" />
+            <Button Content="Giù" Command="{Binding Display.MoveDownCommand}" />
+          </StackPanel>
+        </WrapPanel>
+        <WrapPanel Orientation="Horizontal">
+          <TextBlock Classes="caption" Text="Sessioni connesse" />
+          <ComboBox Width="200" ItemsSource="{x:Static vm:MonitorPageViewModel.BarStyleChoices}" SelectedItem="{Binding Display.BarStyleChoice}" />
+        </WrapPanel>
+        <TextBlock Classes="note" Text="I pulsanti rapidi sono le stesse azioni delle scorciatoie. Sezioni vuote (nessun preferito, spazio di lavoro o testo rapido) non si mostrano." />
+      </StackPanel>
+    </StackPanel>
+  </StackPanel>
+</UserControl>

@@ -132,6 +132,14 @@ public class DialogLayoutTests
         return doc;
     };
 
+    /// <summary>Impostazioni già sulla pagina indicata (0 = Generale), per provare la disposizione di ognuna.</summary>
+    private static SettingsViewModel SettingsAt(int page)
+    {
+        var vm = new SettingsViewModel(new AppSettings(), "/x/connections.json");
+        vm.SelectedPage = vm.Pages[page];
+        return vm;
+    }
+
     /// <summary>Apre ogni dialogo con la sua funzione vera. Ognuno passa dal tracker, dove la prova prende la finestra.</summary>
     private static List<(string Name, Func<Task> Open)> Scenarios(DialogService dialogs, AvaloniaShellUi shell, Window owner, TempData data)
     {
@@ -158,6 +166,13 @@ public class DialogLayoutTests
             ("Nuova connessione", () => dialogs.EditConnectionAsync(new ConnectionEditViewModel(doc, new RdpConnection(), true))),
             ("Profili di credenziali", () => dialogs.ShowProfilesAsync(new ProfilesViewModel(doc, () => true, fake))),
             ("Impostazioni", () => dialogs.ShowSettingsAsync(new SettingsViewModel(new AppSettings(), "/x/connections.json"))),
+            ("Impostazioni, pagina 1", () => dialogs.ShowSettingsAsync(SettingsAt(1))),
+            ("Impostazioni, pagina 2", () => dialogs.ShowSettingsAsync(SettingsAt(2))),
+            ("Impostazioni, pagina 3", () => dialogs.ShowSettingsAsync(SettingsAt(3))),
+            ("Impostazioni, pagina 4", () => dialogs.ShowSettingsAsync(SettingsAt(4))),
+            ("Impostazioni, pagina 5", () => dialogs.ShowSettingsAsync(SettingsAt(5))),
+            ("Impostazioni, pagina 6", () => dialogs.ShowSettingsAsync(SettingsAt(6))),
+            ("Impostazioni, pagina 7", () => dialogs.ShowSettingsAsync(SettingsAt(7))),
             ("Impostazioni cartella", () => dialogs.ShowAsync(new FolderSettingsViewModel(doc, "Uffici"))),
             ("Ricerca rapida", () => dialogs.ShowAsync(new QuickSearchViewModel([doc.Connections[0]], [doc.Connections[0].Id]))),
             ("Cronologia", () => dialogs.ShowAsync(new HistoryViewModel(history, doc, null, _ => Task.FromResult(true)))),

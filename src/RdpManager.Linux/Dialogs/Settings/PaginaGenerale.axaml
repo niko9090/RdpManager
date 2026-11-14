@@ -1,0 +1,45 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:RdpManager.Linux.ViewModels.Settings"
+             x:Class="RdpManager.Linux.Dialogs.Settings.PaginaGenerale"
+             x:DataType="vm:GeneralePageViewModel">
+  <!-- Pagina «Generale» (come Windows): area di notifica, richiamo rapido, elenco delle connessioni, avvio. -->
+  <StackPanel>
+    <StackPanel Classes="group">
+      <TextBlock Classes="groupTitle" Text="Area di notifica" />
+      <StackPanel Classes="groupBody">
+        <CheckBox Content="Icona nell'area di notifica con il menu delle connessioni" IsChecked="{Binding Tray.ShowTrayIcon}" />
+        <CheckBox Content="Chiudendo la finestra resta nell'area di notifica" IsChecked="{Binding Tray.CloseToTray}" IsEnabled="{Binding Tray.CloseToTrayEnabled}" />
+        <TextBlock Classes="note" Text="{Binding Tray.TrayNote}" />
+      </StackPanel>
+    </StackPanel>
+
+    <StackPanel Classes="group">
+      <TextBlock Classes="groupTitle" Text="Richiamo rapido dell'app" />
+      <StackPanel Classes="groupBody">
+        <WrapPanel Orientation="Horizontal" ItemSpacing="0">
+          <TextBlock Classes="caption" Text="Scorciatoia globale" />
+          <TextBox Width="260" Text="{Binding Tray.GlobalHotkey}" Watermark="Ctrl+Alt+Maiusc+R (vuoto = disattivata)" IsEnabled="{Binding Tray.HotkeyAvailable}" />
+        </WrapPanel>
+        <TextBlock Classes="error" Text="{Binding Tray.HotkeyError}" />
+        <TextBlock Classes="note" Text="{Binding Tray.HotkeyNote}" />
+      </StackPanel>
+    </StackPanel>
+
+    <StackPanel Classes="group">
+      <TextBlock Classes="groupTitle" Text="Elenco delle connessioni" />
+      <StackPanel Classes="groupBody">
+        <CheckBox Content="Ordine delle connessioni scelto trascinandole (altrimenti per nome)" IsChecked="{Binding List.ManualOrder}" />
+        <TextBlock Classes="note" Text="{Binding List.Note}" />
+      </StackPanel>
+    </StackPanel>
+
+    <StackPanel Classes="group">
+      <TextBlock Classes="groupTitle" Text="Avvio" />
+      <StackPanel Classes="groupBody">
+        <CheckBox Content="Riapri all'avvio le sessioni lasciate aperte" IsChecked="{Binding Startup.ReopenSessionsOnStartup}" />
+        <TextBlock Classes="note" Text="Le sessioni aperte alla chiusura si riaprono da sole." />
+      </StackPanel>
+    </StackPanel>
+  </StackPanel>
+</UserControl>
