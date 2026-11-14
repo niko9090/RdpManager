@@ -7,12 +7,12 @@
     Barra di menu, con le stesse voci del programma Windows. La struttura è fissata (passo 0): ogni voce è legata a un comando
     di MainWindowViewModel.A.cs o .B.cs. Le voci di funzioni non ancora presenti su Linux hanno il comando disabilitato.
   -->
-  <Border Classes="bar" BorderThickness="0,0,0,1">
+  <Border Classes="bar" BorderThickness="0">
     <Menu>
       <!-- ===== Zona blocco A: File, Connessioni ===== -->
       <MenuItem Header="_File">
         <MenuItem Header="_Importa">
-          <MenuItem Header="Da file _.rdp…" Command="{Binding ImportRdpCommand}" />
+          <MenuItem Header="Da file _.rdp…" Command="{Binding ImportRdpCommand}" InputGesture="Ctrl+I" />
           <MenuItem Header="Da file .rdp_m (backup di RdpManager)…" Command="{Binding ImportRdpmCommand}" />
           <MenuItem Header="Da file _CSV…" Command="{Binding ImportCsvCommand}" />
         </MenuItem>
@@ -27,8 +27,8 @@
         <MenuItem Header="E_sci" Command="{Binding ExitCommand}" InputGesture="Alt+F4" />
       </MenuItem>
       <MenuItem Header="_Connessioni">
-        <MenuItem Header="_Nuova connessione…" Command="{Binding NewConnectionCommand}" />
-        <MenuItem Header="Nuova _cartella…" Command="{Binding NewFolderCommand}" />
+        <MenuItem Header="_Nuova connessione…" Command="{Binding NewConnectionCommand}" InputGesture="Ctrl+N" />
+        <MenuItem Header="Nuova _cartella…" Command="{Binding NewFolderCommand}" InputGesture="Ctrl+Shift+N" />
         <MenuItem Header="_Modifica…" Command="{Binding EditCommand}" InputGesture="Ctrl+E" />
         <MenuItem Header="_Duplica" Command="{Binding DuplicateCommand}" InputGesture="Ctrl+D" />
         <MenuItem Header="_Elimina" Command="{Binding DeleteCommand}" />

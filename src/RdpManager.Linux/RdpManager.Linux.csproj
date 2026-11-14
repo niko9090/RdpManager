@@ -29,6 +29,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- L'icona dell'app Windows (app.ico) in PNG: finestra e area di notifica. -->
+    <AvaloniaResource Include="Assets\app.png" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="RdpManager.Linux.Tests" />
   </ItemGroup>
 

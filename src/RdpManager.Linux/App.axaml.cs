@@ -183,6 +183,15 @@ public sealed class App : Application
 
     private static WindowIcon CreateIcon()
     {
+        try
+        {
+            // La stessa icona del programma Windows (app.ico, convertita in PNG).
+            return new WindowIcon(Avalonia.Platform.AssetLoader.Open(new Uri("avares://RdpManager.Linux/Assets/app.png")));
+        }
+        catch (Exception ex) when (ex is IOException or FileNotFoundException or ArgumentException or NotSupportedException)
+        {
+            // ripiego: icona disegnata a mano
+        }
         var bitmap = new WriteableBitmap(new PixelSize(32, 32), new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Premul);
         using (var fb = bitmap.Lock())
         {

@@ -129,7 +129,7 @@ public sealed partial class MainWindowViewModel
     /// </summary>
     public bool MoveNode(TreeNodeViewModel source, TreeNodeViewModel? target)
     {
-        if (IsLocked)
+        if (IsLocked || source.IsSection || target is { IsSection: true })
             return false;
         bool moved;
         string? selectKey = source.Key;

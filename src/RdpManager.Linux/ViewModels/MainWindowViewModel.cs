@@ -17,6 +17,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     private readonly IDialogService _dialogs;
     private readonly IShellService _shell;
     private readonly HashSet<string> _expanded = new(StringComparer.CurrentCultureIgnoreCase);
+    private readonly HashSet<string> _collapsedSections = new(StringComparer.CurrentCultureIgnoreCase);
     private string _searchText = "";
     private string _status = "";
     private TreeNodeViewModel? _selectedNode;
@@ -34,9 +35,9 @@ public sealed partial class MainWindowViewModel : ViewModelBase
 
         NewConnectionCommand = new RelayCommand(() => Run(NewConnectionAsync));
         NewFolderCommand = new RelayCommand(() => Run(NewFolderAsync));
-        EditCommand = new RelayCommand(() => Run(EditSelectedAsync), () => SelectedNode is not null && !HasMultiSelection);
+        EditCommand = new RelayCommand(() => Run(EditSelectedAsync), () => SelectedNode is { IsSection: false } && !HasMultiSelection);
         DuplicateCommand = new RelayCommand(DuplicateSelected, () => SelectedNode?.Connection is not null && !HasMultiSelection);
-        DeleteCommand = new RelayCommand(() => Run(DeleteSelectedAsync), () => SelectedNode is not null || HasMultiSelection);
+        DeleteCommand = new RelayCommand(() => Run(DeleteSelectedAsync), () => SelectedNode is { IsSection: false } || HasMultiSelection);
         ConnectCommand = new RelayCommand(ConnectSelected, () => SelectedNode?.Connection is not null || HasMultiSelection);
         FavoriteCommand = new RelayCommand(ToggleFavorite, () => SelectedNode?.Connection is not null);
         ProfilesCommand = new RelayCommand(() => Run(ShowProfilesAsync));
@@ -180,12 +181,39 @@ public sealed partial class MainWindowViewModel : ViewModelBase
             {
                 if (n.IsExpanded) _expanded.Add(n.FolderPath); else _expanded.Remove(n.FolderPath);
             }
+        if (!_treeFiltered)
+            foreach (var n in Roots.Where(n => n.IsSection))
+            {
+                if (n.IsExpanded) _collapsedSections.Remove(n.Title); else _collapsedSections.Add(n.Title);
+            }
 
         var query = SearchText.Trim();
         bool filtering = query.Length > 0;
         _treeFiltered = filtering;
         var folders = new Dictionary<string, TreeNodeViewModel>(StringComparer.CurrentCultureIgnoreCase);
         var roots = new List<TreeNodeViewModel>();
+
+        // Sezioni rapide in cima, come in Windows: Preferiti e Recenti (non durante la ricerca).
+        if (!filtering)
+        {
+            AddSection("Preferiti", Document.Favorites());
+            AddSection("Recenti", Document.Recent(RecentCount));
+        }
+
+        void AddSection(string name, IReadOnlyList<RdpConnection> items)
+        {
+            if (items.Count == 0)
+                return;
+            var section = TreeNodeViewModel.ForSection(name);
+            section.IsExpanded = !_collapsedSections.Contains(name);
+            foreach (var c in items)
+            {
+                var node = TreeNodeViewModel.ForConnection(c, name);
+                node.Reachability = _reach.GetValueOrDefault(c.Id);
+                section.Children.Add(node);
+            }
+            roots.Add(section);
+        }
 
         foreach (var path in Document.AllGroups())
         {
@@ -217,6 +245,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         KeepSelectionAfterRebuild();
         OnPropertyChanged(nameof(VisibleConnectionCount));
         OnPropertyChanged(nameof(NoResults));
+        OnPropertyChanged(nameof(StatusSummary));
         RefreshQuickLists();
     }
 
@@ -241,12 +270,23 @@ public sealed partial class MainWindowViewModel : ViewModelBase
 
     private static IEnumerable<TreeNodeViewModel> Flatten(IEnumerable<TreeNodeViewModel> nodes)
     {
+        // Le righe delle sezioni rapide (Preferiti, Recenti) ripetono connessioni già nell'elenco: vengono per ultime,
+        // così chi cerca «la riga di questa connessione» trova prima quella vera.
+        var sections = new List<TreeNodeViewModel>();
         foreach (var n in nodes)
         {
             yield return n;
+            if (n.IsSection)
+            {
+                sections.Add(n);
+                continue;
+            }
             foreach (var c in Flatten(n.Children))
                 yield return c;
         }
+        foreach (var s in sections)
+            foreach (var c in Flatten(s.Children))
+                yield return c;
     }
 
     // --- Connessioni e cartelle ---
@@ -285,7 +325,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     {
         if (IsLocked)
             return;
-        if (SelectedNode is not { } node || HasMultiSelection)
+        if (SelectedNode is not { IsSection: false } node || HasMultiSelection)
             return;
         if (node.Connection is { } c)
         {
@@ -338,7 +378,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
             await DeleteGroupAsync();
             return;
         }
-        if (SelectedNode is not { } node)
+        if (SelectedNode is not { IsSection: false } node)
             return;
         if (node.Connection is { } c)
         {

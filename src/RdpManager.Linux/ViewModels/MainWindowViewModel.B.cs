@@ -106,13 +106,53 @@ public sealed partial class MainWindowViewModel
         PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(SelectedTab))
+            {
                 RaiseTabCommands();
+                OnPropertyChanged(nameof(WindowTitle));
+            }
         };
         Tabs.CollectionChanged += (_, _) =>
         {
             RaiseTabCommands();
             DropSplitIfTabGone();
+            OnPropertyChanged(nameof(StatusSummary));
         };
+    }
+
+    /// <summary>Titolo della finestra, come in Windows: «Nome - RdpManager versione» con una sessione scelta, altrimenti «RdpManager versione - Desktop remoti».</summary>
+    public string WindowTitle => SelectedTab is { } t
+        ? $"{t.Title} - RdpManager {AppInfo.VersionText}"
+        : $"RdpManager {AppInfo.VersionText} - Desktop remoti";
+
+    /// <summary>Riepilogo a sinistra della barra di stato, uguale a Windows.</summary>
+    public string StatusSummary
+    {
+        get
+        {
+            int connected = Tabs.Count(t => t.IsConnected);
+            return $"{Document.Connections.Count} connessioni salvate · {Tabs.Count} sessioni aperte ({connected} connesse)";
+        }
+    }
+
+    /// <summary>Testo del pulsante della barra laterale: «A comparsa» se ora è fissa, «Fissa» se è a comparsa (come Windows).</summary>
+    public string PinButtonText => SidebarPinned ? "A comparsa" : "Fissa";
+
+    public string PinButtonTip => SidebarPinned
+        ? "Barra a comparsa: si nasconde e riappare portando il mouse sul bordo sinistro"
+        : "Fissa la barra laterale accanto alle sessioni";
+
+    /// <summary>Testo al centro quando non c'è nessuna sessione, con le scorciatoie in uso (come Windows).</summary>
+    public string EmptyHint
+    {
+        get
+        {
+            var map = _shortcuts;
+            return "Nessuna sessione aperta.\n\nFai doppio clic su una connessione nella barra laterale (o premi Invio) per aprirla in una scheda.\n" +
+                   $"Ctrl+N nuova connessione · Ctrl+Tab cambia scheda · {map[ShortcutAction.ToggleFullScreen]} schermo intero · " +
+                   $"{map[ShortcutAction.ToggleSidebar]} barra laterale\n" +
+                   $"{map[ShortcutAction.QuickSearch]} ricerca rapida · {map[ShortcutAction.Overview]} panoramica · " +
+                   $"{map[ShortcutAction.ToggleSplitView]} vista affiancata";
+        }
     }
 
     private void RaiseTabCommands()
@@ -270,7 +310,11 @@ public sealed partial class MainWindowViewModel
     /// <summary>Le scorciatoie in vigore, dalle impostazioni.</summary>
     public ShortcutMap Shortcuts => _shortcuts;
 
-    public void ReloadShortcuts() => _shortcuts = ShortcutMap.FromSettings(Document.Settings.Shortcuts);
+    public void ReloadShortcuts()
+    {
+        _shortcuts = ShortcutMap.FromSettings(Document.Settings.Shortcuts);
+        OnPropertyChanged(nameof(EmptyHint));
+    }
 
     // --- Schermo intero, monitor, barra laterale, vista affiancata ---
 
@@ -295,6 +339,8 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SidebarVisible));
         OnPropertyChanged(nameof(SidebarShown));
         OnPropertyChanged(nameof(SidebarPinned));
+        OnPropertyChanged(nameof(PinButtonText));
+        OnPropertyChanged(nameof(PinButtonTip));
         OnPropertyChanged(nameof(IsSplit));
         OnPropertyChanged(nameof(ChromeVisible));
         LayoutChanged?.Invoke(this, EventArgs.Empty);

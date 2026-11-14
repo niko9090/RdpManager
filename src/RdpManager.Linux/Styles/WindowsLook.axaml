@@ -1,0 +1,99 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!--
+    Aspetto del programma Windows (WinForms): stessi colori (App.axaml), carattere di sistema da 9 pt, pulsanti quadrati
+    da 75 px, elenco bianco con la riga scelta in blu, menu piatto. Qui solo le regole generali: le misure per il tocco
+    (classe «touch» della finestra principale) restano in App.axaml e vincono su queste.
+  -->
+  <Style Selector="Window">
+    <Setter Property="FontFamily" Value="Segoe UI, Noto Sans, Cantarell, Ubuntu, DejaVu Sans, sans-serif" />
+    <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
+    <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
+  </Style>
+
+  <!-- Pulsanti: spigoli vivi, bordo sottile, 75 px come i Button di WinForms; quelli piatti (barre) senza bordo né larghezza minima. -->
+  <Style Selector="Button">
+    <Setter Property="MinWidth" Value="75" />
+    <Setter Property="Padding" Value="8,0" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="0" />
+  </Style>
+  <Style Selector="Button.flat">
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="Button.accent">
+    <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}" />
+    <Setter Property="Background" Value="{DynamicResource ButtonBackground}" />
+    <Setter Property="Foreground" Value="{DynamicResource ButtonForeground}" />
+  </Style>
+  <Style Selector="Button.accent:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource ButtonBackgroundPointerOver}" />
+    <Setter Property="Foreground" Value="{DynamicResource ButtonForegroundPointerOver}" />
+  </Style>
+  <Style Selector="Button.accent:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource ButtonBackgroundPressed}" />
+    <Setter Property="Foreground" Value="{DynamicResource ButtonForegroundPressed}" />
+  </Style>
+
+  <Style Selector="TextBox">
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="Padding" Value="4,2" />
+  </Style>
+  <Style Selector="ComboBox">
+    <Setter Property="CornerRadius" Value="0" />
+  </Style>
+
+  <!-- Elenco (TreeView di WinForms): righe da 22 px, fondo bianco; il testo della riga scelta diventa bianco. -->
+  <Style Selector="TreeViewItem">
+    <Setter Property="MinHeight" Value="22" />
+  </Style>
+  <Style Selector="TreeView">
+    <Setter Property="Background" Value="{DynamicResource AppSidebarBrush}" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+
+  <!-- Schede delle sessioni: linguette rettangolari, senza sottolineatura, la scelta col colore delle caselle. -->
+  <Style Selector="TabControl">
+    <Setter Property="Background" Value="{DynamicResource AppInputBrush}" />
+    <Setter Property="Padding" Value="0" />
+  </Style>
+  <Style Selector="TabItem">
+    <Setter Property="MinHeight" Value="24" />
+    <Setter Property="Padding" Value="8,0" />
+    <Setter Property="Margin" Value="0" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+    <Setter Property="BorderThickness" Value="0,0,1,0" />
+  </Style>
+  <Style Selector="TabItem /template/ Border#PART_LayoutRoot">
+    <Setter Property="CornerRadius" Value="0" />
+  </Style>
+
+  <!-- Barre (menu, stato): fondo dei controlli, nessuna linea di separazione come in WinForms. -->
+  <Style Selector="Menu">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="MenuItem">
+    <Setter Property="MinHeight" Value="22" />
+    <Setter Property="Padding" Value="8,2" />
+  </Style>
+  <Style Selector="Rectangle.separator">
+    <Setter Property="Fill" Value="{DynamicResource AppBorderBrush}" />
+    <Setter Property="Width" Value="1" />
+    <Setter Property="Margin" Value="4,4" />
+  </Style>
+
+  <!-- Intestazione della barra laterale: «Connessioni» in grassetto e, a destra, i pulsanti piccoli (ToolStrip). -->
+  <Style Selector="TextBlock.sidebarTitle">
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <!-- Chiusura scheda: come in Windows la X c'è solo con la modalità tocco; di solito si chiude col menu, Ctrl+F4 o clic centrale. -->
+  <Style Selector="Button.tabclose">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector="Window.touch Button.tabclose">
+    <Setter Property="IsVisible" Value="True" />
+  </Style>
+</Styles>

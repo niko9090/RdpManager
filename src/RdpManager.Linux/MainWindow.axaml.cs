@@ -320,9 +320,17 @@ public sealed partial class MainWindow : Window
     /// <summary>Il clic destro su una scheda la seleziona, così il menu della scheda agisce su quella.</summary>
     private void OnTabPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (!e.GetCurrentPoint(this).Properties.IsRightButtonPressed || DataContext is not MainWindowViewModel { IsLocked: false } vm)
+        var props = e.GetCurrentPoint(this).Properties;
+        if (!(props.IsRightButtonPressed || props.IsMiddleButtonPressed) || DataContext is not MainWindowViewModel { IsLocked: false } vm)
             return;
-        if ((e.Source as Visual)?.FindAncestorOfType<TabItem>()?.DataContext is SessionTabViewModel tab)
-            vm.SelectedTab = tab;
+        if ((e.Source as Visual)?.FindAncestorOfType<TabItem>()?.DataContext is not SessionTabViewModel tab)
+            return;
+        vm.SelectedTab = tab;
+        // Come in Windows, il clic centrale su una scheda la chiude.
+        if (props.IsMiddleButtonPressed)
+        {
+            tab.CloseCommand.Execute(null);
+            e.Handled = true;
+        }
     }
 }

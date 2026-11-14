@@ -8,10 +8,13 @@
         x:Class="RdpManager.Linux.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         dlg:WindowBehaviors.BackgroundWork="True"
-        Title="RdpManager" Width="1100" Height="700" MinWidth="560" MinHeight="420">
+        Title="{Binding WindowTitle}" Icon="avares://RdpManager.Linux/Assets/app.png"
+        Width="1400" Height="900" MinWidth="800" MinHeight="500">
 
   <!-- Scorciatoie fisse del blocco A. Ctrl+Alt+Spazio e Ctrl+Alt+L stanno nella ShortcutMap configurabile (blocco B). -->
   <Window.KeyBindings>
+    <KeyBinding Gesture="Ctrl+Shift+N" Command="{Binding NewFolderCommand}" />
+    <KeyBinding Gesture="Ctrl+I" Command="{Binding ImportRdpCommand}" />
     <KeyBinding Gesture="Ctrl+E" Command="{Binding EditCommand}" />
     <KeyBinding Gesture="Ctrl+D" Command="{Binding DuplicateCommand}" />
     <KeyBinding Gesture="Ctrl+H" Command="{Binding HistoryCommand}" />
@@ -39,64 +42,73 @@
 
   <DockPanel Background="{DynamicResource AppSurfaceBrush}" IsVisible="{Binding IsUnlocked}">
     <!-- Barra di stato -->
-    <Border DockPanel.Dock="Bottom" Classes="bar" Padding="14,6" BorderThickness="0,1,0,0" IsVisible="{Binding ChromeVisible}">
-      <TextBlock Text="{Binding StatusMessage}" TextTrimming="CharacterEllipsis" MinHeight="20"
-                 FontSize="12" Classes="muted" VerticalAlignment="Center" />
+    <!-- Barra di stato (StatusStrip): a sinistra il riepilogo, poi l'ultimo avviso. -->
+    <Border DockPanel.Dock="Bottom" Classes="bar" Padding="8,3" BorderThickness="0" IsVisible="{Binding ChromeVisible}">
+      <Grid ColumnDefinitions="Auto,*">
+        <TextBlock Text="{Binding StatusSummary}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="1" Text="{Binding StatusMessage}" Margin="16,0,0,0" TextTrimming="CharacterEllipsis"
+                   VerticalAlignment="Center" />
+      </Grid>
     </Border>
 
-    <!-- Barra di menu -->
+    <!-- Barra di menu (come Windows: nessuna barra comandi in alto; i comandi rapidi stanno sopra l'elenco). -->
     <menus:MainMenu DockPanel.Dock="Top" IsVisible="{Binding ChromeVisible}" />
 
-    <!-- Barra comandi -->
-    <Border DockPanel.Dock="Top" Classes="bar" BorderThickness="0,0,0,1" IsVisible="{Binding ChromeVisible}">
-      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-        <StackPanel Orientation="Horizontal" Spacing="4" Margin="10,6">
-          <Button Classes="accent" Content="Nuova connessione" Command="{Binding NewConnectionCommand}" />
-          <Button Classes="flat" Content="Nuova cartella" Command="{Binding NewFolderCommand}" />
-          <Rectangle Width="1" Margin="6,6" Fill="{DynamicResource AppBorderBrush}" />
-          <Button Classes="flat" Content="Modifica" Command="{Binding EditCommand}" />
-          <Button Classes="flat" Content="Duplica" Command="{Binding DuplicateCommand}" />
-          <Button Classes="flat" Content="Preferita" Command="{Binding FavoriteCommand}" ToolTip.Tip="Aggiungi o togli dalle preferite" />
-          <Button Classes="flat danger" Content="Elimina" Command="{Binding DeleteCommand}" />
-          <Rectangle Width="1" Margin="6,6" Fill="{DynamicResource AppBorderBrush}" />
-          <Button Classes="flat" Content="Profili" Command="{Binding ProfilesCommand}" ToolTip.Tip="Profili di credenziali" />
-          <Button Classes="flat" Content="Impostazioni" Command="{Binding SettingsCommand}" />
-        </StackPanel>
-      </ScrollViewer>
-    </Border>
-
-    <Grid x:Name="MainGrid" ColumnDefinitions="300,Auto,*">
+    <Grid x:Name="MainGrid" ColumnDefinitions="280,Auto,*">
       <!-- Barra laterale: ricerca e albero delle connessioni (fissa, oppure a comparsa dal bordo sinistro) -->
-      <Border x:Name="SidebarPanel" Grid.Column="0" MinWidth="200" Background="{DynamicResource AppSidebarBrush}">
-        <DockPanel Margin="10">
-          <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
-            <TextBox Name="SearchBox" Text="{Binding SearchText}" Watermark="Cerca connessioni…">
-              <TextBox.KeyBindings>
-                <KeyBinding Gesture="Escape" Command="{Binding ClearSearchCommand}" />
-              </TextBox.KeyBindings>
-            </TextBox>
-            <Button Grid.Column="1" Classes="flat" Content="✕" Margin="4,0,0,0"
-                    Command="{Binding ClearSearchCommand}" ToolTip.Tip="Cancella la ricerca" />
-          </Grid>
+      <Border x:Name="SidebarPanel" Grid.Column="0" MinWidth="180" Background="{DynamicResource AppSidebarBrush}">
+        <DockPanel>
+          <!-- Intestazione (come ToolStrip di Windows): titolo in grassetto, a destra «Cerca PC» e fissa/a comparsa. -->
+          <Border DockPanel.Dock="Top" Classes="bar" Padding="4,1">
+            <Grid ColumnDefinitions="*,Auto,Auto">
+              <TextBlock Classes="sidebarTitle" Text="Connessioni" Margin="4,0,0,0" />
+              <Button Grid.Column="1" Classes="flat" Content="Cerca PC" MinHeight="22" Padding="6,0"
+                      Command="{Binding NetworkScanCommand}"
+                      ToolTip.Tip="Cerca PC in rete (rete locale, Tailscale, altre VPN)" />
+              <Button Grid.Column="2" Classes="flat" Content="{Binding PinButtonText}" MinHeight="22" Padding="6,0"
+                      Command="{Binding PinSidebarCommand}" ToolTip.Tip="{Binding PinButtonTip}" />
+            </Grid>
+          </Border>
+          <TextBox DockPanel.Dock="Top" Name="SearchBox" Text="{Binding SearchText}" Watermark="Cerca (Ctrl+F)…" Margin="0,2,0,0">
+            <TextBox.KeyBindings>
+              <KeyBinding Gesture="Escape" Command="{Binding ClearSearchCommand}" />
+            </TextBox.KeyBindings>
+          </TextBox>
+          <!-- Comandi rapidi: a capo invece di un menu di comandi nascosti (come Windows). -->
+          <Border DockPanel.Dock="Top" Classes="bar" Padding="2,1">
+            <WrapPanel>
+              <Button Classes="flat" Content="Nuova" MinHeight="22" Padding="6,0" Command="{Binding NewConnectionCommand}" ToolTip.Tip="Nuova connessione (Ctrl+N)" />
+              <Button Classes="flat" Content="Cartella" MinHeight="22" Padding="6,0" Command="{Binding NewFolderCommand}" ToolTip.Tip="Nuova cartella (Ctrl+Shift+N)" />
+              <Button Classes="flat" Content="Modifica" MinHeight="22" Padding="6,0" Command="{Binding EditCommand}" ToolTip.Tip="Modifica (Ctrl+E)" />
+              <Button Classes="flat" Content="Duplica" MinHeight="22" Padding="6,0" Command="{Binding DuplicateCommand}" ToolTip.Tip="Duplica (Ctrl+D)" />
+              <Button Classes="flat" Content="Elimina" MinHeight="22" Padding="6,0" Command="{Binding DeleteCommand}" ToolTip.Tip="Elimina (Canc)" />
+            </WrapPanel>
+          </Border>
 
           <Grid>
             <TreeView Name="ConnectionTree" Background="Transparent" ItemsSource="{Binding Roots}" SelectedItem="{Binding SelectedNode}"
                       dlg:WindowBehaviors.MultiSelect="True" dlg:WindowBehaviors.DragDrop="True">
               <TreeView.ContextMenu>
                 <ContextMenu>
+                  <!-- Stesso ordine e stessi testi del menu dell'elenco di Windows; le voci di cartella si vedono solo su una cartella. -->
                   <MenuItem Header="Connetti" Command="{Binding ConnectCommand}" />
-                  <MenuItem Header="Connetti tutta la cartella" Command="{Binding ConnectFolderCommand}" />
-                  <MenuItem Header="Modifica…" Command="{Binding EditCommand}" />
-                  <MenuItem Header="Duplica" Command="{Binding DuplicateCommand}" />
-                  <MenuItem Header="Preferita" Command="{Binding FavoriteCommand}" />
-                  <Separator />
-                  <MenuItem Header="Sposta in una cartella…" Command="{Binding MoveToFolderCommand}" />
-                  <MenuItem Header="Assegna un profilo di credenziali…" Command="{Binding AssignProfileCommand}" />
-                  <MenuItem Header="Impostazioni della cartella…" Command="{Binding FolderSettingsCommand}" />
+                  <MenuItem Header="Connetti tutta la cartella" Command="{Binding ConnectFolderCommand}"
+                            IsVisible="{Binding SelectedNode.IsFolder, FallbackValue=False}" />
+                  <MenuItem Header="Impostazioni della cartella…" Command="{Binding FolderSettingsCommand}"
+                            IsVisible="{Binding SelectedNode.IsFolder, FallbackValue=False}" />
                   <MenuItem Header="Esporta come file .rdp…" Command="{Binding ExportRdpFileCommand}" />
                   <MenuItem Header="Accendi (Wake-on-LAN)" Command="{Binding WakeCommand}" />
                   <MenuItem Header="Verifica raggiungibilità" Command="{Binding CheckReachabilityCommand}" />
                   <Separator />
+                  <MenuItem Header="Preferita ★" Command="{Binding FavoriteCommand}" />
+                  <MenuItem Header="Cronologia…" Command="{Binding HistoryCommand}" />
+                  <Separator />
+                  <MenuItem Header="Nuova connessione…" Command="{Binding NewConnectionCommand}" />
+                  <MenuItem Header="Nuova cartella…" Command="{Binding NewFolderCommand}" />
+                  <MenuItem Header="Modifica / Rinomina…" Command="{Binding EditCommand}" />
+                  <MenuItem Header="Duplica" Command="{Binding DuplicateCommand}" />
+                  <MenuItem Header="Sposta in una cartella…" Command="{Binding MoveToFolderCommand}" />
+                  <MenuItem Header="Assegna un profilo di credenziali…" Command="{Binding AssignProfileCommand}" />
                   <MenuItem Header="Elimina" Command="{Binding DeleteCommand}" />
                 </ContextMenu>
               </TreeView.ContextMenu>
@@ -107,24 +119,31 @@
               </TreeView.Styles>
               <TreeView.ItemTemplate>
                 <TreeDataTemplate DataType="vm:TreeNodeViewModel" ItemsSource="{Binding Children}">
-                  <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,4" ToolTip.Tip="{Binding StatusText}">
-                    <Path Classes="icon" Margin="0,0,10,0"
-                          Data="{StaticResource IconFolder}" IsVisible="{Binding IsFolder}" />
-                    <Path Classes="icon" Margin="0,0,10,0"
-                          Data="{StaticResource IconComputer}" IsVisible="{Binding !IsFolder}" />
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                      <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis"
-                                 FontWeight="{Binding IsFolder, Converter={x:Static l:Converters.FolderWeight}}" />
-                      <TextBlock Text="{Binding Subtitle}" FontSize="12" Classes="muted"
-                                 TextTrimming="CharacterEllipsis" IsVisible="{Binding !IsFolder}" />
-                    </StackPanel>
-                    <!-- Colore dell'etichetta e stato di raggiungibilità (#4, #13) -->
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" IsVisible="{Binding !IsFolder}">
-                      <Border Width="10" Height="10" CornerRadius="2" IsVisible="{Binding HasLabelColor}"
-                              Background="{Binding LabelColor, Converter={x:Static dlg:HexBrushConverter.Instance}}" />
-                      <Ellipse Width="10" Height="10"
-                               Fill="{Binding StatusColor, Converter={x:Static dlg:HexBrushConverter.Instance}}" />
-                    </StackPanel>
+                  <!-- Una riga come in Windows: icona da 16 px (cartella gialla, stella, PC con lo schermo del colore
+                       dell'etichetta e il pallino di raggiungibilità) e il nome; indirizzo e stato nel suggerimento. -->
+                  <Grid ColumnDefinitions="Auto,*" Margin="0,1" ToolTip.Tip="{Binding ToolTipText}">
+                    <Panel Width="16" Height="16" Margin="0,0,5,0" VerticalAlignment="Center">
+                      <Canvas IsVisible="{Binding IsFolder}" Width="16" Height="16">
+                        <Rectangle Canvas.Left="1" Canvas.Top="4" Width="14" Height="10" Fill="#F0C450" />
+                        <Rectangle Canvas.Left="1" Canvas.Top="2" Width="6" Height="3" Fill="#F0C450" />
+                        <Rectangle Canvas.Left="1.5" Canvas.Top="4.5" Width="13" Height="9" Stroke="#BE8C28" StrokeThickness="1" />
+                      </Canvas>
+                      <Canvas IsVisible="{Binding IsSection}" Width="16" Height="16">
+                        <Path Fill="#F5B41E" Data="M8,1 L9.88,5.91 L15.13,6.18 L11.04,9.49 L12.41,14.57 L8,11.7 L3.59,14.57 L4.96,9.49 L0.87,6.18 L6.12,5.91 Z" />
+                      </Canvas>
+                      <Canvas IsVisible="{Binding IsConnection}" Width="16" Height="16">
+                        <Rectangle Canvas.Left="1" Canvas.Top="2" Width="14" Height="10" Fill="#3C3C46" />
+                        <Rectangle Canvas.Left="2" Canvas.Top="3" Width="12" Height="8"
+                                   Fill="{Binding ScreenColor, Converter={x:Static dlg:HexBrushConverter.Instance}}" />
+                        <Rectangle Canvas.Left="6" Canvas.Top="12" Width="4" Height="2" Fill="#3C3C46" />
+                        <Rectangle Canvas.Left="4" Canvas.Top="14" Width="8" Height="1" Fill="#3C3C46" />
+                        <Ellipse Canvas.Left="8.5" Canvas.Top="8.5" Width="7.5" Height="7.5" Fill="White" IsVisible="{Binding HasStatusColor}" />
+                        <Ellipse Canvas.Left="10.2" Canvas.Top="10.2" Width="4.2" Height="4.2" StrokeThickness="2" IsVisible="{Binding HasStatusColor}"
+                                 Stroke="{Binding StatusColor, Converter={x:Static dlg:HexBrushConverter.Instance}}" />
+                      </Canvas>
+                    </Panel>
+                    <TextBlock Grid.Column="1" Text="{Binding Title}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                               FontWeight="{Binding IsSection, Converter={x:Static l:Converters.SectionWeight}}" />
                   </Grid>
                 </TreeDataTemplate>
               </TreeView.ItemTemplate>
@@ -138,7 +157,7 @@
       <!-- Bordo sensibile: con la barra a comparsa, avvicinando il mouse la barra si apre. -->
       <Border x:Name="SidebarEdge" Grid.Column="0" Width="6" HorizontalAlignment="Left" Background="Transparent" IsVisible="False" ZIndex="5" />
 
-      <GridSplitter x:Name="SidebarSplitter" Grid.Column="1" Width="4" Background="{DynamicResource AppBorderBrush}" ResizeDirection="Columns" />
+      <GridSplitter x:Name="SidebarSplitter" Grid.Column="1" Width="5" Background="{DynamicResource AppSurfaceBrush}" ResizeDirection="Columns" />
 
       <!-- Area a schede per le sessioni: la riga delle schede qui, le viste delle sessioni in SessionHost -->
       <Grid Grid.Column="2">
@@ -146,18 +165,23 @@
         <TabControl x:Name="TabStrip" DockPanel.Dock="Top" ItemsSource="{Binding Tabs}" SelectedItem="{Binding SelectedTab}" Padding="0">
           <TabControl.ContextMenu>
             <ContextMenu>
-              <MenuItem Header="_Riconnetti" Command="{Binding ReconnectCommand}" InputGesture="F5" />
-              <MenuItem Header="S_tacca in una finestra" Command="{Binding DetachTabCommand}" InputGesture="Ctrl+Shift+D" />
+              <!-- Stesse voci e stessi testi del menu delle schede di Windows («Apri con mstsc» esiste solo lì). -->
+              <MenuItem Header="Riconnetti" Command="{Binding ReconnectCommand}" InputGesture="F5" />
+              <MenuItem Header="Schermo intero" Command="{Binding FullScreenCommand}" InputGesture="F11" />
+              <MenuItem Header="Stacca in una finestra" Command="{Binding DetachTabCommand}" InputGesture="Ctrl+Shift+D" />
+              <MenuItem Header="Vista affiancata" Command="{Binding SplitViewCommand}" />
               <Separator />
-              <MenuItem Header="C_hiudi scheda" Command="{Binding CloseCurrentTabCommand}" InputGesture="Ctrl+F4" />
+              <MenuItem Header="Chiudi scheda" Command="{Binding CloseCurrentTabCommand}" InputGesture="Ctrl+F4" />
             </ContextMenu>
           </TabControl.ContextMenu>
           <TabControl.ItemTemplate>
             <DataTemplate x:DataType="vm:SessionTabViewModel">
-              <StackPanel Orientation="Horizontal" Spacing="6">
-                <Path Classes="icon" Data="{StaticResource IconComputer}" Width="16" Height="16" />
+              <!-- Come in Windows: pallino di stato (12 px) e titolo; la X solo con la modalità tocco. -->
+              <StackPanel Orientation="Horizontal" Spacing="4">
+                <Ellipse Width="10" Height="10" VerticalAlignment="Center"
+                         Fill="{Binding StateColor, Converter={x:Static dlg:HexBrushConverter.Instance}}" />
                 <TextBlock Text="{Binding Title}" VerticalAlignment="Center" MaxWidth="220" TextTrimming="CharacterEllipsis" />
-                <Button Classes="flat" Content="✕" MinWidth="32" MinHeight="32" Padding="0"
+                <Button Classes="flat tabclose" Content="✕" MinWidth="32" MinHeight="32" Padding="0"
                         Command="{Binding CloseCommand}" ToolTip.Tip="Chiudi la scheda" />
               </StackPanel>
             </DataTemplate>
@@ -172,15 +196,9 @@
         </DockPanel>
 
         <!-- Stato vuoto -->
-        <StackPanel IsVisible="{Binding !HasTabs}" HorizontalAlignment="Center" VerticalAlignment="Center"
-                    Spacing="10" MaxWidth="440" Margin="24">
-          <Path Classes="icon muted" Data="{StaticResource IconComputer}" Width="64" Height="64" HorizontalAlignment="Center" />
-          <TextBlock Text="Nessuna sessione aperta" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" />
-          <TextBlock Text="Fai doppio clic su una connessione per aprirla in una scheda, oppure creane una nuova."
-                     TextWrapping="Wrap" TextAlignment="Center" Classes="muted" />
-          <Button Classes="accent" Content="Nuova connessione" Command="{Binding NewConnectionCommand}"
-                  HorizontalAlignment="Center" Margin="0,8,0,0" />
-        </StackPanel>
+        <!-- Stato vuoto: solo testo grigio al centro, con le scorciatoie in uso (come la Label di Windows). -->
+        <TextBlock IsVisible="{Binding !HasTabs}" Text="{Binding EmptyHint}" Classes="muted"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="24" />
       </Grid>
     </Grid>
   </DockPanel>
