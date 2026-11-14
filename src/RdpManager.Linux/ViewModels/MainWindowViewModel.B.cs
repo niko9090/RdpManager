@@ -41,6 +41,13 @@ public sealed partial class MainWindowViewModel
     public Func<CancellationToken, Task<UpdateCheckResult>> UpdateCheck { get; set; } =
         ct => UpdateChecker.CheckAsync(SharedHttp, AppInfo.Version, TimeSpan.FromSeconds(15), ct);
 
+    /// <summary>Scaricamento e verifica dell'allegato dell'aggiornamento (nelle prove si sostituisce).</summary>
+    public Func<ReleaseInfo, ReleaseAsset, IProgress<double>, CancellationToken, Task<UpdateDownloadResult>> UpdateDownload { get; set; } =
+        (release, asset, progress, ct) => UpdateDownloader.DownloadAndVerifyAsync(SharedHttp, release, asset, null, progress, ct);
+
+    /// <summary>Rilevamento e installazione dell'aggiornamento su Linux (nelle prove si sostituisce).</summary>
+    public LinuxUpdater Updater { get; set; } = new();
+
     private static readonly HttpClient SharedHttp = new();
 
     /// <summary>Percorso del profilo VPN (null = quello predefinito; nelle prove una cartella temporanea).</summary>
@@ -716,8 +723,9 @@ public sealed partial class MainWindowViewModel
     public RelayCommand CheckUpdatesCommand => AsyncCmd(() => CheckUpdatesAsync(manual: true));
 
     /// <summary>
-    /// Controlla se c'è una versione nuova su GitHub. Su Linux non si installa da soli: si avvisa e si offre il link alla pagina
-    /// della release. A mano mostra sempre un esito; in automatico (secondo l'impostazione) solo se c'è una novità.
+    /// Controlla se c'è una versione nuova su GitHub e, dopo la conferma, la installa (AppImage, .deb o .rpm); se l'installazione
+    /// non è riconosciuta o qualcosa va storto, si apre la pagina della release. A mano mostra sempre un esito; in automatico
+    /// (secondo l'impostazione) solo se c'è una novità.
     /// </summary>
     public async Task CheckUpdatesAsync(bool manual)
     {
@@ -745,8 +753,61 @@ public sealed partial class MainWindowViewModel
         Notice(line);
         if (!manual && mode != UpdateMode.AutomaticWithConfirmation)
             return; // «Solo avviso»: resta la riga nella barra di stato
-        if (await Ui.OfferUpdateAsync(release, AppInfo.VersionText))
+        var updater = Updater;
+        var install = await updater.DetectAsync(_shutdown.Token);
+        var asset = LinuxUpdater.PickAsset(release, install.Kind);
+        bool canInstall = asset is not null && release.ChecksumsAsset is not null;
+        if (!await Ui.OfferUpdateAsync(release, AppInfo.VersionText, canInstall))
+            return;
+        if (!canInstall)
+        {
             Ui.OpenUrl(release.PageUrl);
+            return;
+        }
+        await InstallUpdateAsync(updater, install, release, asset!);
+    }
+
+    /// <summary>
+    /// Scarica e verifica l'allegato (SHA256SUMS.txt), lo installa e riapre l'app. Ogni intoppo (rete, hash, permessi negati,
+    /// pkexec assente) si dice in italiano e apre la pagina della release, come prima dell'aggiornamento automatico.
+    /// </summary>
+    private async Task InstallUpdateAsync(LinuxUpdater updater, LinuxInstallInfo install, ReleaseInfo release, ReleaseAsset asset)
+    {
+        UpdateDownloadResult download;
+        using (var progress = Ui.ShowUpdateProgress(release))
+        {
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(_shutdown.Token, progress.Cancelled);
+            download = await UpdateDownload(release, asset, new Progress<double>(progress.Report), linked.Token);
+            if (!download.IsVerified && progress.Cancelled.IsCancellationRequested)
+                download = download with { Message = "Aggiornamento annullato." };
+        }
+        if (!download.IsVerified || download.InstallerPath is null)
+        {
+            UpdateFallback(release, download.Message);
+            return;
+        }
+
+        var result = await updater.InstallAsync(install, download.InstallerPath, _shutdown.Token);
+        if (!result.IsInstalled)
+        {
+            var text = result.Status switch
+            {
+                LinuxInstallStatus.Cancelled => "Aggiornamento non installato: non hai autorizzato l'operazione.",
+                LinuxInstallStatus.NoPrivilegeTool => "Aggiornamento non installato: " + result.Message + " Installa il file a mano dalla pagina della release.",
+                _ => result.Message,
+            };
+            UpdateFallback(release, text);
+            return;
+        }
+        Notice($"RdpManager {release.Version.ToString(3)} installato: riavvio.");
+        updater.Relaunch(install);
+        ExitCommand.Execute(null);
+    }
+
+    private void UpdateFallback(ReleaseInfo release, string message)
+    {
+        Notice(message + " Si apre la pagina della release.");
+        Ui.OpenUrl(release.PageUrl);
     }
 
     // --- Elenco rapido per l'area di notifica ---

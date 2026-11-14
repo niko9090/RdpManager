@@ -109,12 +109,17 @@ public static class UpdateDownloader
         return n;
     }
 
-    public static async Task<UpdateDownloadResult> DownloadAndVerifyAsync(HttpClient http, ReleaseInfo release,
+    public static Task<UpdateDownloadResult> DownloadAndVerifyAsync(HttpClient http, ReleaseInfo release,
+        string? folder = null, IProgress<double>? progress = null, CancellationToken cancellationToken = default) =>
+        DownloadAndVerifyAsync(http, release, release?.SetupAsset, folder, progress, cancellationToken);
+
+    /// <summary>Come sopra, ma per un allegato scelto dal chiamato (su Linux: .deb, .rpm o AppImage); null = la release non lo ha.</summary>
+    public static async Task<UpdateDownloadResult> DownloadAndVerifyAsync(HttpClient http, ReleaseInfo release, ReleaseAsset? asset,
         string? folder = null, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(http);
         ArgumentNullException.ThrowIfNull(release);
-        if (release.SetupAsset is not { } setup)
+        if (asset is not { } setup)
             return new(UpdateDownloadStatus.NoInstaller, null, $"La release {release.Tag} non contiene l'installer.");
         if (release.ChecksumsAsset is not { } sums)
             return new(UpdateDownloadStatus.NoChecksum, null,
