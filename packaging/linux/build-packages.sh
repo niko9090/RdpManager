@@ -225,8 +225,22 @@ if [[ ! -x "$TOOL" ]]; then
 fi
 APPIMAGE="$OUT/RdpManager-${VERSION}-x86_64.AppImage"
 rm -f "$APPIMAGE"
-ARCH=x86_64 "$TOOL" --appimage-extract-and-run --no-appstream "$APPDIR" "$APPIMAGE" > "$WORK/appimagetool.log" 2>&1 \
-  || { cat "$WORK/appimagetool.log" >&2; exit 1; }
+# Con l'opzione extract-and-run l'estrazione va sempre in /tmp/appimage_extracted_<hash> (hash fisso del file):
+# un'altra costruzione o un processo rimasto appeso la' dentro fa fallire exec con «Text file busy».
+# Estraggo quindi appimagetool una volta in una cartella propria di questa esecuzione ($WORK, ripulita dal trap).
+mkdir -p "$WORK/tool"
+cp -f "$TOOL" "$WORK/tool/appimagetool.AppImage"
+chmod 755 "$WORK/tool/appimagetool.AppImage"
+(cd "$WORK/tool" && ./appimagetool.AppImage --appimage-extract > "$WORK/extract.log" 2>&1) \
+  || { cat "$WORK/extract.log" >&2; exit 1; }
+built=0
+for i in 1 2 3 4 5; do
+  if ARCH=x86_64 "$WORK/tool/squashfs-root/AppRun" --no-appstream "$APPDIR" "$APPIMAGE" > "$WORK/appimagetool.log" 2>&1; then built=1; break; fi
+  grep -q 'Text file busy' "$WORK/appimagetool.log" || break
+  echo "appimagetool: Text file busy (tentativo $i/5), riprovo" >&2
+  sleep 2
+done
+[[ $built == 1 ]] || { cat "$WORK/appimagetool.log" >&2; exit 1; }
 chmod 755 "$APPIMAGE"
 
 # ---------- consegna in dist ----------

@@ -81,6 +81,11 @@ public class LinuxPackagingTests
         var script = Read("packaging", "linux", "build-packages.sh");
         Assert.Contains("mv -f \"$tmp\" \"$dst\"", script);
         Assert.Contains("$TOOL.$$.part", script);
+        // appimagetool estratto in una cartella propria della costruzione, non in /tmp/appimage_extracted_<hash>.
+        Assert.Contains("--appimage-extract >", script);
+        Assert.Contains("squashfs-root/AppRun", script);
+        Assert.Contains("Text file busy", script);
+        Assert.DoesNotContain("--appimage-extract-and-run", script);
     }
 
     [Fact]

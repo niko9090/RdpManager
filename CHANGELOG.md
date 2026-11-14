@@ -1,5 +1,13 @@
 # Novità di RdpManager
 
+## 1.16.0 (2026-11-14)
+
+**Linux: aggiornamenti automatici e aspetto come su Windows**
+- Linux: aggiornamento automatico vero. L'app riconosce se è installata da .deb, .rpm o AppImage, scarica il file giusto, verifica lo SHA256, installa (con la password di sistema per deb e rpm) e si riavvia; se non si può, apre la pagina della release.
+- Linux: finestra principale allineata a Windows (colori, caratteri, barra laterale con Preferiti e Recenti, icone, schede, menu, barra di stato, titolo, icona dell'app).
+- Linux: Impostazioni e finestre di dialogo allineate a Windows (stesse 8 pagine, opzioni dello schermo intero, ordine dei pulsanti, modifica connessione).
+- Nota: dalla 1.16.0 gli aggiornamenti su Linux arrivano da soli; la 1.16.0 va installata a mano una volta.
+
 ## 1.15.0 (2026-11-13)
 
 **Un solo installatore VPN per tutti i PC da raggiungere**
