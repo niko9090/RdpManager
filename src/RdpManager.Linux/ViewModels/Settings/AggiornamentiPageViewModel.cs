@@ -45,7 +45,8 @@ public sealed class AggiornamentiPageViewModel : SettingsPageViewModel
 
     public string Version => "Versione in uso: " + AppInfo.VersionText;
 
-    public string Note => "Su Linux l'aggiornamento non si installa da solo: quando c'è una versione nuova compare un avviso con il link alla pagina della release su GitHub, da cui scaricare il pacchetto. "
+    public string Note => "Se RdpManager è installato da un pacchetto .deb, .rpm o da un AppImage, l'aggiornamento si scarica, si verifica e si installa da solo, poi l'app si riapre; per .deb e .rpm viene chiesta la password di sistema. "
+        + "Negli altri casi compare un avviso con il link alla pagina della release su GitHub, da cui scaricare il pacchetto. "
         + "Il controllo avviene all'avvio e ogni 24 ore; con «Solo avviso» compare una riga nella barra di stato, con «Spenti» non si controlla da soli.";
 
     public override void Apply() => _settings.UpdateMode = Update.Value;
