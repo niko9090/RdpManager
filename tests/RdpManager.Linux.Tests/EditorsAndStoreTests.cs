@@ -125,7 +125,7 @@ public class ProfilesViewModelTests
 [Collection("Globali")]
 public class SettingsViewModelTests
 {
-    private static T Page<T>(SettingsViewModel vm) where T : SettingsPageViewModel => vm.Pages.OfType<T>().Single();
+    private static T Page<T>(SettingsViewModel vm) where T : SettingsPageViewModel => vm.Sections.OfType<T>().Single();
 
     [Fact]
     public void Apply_scrive_le_scelte_di_ogni_pagina_sulle_impostazioni()
@@ -148,7 +148,7 @@ public class SettingsViewModelTests
     public void Le_pagine_sono_quelle_del_documento_di_parita()
     {
         var vm = new SettingsViewModel(new AppSettings(), "/x/connections.json");
-        Assert.Equal(["Aspetto", "Avvio", "Elenco", "PIN", "Area di notifica", "Monitor", "Tocco", "Scorciatoie", "Aggiornamenti"],
+        Assert.Equal(["Generale", "Aspetto", "Schermo intero", "Tocco e gesti", "Scorciatoie", "Sicurezza", "Aggiornamenti", "Cronologia e log"],
             vm.Pages.Select(p => p.Title));
         Assert.Same(vm.Pages[0], vm.SelectedPage);
     }
@@ -167,8 +167,8 @@ public class SettingsViewModelTests
         var settings = new AppSettings { HistoryEnabled = true };
         var page = Page<AvvioPageViewModel>(new SettingsViewModel(settings, "/x/c.json"));
         Assert.True(page.HistoryEnabled);
-        var axaml = File.ReadAllText(RepoFile("src/RdpManager.Linux/Dialogs/Settings/PaginaAvvio.axaml"));
-        Assert.Contains("Registra la cronologia delle connessioni", axaml);
+        var axaml = File.ReadAllText(RepoFile("src/RdpManager.Linux/Dialogs/Settings/PaginaCronologia.axaml"));
+        Assert.Contains("Annota inizio, fine e motivo di ogni sessione", axaml);
         Assert.DoesNotContain("Ricorda le ultime connessioni", axaml);
     }
 

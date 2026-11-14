@@ -43,6 +43,8 @@ public sealed class ScorciatoiePageViewModel : SettingsPageViewModel
 
     public override string Title => "Scorciatoie";
 
+    public override string Subtitle => "Combinazioni di tasti";
+
     public IReadOnlyList<ShortcutEntry> Entries { get; }
 
     public RelayCommand ResetCommand { get; }

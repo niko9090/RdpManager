@@ -921,10 +921,10 @@ public class SettingsAndInfoTests
         vm.SettingsChanged += (_, _) => changed = true;
         dialogs.OnSettings = s =>
         {
-            s.Pages.OfType<AvvioPageViewModel>().Single().ReopenSessionsOnStartup = true;
-            s.Pages.OfType<AvvioPageViewModel>().Single().VerboseLog = true;
-            s.Pages.OfType<ElencoPageViewModel>().Single().ManualOrder = true;
-            s.Pages.OfType<AspettoPageViewModel>().Single().Theme = Choices.Pick(Choices.Theme, AppTheme.Dark);
+            s.Sections.OfType<AvvioPageViewModel>().Single().ReopenSessionsOnStartup = true;
+            s.Sections.OfType<AvvioPageViewModel>().Single().VerboseLog = true;
+            s.Sections.OfType<ElencoPageViewModel>().Single().ManualOrder = true;
+            s.Sections.OfType<AspettoPageViewModel>().Single().Theme = Choices.Pick(Choices.Theme, AppTheme.Dark);
             return s.Validate();
         };
 
@@ -938,10 +938,11 @@ public class SettingsAndInfoTests
     [Fact]
     public void La_pagina_avvio_ha_la_casella_di_riapertura_e_quella_della_cronologia_separate()
     {
-        var axaml = File.ReadAllText(SettingsViewModelTests.RepoFile("src/RdpManager.Linux/Dialogs/Settings/PaginaAvvio.axaml"));
-        Assert.Contains("Riapri all'avvio le sessioni lasciate aperte", axaml);
-        Assert.Contains("ReopenSessionsOnStartup", axaml);
-        Assert.Contains("Registra la cronologia delle connessioni", axaml);
+        var general = File.ReadAllText(SettingsViewModelTests.RepoFile("src/RdpManager.Linux/Dialogs/Settings/PaginaGenerale.axaml"));
+        var logs = File.ReadAllText(SettingsViewModelTests.RepoFile("src/RdpManager.Linux/Dialogs/Settings/PaginaCronologia.axaml"));
+        Assert.Contains("Riapri all'avvio le sessioni lasciate aperte", general);
+        Assert.Contains("ReopenSessionsOnStartup", general);
+        Assert.Contains("Annota inizio, fine e motivo di ogni sessione", logs);
         var settings = new AppSettings { ReopenSessionsOnStartup = false, HistoryEnabled = true };
         var page = new AvvioPageViewModel(settings, "/x/c.json");
         page.ReopenSessionsOnStartup = true;
@@ -954,7 +955,7 @@ public class SettingsAndInfoTests
     public void Le_pagine_aspetto_avvio_elenco_e_pin_hanno_contenuto_proprio()
     {
         var vm = new SettingsViewModel(new AppSettings(), "/x/c.json");
-        foreach (var page in vm.Pages.Take(4))
+        foreach (var page in vm.Pages)
             Assert.IsNotAssignableFrom<PlaceholderSettingsPageViewModel>(page);
         Assert.DoesNotContain("Notice", File.ReadAllText(SettingsViewModelTests.RepoFile("src/RdpManager.Linux/Dialogs/Settings/PaginaPin.axaml")));
     }

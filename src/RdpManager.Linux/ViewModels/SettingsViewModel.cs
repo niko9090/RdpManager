@@ -5,8 +5,8 @@ using RdpManager.Linux.ViewModels.Settings;
 namespace RdpManager.Linux.ViewModels;
 
 /// <summary>
-/// Impostazioni: un elenco di pagine, ciascuna con il proprio modello (cartella <c>ViewModels/Settings</c>) e la propria vista
-/// (cartella <c>Dialogs/Settings</c>). Per aggiungere una pagina: nuovo modello, nuova vista, una riga in <see cref="Pages"/>.
+/// Impostazioni: le stesse otto pagine di Windows (cartella <c>ViewModels/Settings</c> per i modelli, <c>Dialogs/Settings</c> per le viste).
+/// Per aggiungere una pagina: nuovo modello, nuova vista, una riga in <see cref="Pages"/> (e in <see cref="Sections"/> se scrive valori).
 /// </summary>
 public sealed class SettingsViewModel : ViewModelBase
 {
@@ -17,26 +17,39 @@ public sealed class SettingsViewModel : ViewModelBase
     public SettingsViewModel(AppSettings settings, string dataFilePath, IShellService? shell = null, IDialogService? dialogs = null)
     {
         DataFilePath = dataFilePath;
+        var look = new AspettoPageViewModel(settings);
+        var startup = new AvvioPageViewModel(settings, dataFilePath, shell);
+        var list = new ElencoPageViewModel(settings);
+        var tray = new VassoioPageViewModel(settings);
+        var pin = new PinPageViewModel(settings, dialogs);
+        var touch = look.Touch;
+        var display = look.Display;
+        var shortcuts = new ScorciatoiePageViewModel(settings);
+        var updates = new AggiornamentiPageViewModel(settings);
+        // Ogni modello di base una volta sola: è lui che scrive sulle impostazioni.
+        Sections = [look, touch, display, startup, list, tray, pin, shortcuts, updates];
+        // Le pagine mostrate sono quelle di Windows, nello stesso ordine.
         Pages =
         [
-            // Blocco A
-            new AspettoPageViewModel(settings),
-            new AvvioPageViewModel(settings, dataFilePath, shell),
-            new ElencoPageViewModel(settings),
-            new PinPageViewModel(settings, dialogs),
-            // Blocco B
-            new VassoioPageViewModel(settings),
-            new MonitorPageViewModel(settings),
-            new ToccoPageViewModel(settings),
-            new ScorciatoiePageViewModel(settings),
-            new AggiornamentiPageViewModel(settings),
+            new GeneralePageViewModel(tray, list, startup),
+            look,
+            new SchermoInteroPageViewModel(display),
+            touch,
+            shortcuts,
+            pin,
+            updates,
+            new CronologiaPageViewModel(startup),
         ];
         _selectedPage = Pages[0];
     }
 
     public string DataFilePath { get; }
 
+    /// <summary>Le pagine dell'elenco di sinistra (stesso ordine e stessi titoli di Windows).</summary>
     public IReadOnlyList<SettingsPageViewModel> Pages { get; }
+
+    /// <summary>I modelli che tengono i valori e li scrivono su Salva; una pagina può mostrarne più di uno.</summary>
+    public IReadOnlyList<SettingsPageViewModel> Sections { get; }
 
     public SettingsPageViewModel SelectedPage
     {
@@ -49,9 +62,20 @@ public sealed class SettingsViewModel : ViewModelBase
     /// </summary>
     public bool Validate()
     {
-        if (Pages.OfType<PinPageViewModel>().FirstOrDefault() is { } pin && !pin.Validate())
+        if (Sections.OfType<PinPageViewModel>().FirstOrDefault() is { } pin && !pin.Validate())
         {
             SelectedPage = pin;
+            return false;
+        }
+        // Come su Windows: combinazioni doppie o non valide non si salvano.
+        if (Sections.OfType<ScorciatoiePageViewModel>().FirstOrDefault() is { Problems.Length: > 0 } keys)
+        {
+            SelectedPage = keys;
+            return false;
+        }
+        if (Sections.OfType<VassoioPageViewModel>().FirstOrDefault() is { HotkeyError.Length: > 0 })
+        {
+            SelectedPage = Pages.OfType<GeneralePageViewModel>().First();
             return false;
         }
         return true;
@@ -60,7 +84,7 @@ public sealed class SettingsViewModel : ViewModelBase
     /// <summary>Scrive i valori scelti sulle impostazioni.</summary>
     public void Apply()
     {
-        foreach (var page in Pages)
-            page.Apply();
+        foreach (var section in Sections)
+            section.Apply();
     }
 }

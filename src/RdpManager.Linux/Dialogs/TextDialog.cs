@@ -22,7 +22,9 @@ public sealed class TextDialog : Window
         ok.Classes.Add("accent");
         ok.Click += (_, _) => Close(true);
 
+        // Come su Windows: OK (o Sì) a sinistra, Annulla (o No) a destra.
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8 };
+        buttons.Children.Add(ok);
         if (cancelText is not null)
         {
             var cancel = new Button { Content = cancelText, IsCancel = true, IsDefault = defaultNo, MinWidth = 96 };
@@ -31,7 +33,6 @@ public sealed class TextDialog : Window
             if (defaultNo)
                 Opened += (_, _) => cancel.Focus();
         }
-        buttons.Children.Add(ok);
 
         var panel = new StackPanel { Margin = new Thickness(20), Spacing = 16 };
         panel.Children.Add(new TextBlock { Text = message, TextWrapping = Avalonia.Media.TextWrapping.Wrap });

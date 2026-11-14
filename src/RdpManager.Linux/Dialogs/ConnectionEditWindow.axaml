@@ -4,121 +4,188 @@
         x:Class="RdpManager.Linux.Dialogs.ConnectionEditWindow"
         xmlns:d="using:RdpManager.Linux.Dialogs"
         x:DataType="vm:ConnectionEditViewModel"
-        Title="{Binding WindowTitle}" Width="560" Height="680" MinWidth="380" MinHeight="420" CanResize="True"
+        Title="{Binding WindowTitle}" Width="620" Height="680" MinWidth="380" MinHeight="420" CanResize="True"
         WindowStartupLocation="CenterOwner">
 
+  <Window.Styles>
+    <StyleInclude Source="avares://RdpManager.Linux/Dialogs/DialogStyles.axaml" />
+  </Window.Styles>
+
+  <!-- Stesse righe, nello stesso ordine e con le stesse etichette del dialogo di Windows (ConnectionDialog). -->
   <DockPanel>
     <Border DockPanel.Dock="Bottom" Classes="bar" BorderThickness="0,1,0,0" Padding="20,12">
       <StackPanel Spacing="8">
         <TextBlock Classes="error" Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+          <Button Content="OK" Click="OnSave" IsDefault="True" Classes="accent" MinWidth="96" />
           <Button Content="Annulla" Click="OnCancel" IsCancel="True" MinWidth="96" />
-          <Button Content="Salva" Click="OnSave" IsDefault="True" Classes="accent" MinWidth="96" />
         </StackPanel>
       </StackPanel>
     </Border>
 
     <ScrollViewer>
-      <StackPanel Spacing="10" Margin="20,10,20,20">
-        <Grid ColumnDefinitions="170,*">
-          <TextBlock Classes="label" Text="Nome" />
-          <TextBox Grid.Column="1" Text="{Binding Name}" Watermark="Nome mostrato nell'elenco" />
+      <StackPanel Spacing="6" Margin="20,12,20,20">
+        <Grid ColumnDefinitions="160,*">
+          <TextBlock Classes="rowLabel" Text="Nome" />
+          <TextBox Grid.Column="1" Width="280" HorizontalAlignment="Left" Text="{Binding Name}" />
         </Grid>
-        <Grid ColumnDefinitions="170,*">
-          <TextBlock Classes="label" Text="Computer" />
-          <TextBox Grid.Column="1" Text="{Binding Host}" Watermark="nome-pc, indirizzo IP o nome:porta" />
+        <Grid ColumnDefinitions="160,*">
+          <TextBlock Classes="rowLabel" Text="Host" />
+          <TextBox Grid.Column="1" Width="280" HorizontalAlignment="Left" Text="{Binding Host}" Watermark="nome-pc, indirizzo IP o nome:porta" />
         </Grid>
-        <Grid ColumnDefinitions="170,*">
-          <TextBlock Classes="label" Text="Porta" />
-          <TextBox Grid.Column="1" Text="{Binding Port}" Width="120" HorizontalAlignment="Left" />
+        <Grid ColumnDefinitions="160,*">
+          <TextBlock Classes="rowLabel" Text="Porta" />
+          <TextBox Grid.Column="1" Text="{Binding Port}" Width="90" HorizontalAlignment="Left" />
         </Grid>
-        <Grid ColumnDefinitions="170,*">
-          <TextBlock Classes="label" Text="Cartella" />
-          <AutoCompleteBox Grid.Column="1" Text="{Binding Group}" ItemsSource="{Binding Groups}" Watermark="Vuota = nessuna cartella (usa / per le sottocartelle)" />
+        <Grid ColumnDefinitions="160,*">
+          <TextBlock Classes="rowLabel" Text="Credenziali" />
+          <WrapPanel Grid.Column="1" Orientation="Horizontal">
+            <ComboBox Width="280" ItemsSource="{Binding Profiles}" SelectedItem="{Binding Profile}" />
+            <Button Classes="help">
+              <Button.Flyout>
+                <Flyout><TextBlock Classes="helpText" Text="«Proprie» usa utente, dominio e password qui sotto. Un profilo (menu Connessioni › Profili di credenziali) li prende da lì: cambiando il profilo cambiano tutte le connessioni che lo usano." /></Flyout>
+              </Button.Flyout>
+            </Button>
+          </WrapPanel>
         </Grid>
-        <Grid ColumnDefinitions="170,*">
-          <TextBlock Classes="label" Text="Etichetta" />
-          <TextBox Grid.Column="1" Text="{Binding Label}" Watermark="Per esempio PROD" MaxLength="12" />
+        <Grid ColumnDefinitions="160,*">
+          <TextBlock Classes="rowLabel" Text="Utente" />
+          <TextBox Grid.Column="1" Width="280" HorizontalAlignment="Left" Text="{Binding Username}" IsEnabled="{Binding OwnCredentials}" />
         </Grid>
-        <Grid ColumnDefinitions="170,*">
-          <TextBlock Classes="label" Text="Colore dell'etichetta" />
-          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-            <TextBox Text="{Binding Color}" Watermark="#RRGGBB (vuoto = nessuno)" Width="200" />
-            <Border Width="28" Height="28" CornerRadius="4" BorderThickness="1" VerticalAlignment="Center"
-                    BorderBrush="{DynamicResource AppBorderBrush}"
-                    Background="{Binding ColorPreview, Converter={x:Static d:HexBrushConverter.Instance}}" />
-          </StackPanel>
+        <Grid ColumnDefinitions="160,*">
+          <TextBlock Classes="rowLabel" Text="Dominio" />
+          <TextBox Grid.Column="1" Width="280" HorizontalAlignment="Left" Text="{Binding Domain}" IsEnabled="{Binding OwnCredentials}" />
         </Grid>
-        <Grid ColumnDefinitions="170,*"><CheckBox Grid.Column="1" Content="Preferita" IsChecked="{Binding IsFavorite}" /></Grid>
-        <TextBlock Classes="section" Text="Credenziali" />
-        <Grid ColumnDefinitions="170,*">
-          <TextBlock Classes="label" Text="Profilo" />
-          <ComboBox Grid.Column="1" ItemsSource="{Binding Profiles}" SelectedItem="{Binding Profile}" HorizontalAlignment="Stretch" />
+        <Grid ColumnDefinitions="160,*">
+          <TextBlock Classes="rowLabel" Text="Password" />
+          <WrapPanel Grid.Column="1" Orientation="Horizontal" ItemSpacing="8">
+            <TextBox Width="280" Text="{Binding Password}" PasswordChar="●" RevealPassword="{Binding ShowPassword}"
+                     Watermark="{Binding PasswordHint}" IsEnabled="{Binding OwnCredentials}" />
+            <CheckBox Content="Mostra" IsChecked="{Binding ShowPassword}" IsEnabled="{Binding OwnCredentials}" />
+          </WrapPanel>
         </Grid>
-        <Grid ColumnDefinitions="170,*">
-          <TextBlock Classes="label" Text="Utente" />
-          <TextBox Grid.Column="1" Text="{Binding Username}" IsEnabled="{Binding OwnCredentials}" />
+        <Grid ColumnDefinitions="160,*">
+          <TextBlock Grid.Column="1" Classes="note" MaxWidth="300" Margin="0" Text="Facoltativa. Viene salvata cifrata, solo per il tuo utente." />
         </Grid>
-        <Grid ColumnDefinitions="170,*">
-          <TextBlock Classes="label" Text="Dominio" />
-          <TextBox Grid.Column="1" Text="{Binding Domain}" IsEnabled="{Binding OwnCredentials}" />
-        </Grid>
-        <Grid ColumnDefinitions="170,*,Auto">
-          <TextBlock Classes="label" Text="Password" />
-          <TextBox Grid.Column="1" Text="{Binding Password}" PasswordChar="●" RevealPassword="{Binding ShowPassword}"
-                   Watermark="{Binding PasswordHint}" IsEnabled="{Binding OwnCredentials}" />
-          <CheckBox Grid.Column="2" Content="Mostra" IsChecked="{Binding ShowPassword}" IsEnabled="{Binding OwnCredentials}" Margin="8,0,0,0" />
-        </Grid>
-        <Grid ColumnDefinitions="170,*" IsVisible="{Binding PasswordWarning, Converter={x:Static ObjectConverters.IsNotNull}}">
+        <Grid ColumnDefinitions="160,*" IsVisible="{Binding PasswordWarning, Converter={x:Static ObjectConverters.IsNotNull}}">
           <TextBlock Grid.Column="1" Classes="error" Text="{Binding PasswordWarning}" />
         </Grid>
-        <TextBlock Classes="section" Text="Schermo e dispositivi" />
-        <Grid ColumnDefinitions="170,*">
-          <TextBlock Classes="label" Text="Risoluzione" />
-          <ComboBox Grid.Column="1" ItemsSource="{Binding ResolutionChoices}" SelectedItem="{Binding Resolution}" HorizontalAlignment="Stretch" />
+        <Grid ColumnDefinitions="160,*">
+          <TextBlock Classes="rowLabel" Text="Gateway" />
+          <WrapPanel Grid.Column="1" Orientation="Horizontal">
+            <CheckBox Content="Passa da un Remote Desktop Gateway" IsChecked="{Binding UseGateway}" />
+            <Button Classes="help">
+              <Button.Flyout>
+                <Flyout><TextBlock Classes="helpText" Text="Remote Desktop Gateway (RD Gateway): il PC remoto si raggiunge attraverso questo server, di solito da fuori dall'ufficio. Si salva anche nei file .rdp esportati." /></Flyout>
+              </Button.Flyout>
+            </Button>
+          </WrapPanel>
         </Grid>
-        <Grid ColumnDefinitions="170,*" IsVisible="{Binding FixedResolution}">
-          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-            <TextBox Text="{Binding DesktopWidth}" Width="110" Watermark="Larghezza" />
+        <Grid ColumnDefinitions="160,*">
+          <TextBox Grid.Column="1" Width="280" HorizontalAlignment="Left" Text="{Binding GatewayHost}" IsEnabled="{Binding UseGateway}"
+                   Watermark="gateway.azienda.it (o host:porta)" />
+        </Grid>
+        <Grid ColumnDefinitions="160,*">
+          <TextBlock Classes="rowLabel" Text="Credenziali gateway" />
+          <ComboBox Grid.Column="1" Width="280" HorizontalAlignment="Left" ItemsSource="{Binding GatewayProfiles}" SelectedItem="{Binding GatewayProfile}"
+                    IsEnabled="{Binding UseGateway}" />
+        </Grid>
+        <Grid ColumnDefinitions="160,*">
+          <TextBlock Classes="rowLabel" Text="Cartella" />
+          <AutoCompleteBox Grid.Column="1" Width="280" HorizontalAlignment="Left" Text="{Binding Group}" ItemsSource="{Binding Groups}" />
+        </Grid>
+        <Grid ColumnDefinitions="160,*">
+          <TextBlock Classes="rowLabel" Text="Risoluzione" />
+          <WrapPanel Grid.Column="1" Orientation="Horizontal" ItemSpacing="12">
+            <RadioButton GroupName="risoluzione" Content="Adatta alla finestra" IsChecked="{Binding FitResolution}" />
+            <RadioButton GroupName="risoluzione" Content="Fissa:" IsChecked="{Binding FixedResolution}" />
+            <TextBox Width="90" Text="{Binding DesktopWidth}" IsEnabled="{Binding FixedResolution}" />
             <TextBlock Text="×" VerticalAlignment="Center" />
-            <TextBox Text="{Binding DesktopHeight}" Width="110" Watermark="Altezza" />
-          </StackPanel>
+            <TextBox Width="90" Text="{Binding DesktopHeight}" IsEnabled="{Binding FixedResolution}" />
+          </WrapPanel>
         </Grid>
-        <Grid ColumnDefinitions="170,*"><CheckBox Grid.Column="1" Content="Usa la risoluzione della cartella" IsChecked="{Binding InheritFolderResolution}"
-                                                  ToolTip.Tip="Se la cartella ha una risoluzione impostata («Impostazioni della cartella…»), vale quella al posto di questa." /></Grid>
-        <Grid ColumnDefinitions="170,*"><CheckBox Grid.Column="1" Content="Usa tutti i monitor" IsChecked="{Binding UseAllMonitors}"
-                                                  ToolTip.Tip="A schermo intero la sessione occupa tutti i monitor come un unico desktop." /></Grid>
-        <Grid ColumnDefinitions="170,*">
-          <TextBlock Classes="label" Text="Audio" />
-          <ComboBox Grid.Column="1" ItemsSource="{Binding AudioChoices}" SelectedItem="{Binding Audio}" HorizontalAlignment="Stretch" />
+        <Grid ColumnDefinitions="160,*">
+          <WrapPanel Grid.Column="1" Orientation="Horizontal">
+            <CheckBox Content="Usa la risoluzione della cartella" IsChecked="{Binding InheritFolderResolution}" />
+            <Button Classes="help">
+              <Button.Flyout>
+                <Flyout><TextBlock Classes="helpText" Text="Se la cartella ha una risoluzione impostata («Impostazioni della cartella…»), vale quella al posto di questa." /></Flyout>
+              </Button.Flyout>
+            </Button>
+          </WrapPanel>
         </Grid>
-        <Grid ColumnDefinitions="170,*">
-          <TextBlock Classes="label" Text="Qualità" />
-          <ComboBox Grid.Column="1" ItemsSource="{Binding QualityChoices}" SelectedItem="{Binding Quality}" HorizontalAlignment="Stretch" />
+        <Grid ColumnDefinitions="160,*">
+          <TextBlock Classes="rowLabel" Text="Risorse" />
+          <WrapPanel Grid.Column="1" Orientation="Horizontal">
+            <CheckBox Content="Condividi appunti" IsChecked="{Binding RedirectClipboard}" Margin="0,0,12,0" />
+            <CheckBox Content="Condividi unità locali" IsChecked="{Binding RedirectDrives}" Margin="0,0,12,0" />
+            <CheckBox Content="Stampanti" IsChecked="{Binding RedirectPrinters}" Margin="0,0,12,0" />
+            <CheckBox Content="Microfono" IsChecked="{Binding RedirectMicrophone}" />
+          </WrapPanel>
         </Grid>
-        <Grid ColumnDefinitions="170,*"><CheckBox Grid.Column="1" Content="Condividi gli appunti" IsChecked="{Binding RedirectClipboard}" /></Grid>
-        <Grid ColumnDefinitions="170,*"><CheckBox Grid.Column="1" Content="Condividi le unità" IsChecked="{Binding RedirectDrives}" /></Grid>
-        <Grid ColumnDefinitions="170,*"><CheckBox Grid.Column="1" Content="Condividi le stampanti" IsChecked="{Binding RedirectPrinters}" /></Grid>
-        <Grid ColumnDefinitions="170,*"><CheckBox Grid.Column="1" Content="Condividi il microfono" IsChecked="{Binding RedirectMicrophone}" /></Grid>
-        <TextBlock Classes="section" Text="Rete" />
-        <Grid ColumnDefinitions="170,*"><CheckBox Grid.Column="1" Content="Riconnetti automaticamente" IsChecked="{Binding AutoReconnect}" /></Grid>
-        <Grid ColumnDefinitions="170,*" IsVisible="{Binding AutoReconnect}">
-          <TextBlock Classes="label" Text="Tentativi al massimo" />
-          <TextBox Grid.Column="1" Text="{Binding AutoReconnectMaxAttempts}" Width="80" HorizontalAlignment="Left" />
+        <Grid ColumnDefinitions="160,*">
+          <TextBlock Classes="rowLabel" Text="Audio" />
+          <ComboBox Grid.Column="1" Width="200" HorizontalAlignment="Left" ItemsSource="{Binding AudioChoices}" SelectedItem="{Binding Audio}" />
         </Grid>
-        <Grid ColumnDefinitions="170,*"><CheckBox Grid.Column="1" Content="Tieni sveglia la sessione" IsChecked="{Binding KeepAlive}" /></Grid>
-        <Grid ColumnDefinitions="170,*"><CheckBox Grid.Column="1" Content="Passa da un Remote Desktop Gateway" IsChecked="{Binding UseGateway}" /></Grid>
-        <Grid ColumnDefinitions="170,*" IsVisible="{Binding UseGateway}">
-          <TextBlock Classes="label" Text="Gateway" />
-          <TextBox Grid.Column="1" Text="{Binding GatewayHost}" Watermark="Host del gateway (anche host:porta)" />
+        <Grid ColumnDefinitions="160,*">
+          <TextBlock Classes="rowLabel" Text="Qualità" />
+          <WrapPanel Grid.Column="1" Orientation="Horizontal">
+            <ComboBox Width="260" ItemsSource="{Binding QualityChoices}" SelectedItem="{Binding Quality}" Margin="0,0,12,0" />
+            <CheckBox Content="Tieni sveglia la sessione" IsChecked="{Binding KeepAlive}" />
+            <Button Classes="help">
+              <Button.Flyout>
+                <Flyout><TextBlock Classes="helpText" Text="Rete locale: 32 bit e tutti gli effetti. Connessione lenta: 16 bit, niente sfondo, animazioni e temi, compressione. Automatica: decide il client misurando la rete. «Tieni sveglia» manda un segnale ogni minuto per evitare le disconnessioni per inattività di router e firewall." /></Flyout>
+              </Button.Flyout>
+            </Button>
+          </WrapPanel>
         </Grid>
-        <Grid ColumnDefinitions="170,*" IsVisible="{Binding UseGateway}">
-          <TextBlock Classes="label" Text="Credenziali del gateway" />
-          <ComboBox Grid.Column="1" ItemsSource="{Binding GatewayProfiles}" SelectedItem="{Binding GatewayProfile}" HorizontalAlignment="Stretch" />
+        <Grid ColumnDefinitions="160,*">
+          <TextBlock Classes="rowLabel" Text="Monitor" />
+          <WrapPanel Grid.Column="1" Orientation="Horizontal">
+            <CheckBox Content="Usa tutti i monitor" IsChecked="{Binding UseAllMonitors}" />
+            <Button Classes="help">
+              <Button.Flyout>
+                <Flyout><TextBlock Classes="helpText" Text="A schermo intero la sessione occupa tutti i monitor come un unico desktop." /></Flyout>
+              </Button.Flyout>
+            </Button>
+          </WrapPanel>
         </Grid>
-        <Grid ColumnDefinitions="170,*">
-          <TextBlock Classes="label" Text="Indirizzo MAC" />
-          <TextBox Grid.Column="1" Text="{Binding MacAddress}" Watermark="AA:BB:CC:DD:EE:FF (per accendere il computer)" />
+        <Grid ColumnDefinitions="160,*">
+          <TextBlock Classes="rowLabel" Text="Riconnessione" />
+          <WrapPanel Grid.Column="1" Orientation="Horizontal">
+            <CheckBox Content="Riconnetti da sola, al massimo" IsChecked="{Binding AutoReconnect}" />
+            <TextBox Width="60" Text="{Binding AutoReconnectMaxAttempts}" IsEnabled="{Binding AutoReconnect}" Margin="4,0,6,0" />
+            <TextBlock Text="volte" VerticalAlignment="Center" />
+            <Button Classes="help">
+              <Button.Flyout>
+                <Flyout><TextBlock Classes="helpText" Text="Dopo una disconnessione non voluta (rete, server riavviato) l'app ritenta con attese crescenti: 2, 4, 8, 16, 30 secondi. Non ritenta se hai chiuso tu la sessione o se le credenziali sono sbagliate." /></Flyout>
+              </Button.Flyout>
+            </Button>
+          </WrapPanel>
+        </Grid>
+        <Grid ColumnDefinitions="160,*">
+          <TextBlock Classes="rowLabel" Text="Elenco" />
+          <WrapPanel Grid.Column="1" Orientation="Horizontal">
+            <CheckBox Content="Preferita ★" IsChecked="{Binding IsFavorite}" Margin="0,0,12,0" />
+            <TextBlock Text="Etichetta" VerticalAlignment="Center" Margin="0,0,6,0" />
+            <TextBox Width="90" Text="{Binding Label}" MaxLength="12" Watermark="es. PROD" />
+            <Border Width="24" Height="24" Margin="8,0" BorderThickness="1" VerticalAlignment="Center"
+                    BorderBrush="{DynamicResource AppBorderBrush}"
+                    Background="{Binding ColorPreview, Converter={x:Static d:HexBrushConverter.Instance}}" />
+            <TextBox Width="110" Text="{Binding Color}" Watermark="#RRGGBB" />
+            <Button Content="Nessuno" Command="{Binding ClearColorCommand}" Margin="8,0,0,0" />
+          </WrapPanel>
+        </Grid>
+        <Grid ColumnDefinitions="160,*">
+          <TextBlock Classes="rowLabel" Text="MAC" />
+          <WrapPanel Grid.Column="1" Orientation="Horizontal">
+            <TextBox Width="160" Text="{Binding MacAddress}" Watermark="AA:BB:CC:DD:EE:FF" />
+            <Button Classes="help">
+              <Button.Flyout>
+                <Flyout><TextBlock Classes="helpText" Text="Indirizzo della scheda di rete del PC remoto, per accenderlo con Wake-on-LAN (menu Connessioni › Accendi). Il PC deve avere il Wake-on-LAN attivo ed essere nella stessa rete." /></Flyout>
+              </Button.Flyout>
+            </Button>
+          </WrapPanel>
         </Grid>
       </StackPanel>
     </ScrollViewer>

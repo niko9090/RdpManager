@@ -3,11 +3,15 @@
              xmlns:vm="using:RdpManager.Linux.ViewModels.Settings"
              x:Class="RdpManager.Linux.Dialogs.Settings.PaginaAggiornamenti"
              x:DataType="vm:AggiornamentiPageViewModel">
-  <!-- Pagina Impostazioni «Aggiornamenti» (blocco B). -->
-  <StackPanel Spacing="10">
-    <TextBlock Classes="section" Margin="0,0,0,4" Text="Aggiornamenti" />
-    <Grid ColumnDefinitions="170,*"><TextBlock Classes="label" Text="Aggiornamenti" /><ComboBox Grid.Column="1" ItemsSource="{Binding UpdateChoices}" SelectedItem="{Binding Update}" HorizontalAlignment="Stretch" /></Grid>
-    <TextBlock Text="{Binding Version}" />
-    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding Note}" />
+  <!-- Pagina «Aggiornamenti» (solo aspetto: la logica di aggiornamento non cambia). Le tre scelte sono a pallino come su Windows. -->
+  <StackPanel Classes="group">
+    <TextBlock Classes="groupTitle" Text="Controllo degli aggiornamenti" />
+    <StackPanel Classes="groupBody">
+      <RadioButton GroupName="aggiornamenti" Content="Automatici con conferma: controlla in sottofondo, poi avvisa" IsChecked="{Binding AutoMode}" />
+      <RadioButton GroupName="aggiornamenti" Content="Solo avviso nella barra di stato" IsChecked="{Binding NotifyMode}" />
+      <RadioButton GroupName="aggiornamenti" Content="Spenti (resta «Aiuto › Controlla aggiornamenti»)" IsChecked="{Binding OffMode}" />
+      <TextBlock Classes="note" Text="{Binding Note}" />
+      <TextBlock Text="{Binding Version}" />
+    </StackPanel>
   </StackPanel>
 </UserControl>

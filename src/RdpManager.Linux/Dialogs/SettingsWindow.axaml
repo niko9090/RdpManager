@@ -8,11 +8,15 @@
         Title="Impostazioni" Width="720" Height="520" MinWidth="520" MinHeight="380"
         WindowStartupLocation="CenterOwner">
 
+  <Window.Styles>
+    <StyleInclude Source="avares://RdpManager.Linux/Dialogs/DialogStyles.axaml" />
+  </Window.Styles>
+
   <DockPanel>
     <Border DockPanel.Dock="Bottom" Classes="bar" BorderThickness="0,1,0,0" Padding="20,12">
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
-        <Button Content="Annulla" Click="OnCancel" IsCancel="True" MinWidth="96" />
         <Button Content="Salva" Click="OnSave" IsDefault="True" Classes="accent" MinWidth="96" />
+        <Button Content="Annulla" Click="OnCancel" IsCancel="True" MinWidth="96" />
       </StackPanel>
     </Border>
 
@@ -27,8 +31,14 @@
       </ListBox>
     </Border>
 
+    <!-- Intestazione fissa (titolo e sottotitolo della pagina, come su Windows); sotto, la pagina che scorre. -->
+    <StackPanel DockPanel.Dock="Top" Margin="16,12,16,4">
+      <TextBlock Classes="pageTitle" Text="{Binding SelectedPage.Title}" />
+      <TextBlock Classes="pageSubtitle" Text="{Binding SelectedPage.Subtitle}" />
+    </StackPanel>
+
     <ScrollViewer>
-      <ContentControl Content="{Binding SelectedPage}" Margin="20">
+      <ContentControl Content="{Binding SelectedPage}" Margin="16,8,16,16">
         <ContentControl.DataTemplates>
           <pages:SettingsPageTemplate />
         </ContentControl.DataTemplates>

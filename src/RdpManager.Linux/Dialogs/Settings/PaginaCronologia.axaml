@@ -1,0 +1,27 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:RdpManager.Linux.ViewModels.Settings"
+             x:Class="RdpManager.Linux.Dialogs.Settings.PaginaCronologia"
+             x:DataType="vm:CronologiaPageViewModel">
+  <!-- Pagina «Cronologia e log» (come Windows); il gruppo «Dati» c'è solo su Linux (il file dei dati si condivide con Windows). -->
+  <StackPanel>
+    <StackPanel Classes="group">
+      <TextBlock Classes="groupTitle" Text="Cronologia e log" />
+      <StackPanel Classes="groupBody">
+        <CheckBox Content="Annota inizio, fine e motivo di ogni sessione" IsChecked="{Binding Logs.HistoryEnabled}" />
+        <CheckBox Content="Log dettagliato (anche gli indirizzi dei PC; mai le password)" IsChecked="{Binding Logs.VerboseLog}" />
+        <TextBlock Classes="note" Text="{Binding Logs.LogFolderNote}" />
+        <Button Content="Apri la cartella dei log" Command="{Binding Logs.OpenLogFolderCommand}" HorizontalAlignment="Left" />
+      </StackPanel>
+    </StackPanel>
+
+    <StackPanel Classes="group">
+      <TextBlock Classes="groupTitle" Text="Dati" />
+      <StackPanel Classes="groupBody">
+        <TextBlock Classes="note" Text="File dei dati (lo stesso dell'app Windows, per la sincronizzazione)" />
+        <TextBox Text="{Binding Logs.DataFilePath, Mode=OneWay}" IsReadOnly="True" />
+        <Button Content="Apri la cartella dei dati" Command="{Binding Logs.OpenDataFolderCommand}" HorizontalAlignment="Left" />
+      </StackPanel>
+    </StackPanel>
+  </StackPanel>
+</UserControl>

@@ -6,7 +6,7 @@ namespace RdpManager.Linux.ViewModels;
 /// <summary>Modulo di modifica di una connessione: lavora su una copia e scrive sull'originale solo con <see cref="TryCommit"/>.</summary>
 public sealed class ConnectionEditViewModel : ViewModelBase
 {
-    private static readonly ChoiceItem<Guid?> NoProfile = new(null, "(nessuno: credenziali proprie)");
+    private static readonly ChoiceItem<Guid?> NoProfile = new(null, "Proprie (qui sotto)");
 
     private readonly ConnectionsDocument _doc;
     private readonly RdpConnection _target;
@@ -55,7 +55,7 @@ public sealed class ConnectionEditViewModel : ViewModelBase
         _audio = Choices.Pick(Choices.Audio, connection.AudioMode);
         _quality = Choices.Pick(Choices.Quality, connection.Quality);
 
-        Profiles = [NoProfile, .. doc.CredentialProfiles.Select(p => new ChoiceItem<Guid?>(p.Id, p.DisplayName))];
+        Profiles = [NoProfile, .. doc.CredentialProfiles.Select(p => new ChoiceItem<Guid?>(p.Id, "Profilo: " + p.DisplayName))];
         _profile = Profiles.FirstOrDefault(p => p.Value is not null && p.Value == connection.CredentialProfileId) ?? NoProfile;
         GatewayProfiles = [SameGatewayCredentials, .. doc.CredentialProfiles.Select(p => new ChoiceItem<Guid?>(p.Id, "Profilo: " + p.DisplayName))];
         _gatewayProfile = connection.GatewayCredentials == GatewayCredentialsSource.Profile
@@ -63,7 +63,11 @@ public sealed class ConnectionEditViewModel : ViewModelBase
             : SameGatewayCredentials;
         Groups = doc.AllGroups();
         _gatewayTouched = false;
+        ClearColorCommand = new RelayCommand(() => Color = "", () => ColorPreview is not null);
     }
+
+    /// <summary>Pulsante «Nessuno» accanto al colore dell'etichetta.</summary>
+    public RelayCommand ClearColorCommand { get; }
 
     private static readonly ChoiceItem<Guid?> SameGatewayCredentials = new(null, "Le stesse della connessione");
 
@@ -82,7 +86,14 @@ public sealed class ConnectionEditViewModel : ViewModelBase
     public string Color
     {
         get => _color;
-        set { if (Set(ref _color, value)) OnPropertyChanged(nameof(ColorPreview)); }
+        set
+        {
+            if (Set(ref _color, value))
+            {
+                OnPropertyChanged(nameof(ColorPreview));
+                ClearColorCommand?.RaiseCanExecuteChanged();
+            }
+        }
     }
 
     /// <summary>Il colore normalizzato per l'anteprima, null se vuoto o non valido.</summary>
@@ -159,7 +170,14 @@ public sealed class ConnectionEditViewModel : ViewModelBase
     public ChoiceItem<ResolutionMode> Resolution
     {
         get => _resolution;
-        set { if (Set(ref _resolution, value)) OnPropertyChanged(nameof(FixedResolution)); }
+        set
+        {
+            if (Set(ref _resolution, value))
+            {
+                OnPropertyChanged(nameof(FixedResolution));
+                OnPropertyChanged(nameof(FitResolution));
+            }
+        }
     }
 
     public ChoiceItem<AudioMode> Audio { get => _audio; set => Set(ref _audio, value); }
@@ -177,7 +195,19 @@ public sealed class ConnectionEditViewModel : ViewModelBase
         }
     }
 
-    public bool FixedResolution => _resolution.Value == ResolutionMode.Fixed;
+    /// <summary>Opzione «Fissa:» (larghezza × altezza), come su Windows.</summary>
+    public bool FixedResolution
+    {
+        get => _resolution.Value == ResolutionMode.Fixed;
+        set { if (value) Resolution = Choices.Pick(Choices.Resolution, ResolutionMode.Fixed); }
+    }
+
+    /// <summary>Opzione «Adatta alla finestra».</summary>
+    public bool FitResolution
+    {
+        get => _resolution.Value == ResolutionMode.FitToWindow;
+        set { if (value) Resolution = Choices.Pick(Choices.Resolution, ResolutionMode.FitToWindow); }
+    }
 
     /// <summary>Motivo per cui la conferma è stata rifiutata, null se non ce n'è.</summary>
     public string? Error { get => _error; private set => Set(ref _error, value); }

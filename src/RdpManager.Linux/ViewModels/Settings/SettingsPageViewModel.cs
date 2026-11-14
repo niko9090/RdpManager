@@ -9,6 +9,9 @@ public abstract class SettingsPageViewModel : ViewModelBase
     /// <summary>Titolo nell'elenco di navigazione a sinistra.</summary>
     public abstract string Title { get; }
 
+    /// <summary>Riga sotto il titolo nell'intestazione della pagina (come su Windows).</summary>
+    public virtual string Subtitle => "";
+
     /// <summary>Scrive i valori scelti nelle impostazioni (chiamato quando si preme Salva).</summary>
     public abstract void Apply();
 }

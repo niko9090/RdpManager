@@ -25,7 +25,9 @@ public sealed class PinPageViewModel : SettingsPageViewModel
         RemovePinCommand = new RelayCommand(() => _ = RunAsync(RemovePinAsync), () => _pin is not null);
     }
 
-    public override string Title => "PIN";
+    public override string Title => "Sicurezza";
+
+    public override string Subtitle => "Blocco dell'app con il PIN";
 
     public string Note => "Si salva solo un'impronta del PIN (PBKDF2). Da bloccata RdpManager nasconde le sessioni, tiene le password cifrate e non apre " +
                           "sessioni nuove. Se dimentichi il PIN le connessioni restano, le password vanno reinserite.";

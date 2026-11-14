@@ -51,6 +51,10 @@ public sealed class WorkspacesViewModel : ViewModelBase
         OpenCommand = new RelayCommand(OpenSelected, () => Selected is not null);
         DeleteCommand = new RelayCommand(() => _ = DeleteSelectedAsync(), () => Selected is not null);
         ApplyShortcutCommand = new RelayCommand(ApplyShortcut, () => Selected is not null);
+        RenameCommand = new RelayCommand(() => _ = RenameSelectedAsync(), () => Selected is not null);
+        ShortcutCommand = new RelayCommand(() => _ = AskShortcutAsync(), () => Selected is not null);
+        MoveUpCommand = new RelayCommand(() => MoveSelected(-1), () => Selected is not null);
+        MoveDownCommand = new RelayCommand(() => MoveSelected(+1), () => Selected is not null);
         Reload();
     }
 
@@ -59,6 +63,12 @@ public sealed class WorkspacesViewModel : ViewModelBase
     public RelayCommand OpenCommand { get; }
     public RelayCommand DeleteCommand { get; }
     public RelayCommand ApplyShortcutCommand { get; }
+
+    /// <summary>«Rinomina…», «Scorciatoia…», «Su» e «Giù»: gli stessi pulsanti del dialogo di Windows.</summary>
+    public RelayCommand RenameCommand { get; }
+    public RelayCommand ShortcutCommand { get; }
+    public RelayCommand MoveUpCommand { get; }
+    public RelayCommand MoveDownCommand { get; }
 
     public WorkspaceItem? Selected
     {
@@ -71,6 +81,10 @@ public sealed class WorkspacesViewModel : ViewModelBase
             OpenCommand.RaiseCanExecuteChanged();
             DeleteCommand.RaiseCanExecuteChanged();
             ApplyShortcutCommand.RaiseCanExecuteChanged();
+            RenameCommand.RaiseCanExecuteChanged();
+            ShortcutCommand.RaiseCanExecuteChanged();
+            MoveUpCommand.RaiseCanExecuteChanged();
+            MoveDownCommand.RaiseCanExecuteChanged();
         }
     }
 
@@ -79,15 +93,17 @@ public sealed class WorkspacesViewModel : ViewModelBase
 
     public string Message { get => _message; private set => Set(ref _message, value); }
 
+    public string Intro => "Uno spazio di lavoro riapre le sue connessioni con lo stesso layout. Si salva da Spazi di lavoro › Salva lo spazio attuale.";
+
     public bool IsEmpty => Items.Count == 0;
 
-    public string EmptyText => "Nessuno spazio di lavoro salvato. Apri le connessioni che ti servono e scegli «Spazi di lavoro → Salva lo spazio attuale».";
+    public string EmptyText => "Nessuno spazio di lavoro salvato. Apri le connessioni che ti servono e scegli «Spazi di lavoro › Salva lo spazio attuale».";
 
     public void Reload()
     {
         var keep = Selected?.Workspace;
         Items.Clear();
-        foreach (var ws in _doc.Workspaces.OrderBy(w => w.Name, StringComparer.CurrentCultureIgnoreCase))
+        foreach (var ws in _doc.Workspaces)
             Items.Add(new WorkspaceItem(ws, ws.Connections.Count(id => _doc.Find(id) is not null)));
         Selected = Items.FirstOrDefault(i => i.Workspace == keep) ?? Items.FirstOrDefault();
         OnPropertyChanged(nameof(IsEmpty));
@@ -99,11 +115,50 @@ public sealed class WorkspacesViewModel : ViewModelBase
             _open(item.Workspace);
     }
 
+    /// <summary>Chiede il nuovo nome e lo salva (come «Rinomina…» su Windows).</summary>
+    public async Task RenameSelectedAsync()
+    {
+        if (Selected is not { } item)
+            return;
+        if (await _dialogs.PromptAsync("Rinomina", "Nome dello spazio di lavoro:", item.Name) is not { Length: > 0 } name)
+            return;
+        item.Workspace.Name = name.Trim();
+        _save();
+        Reload();
+    }
+
+    /// <summary>Chiede la combinazione e la assegna (come «Scorciatoia…» su Windows).</summary>
+    public async Task AskShortcutAsync()
+    {
+        if (Selected is not { } item)
+            return;
+        var text = await _dialogs.PromptAsync("Scorciatoia", "Combinazione (es. Ctrl+Alt+Maiusc+1; vuoto = nessuna):", item.Workspace.Shortcut);
+        if (text is null)
+            return;
+        Shortcut = text;
+        ApplyShortcut();
+    }
+
+    /// <summary>Sposta di un posto lo spazio scelto (su = -1, giù = +1) nell'ordine salvato.</summary>
+    public void MoveSelected(int delta)
+    {
+        if (Selected is not { } item)
+            return;
+        int from = _doc.Workspaces.IndexOf(item.Workspace), to = Math.Clamp(from + delta, 0, _doc.Workspaces.Count - 1);
+        if (from < 0 || from == to)
+            return;
+        _doc.Workspaces.RemoveAt(from);
+        _doc.Workspaces.Insert(to, item.Workspace);
+        _save();
+        Reload();
+        Selected = Items.FirstOrDefault(i => i.Workspace == item.Workspace);
+    }
+
     public async Task DeleteSelectedAsync()
     {
         if (Selected is not { } item)
             return;
-        if (!await _dialogs.ConfirmDestructiveAsync("Elimina spazio di lavoro", $"Eliminare lo spazio di lavoro «{item.Name}»? Le connessioni non vengono toccate."))
+        if (!await _dialogs.ConfirmDestructiveAsync("Elimina spazio di lavoro", $"Eliminare lo spazio di lavoro «{item.Name}»? Le connessioni restano."))
             return;
         _doc.Workspaces.Remove(item.Workspace);
         _save();

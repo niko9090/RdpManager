@@ -52,8 +52,8 @@ internal sealed class FolderSettingsWindow : ToolWindow
             DialogKit.Error());
         Content = DialogKit.Frame(new ScrollViewer { Content = body },
             DialogKit.Buttons(
-                DialogKit.Button("Annulla", (_, _) => Close(false), isCancel: true),
-                DialogKit.Button("OK", (_, _) => { if (vm.TryCommit()) Close(true); }, accent: true, isDefault: true)));
+                DialogKit.Button("OK", (_, _) => { if (vm.TryCommit()) Close(true); }, accent: true, isDefault: true),
+                DialogKit.Button("Annulla", (_, _) => Close(false), isCancel: true)));
     }
 
     private static readonly AvaloniaProperty ToggleButton_IsChecked = Avalonia.Controls.Primitives.ToggleButton.IsCheckedProperty;
@@ -69,8 +69,8 @@ internal sealed class PinSetWindow : ToolWindow
         var body = DialogKit.Page(DialogKit.Row("PIN", pin, 80), DialogKit.Row("Ripeti", confirm, 80),
             DialogKit.Label(vm.Note, "muted"), DialogKit.Error());
         Content = DialogKit.Frame(body, DialogKit.Buttons(
-            DialogKit.Button("Annulla", (_, _) => Close(false), isCancel: true),
-            DialogKit.Button("OK", (_, _) => { if (vm.TryCommit()) Close(true); }, accent: true, isDefault: true)));
+            DialogKit.Button("OK", (_, _) => { if (vm.TryCommit()) Close(true); }, accent: true, isDefault: true),
+            DialogKit.Button("Annulla", (_, _) => Close(false), isCancel: true)));
         Opened += (_, _) => pin.Focus();
     }
 }
@@ -228,8 +228,8 @@ internal sealed class RdpmExportWindow : ToolWindow
         items.AddRange([without, with, DialogKit.Row("Password del file", pw), DialogKit.Row("Ripeti", again), DialogKit.Label(vm.CipherNote, "muted"),
             settings, DialogKit.Label(vm.SettingsNote, "muted"), DialogKit.Error()]);
         Content = DialogKit.Frame(new ScrollViewer { Content = DialogKit.Page([.. items]) }, DialogKit.Buttons(
-            DialogKit.Button("Annulla", (_, _) => Close(false), isCancel: true),
-            DialogKit.Button("Esporta…", async (_, _) => { if (await vm.TryAcceptAsync()) Close(true); }, accent: true, isDefault: true)));
+            DialogKit.Button("Esporta…", async (_, _) => { if (await vm.TryAcceptAsync()) Close(true); }, accent: true, isDefault: true),
+            DialogKit.Button("Annulla", (_, _) => Close(false), isCancel: true)));
     }
 }
 
@@ -246,8 +246,8 @@ internal sealed class RdpmImportWindow : ToolWindow
             .Bind(Avalonia.Controls.Primitives.ToggleButton.IsCheckedProperty, nameof(vm.ApplySettings), BindingMode.TwoWay);
         Content = DialogKit.Frame(new ScrollViewer { Content = DialogKit.Page(DialogKit.Label(vm.Summary), merge, DialogKit.Label(vm.MergeNote, "muted"), replace, settings) },
             DialogKit.Buttons(
-                DialogKit.Button("Annulla", (_, _) => Close(false), isCancel: true),
-                DialogKit.Button("Importa", async (_, _) => { if (await vm.TryAcceptAsync()) Close(true); }, accent: true, isDefault: true)));
+                DialogKit.Button("Importa", async (_, _) => { if (await vm.TryAcceptAsync()) Close(true); }, accent: true, isDefault: true),
+                DialogKit.Button("Annulla", (_, _) => Close(false), isCancel: true)));
     }
 }
 
@@ -294,7 +294,7 @@ internal sealed class CsvImportWindow : ToolWindow
         import.Bind(ContentControl.ContentProperty, nameof(vm.ImportLabel));
         import.Bind(IsEnabledProperty, nameof(vm.CanImport));
         import.Click += (_, _) => Close(true);
-        Content = DialogKit.Frame(list, DialogKit.Buttons(DialogKit.Button("Annulla", (_, _) => Close(false), isCancel: true), import), top);
+        Content = DialogKit.Frame(list, DialogKit.Buttons(import, DialogKit.Button("Annulla", (_, _) => Close(false), isCancel: true)), top);
     }
 }
 

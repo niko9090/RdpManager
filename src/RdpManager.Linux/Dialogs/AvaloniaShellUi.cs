@@ -98,7 +98,7 @@ public sealed class AvaloniaShellUi : IShellUi
             {
                 new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
                 input,
-                new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Children = { cancel, ok } },
+                new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Children = { ok, cancel } },
             },
         };
         return await window.ShowDialogTracked<bool>(RequireOwner()) ? input.Text : null;
