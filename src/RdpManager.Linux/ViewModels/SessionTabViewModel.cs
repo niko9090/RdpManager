@@ -11,8 +11,15 @@ public sealed class SessionTabViewModel : ViewModelBase
     {
         Session = session;
         CloseCommand = new RelayCommand(() => close(this));
-        session.TitleChanged += (_, _) => OnPropertyChanged(nameof(Title));
+        session.TitleChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(Title));
+            OnPropertyChanged(nameof(StateColor));
+        };
     }
+
+    /// <summary>Pallino dello stato nella linguetta, come in Windows: verde se collegata, rosso se disconnessa.</summary>
+    public string StateColor => IsConnected ? "#2EA043" : "#C83C32";
 
     public ISession Session { get; }
 

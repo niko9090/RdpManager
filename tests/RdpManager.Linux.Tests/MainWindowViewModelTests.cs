@@ -217,7 +217,48 @@ public class MainWindowViewModelTests
         Assert.Equal(2, saved.Connections.Count);
         Assert.Contains(saved.Connections, c => c.Name == "Originale (copia)");
         Assert.Single(saved.Favorites());
-        Assert.StartsWith("★ ", Node(vm, "★ Originale").Title);
+        // Come in Windows: niente stella nel nome, il preferito compare nella sezione «Preferiti» in cima.
+        Assert.Equal("Preferiti", vm.Roots[0].Title);
+        Assert.True(vm.Roots[0].IsSection);
+        Assert.Equal(["Originale"], vm.Roots[0].Children.Select(n => n.Title));
+    }
+
+    [Fact]
+    public void Sezioni_rapide_in_cima_e_righe_vere_trovate_per_prime()
+    {
+        using var data = new TempData();
+        var fav = Seed.Conn("Alfa", "a");
+        fav.IsFavorite = true;
+        Seed.Write(data.Store, fav, Seed.Conn("Beta", "b"));
+        var vm = Seed.Main(data);
+
+        Assert.Equal("Preferiti", vm.Roots[0].Title);
+        Assert.Equal(["q:Preferiti:"], All(vm.Roots).Where(n => n.Title == "Alfa" && n.Key.StartsWith("q:")).Select(n => n.Key[..12]));
+        Assert.Single(All(vm.Roots), n => n.Title == "Alfa" && n.Key.StartsWith("c:")); // la riga vera c'è, oltre alla copia in «Preferiti»
+
+        // La sezione non si modifica né si elimina (non è una cartella).
+        vm.SelectedNode = vm.Roots[0];
+        Assert.False(vm.EditCommand.CanExecute(null));
+        Assert.False(vm.DeleteCommand.CanExecute(null));
+        Assert.False(vm.ConnectCommand.CanExecute(null));
+
+        // Durante la ricerca le sezioni spariscono.
+        vm.SearchText = "Alfa";
+        Assert.DoesNotContain(vm.Roots, n => n.IsSection);
+    }
+
+    [Fact]
+    public void Barra_di_stato_e_titolo_come_Windows()
+    {
+        using var data = new TempData();
+        Seed.Write(data.Store, Seed.Conn("Alfa", "a"), Seed.Conn("Beta", "b"));
+        var vm = Seed.Main(data);
+
+        Assert.Equal("2 connessioni salvate · 0 sessioni aperte (0 connesse)", vm.StatusSummary);
+        Assert.Equal(vm.SidebarPinned ? "A comparsa" : "Fissa", vm.PinButtonText);
+        Assert.StartsWith("RdpManager ", vm.WindowTitle);
+        Assert.EndsWith(" - Desktop remoti", vm.WindowTitle);
+        Assert.StartsWith("Nessuna sessione aperta.", vm.EmptyHint);
     }
 
     [Fact]

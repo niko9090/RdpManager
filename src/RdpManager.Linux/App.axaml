@@ -6,34 +6,117 @@
   <Application.Resources>
     <ResourceDictionary>
       <ResourceDictionary.ThemeDictionaries>
+        <!-- Gli stessi colori del programma Windows (src/RdpManager/UI/Theme.cs): chiaro = colori di sistema di Windows
+             (Window, Control, ControlText, GrayText, ControlDark, Highlight), scuro = tavolozza di ThemeManager.Dark. -->
         <ResourceDictionary x:Key="Light">
-          <Color x:Key="AppAccent">#2563EB</Color>
-          <SolidColorBrush x:Key="AppAccentBrush" Color="#2563EB" />
-          <SolidColorBrush x:Key="AppSidebarBrush" Color="#F3F5F9" />
-          <SolidColorBrush x:Key="AppBarBrush" Color="#FFFFFF" />
-          <SolidColorBrush x:Key="AppSurfaceBrush" Color="#FAFBFD" />
-          <SolidColorBrush x:Key="AppBorderBrush" Color="#D9DEE7" />
-          <SolidColorBrush x:Key="AppMutedBrush" Color="#6B7280" />
-          <SolidColorBrush x:Key="AppDangerBrush" Color="#C62828" />
+          <Color x:Key="AppAccent">#0078D7</Color>
+          <Color x:Key="SystemAccentColor">#0078D7</Color>
+          <SolidColorBrush x:Key="AppAccentBrush" Color="#0078D7" />
+          <SolidColorBrush x:Key="AppHighlightTextBrush" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="AppSidebarBrush" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="AppBarBrush" Color="#F0F0F0" />
+          <SolidColorBrush x:Key="AppSurfaceBrush" Color="#F0F0F0" />
+          <SolidColorBrush x:Key="AppInputBrush" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="AppTextBrush" Color="#000000" />
+          <SolidColorBrush x:Key="AppBorderBrush" Color="#A0A0A0" />
+          <SolidColorBrush x:Key="AppMutedBrush" Color="#6D6D6D" />
+          <SolidColorBrush x:Key="AppDangerBrush" Color="#B22222" />
+          <!-- Pulsanti, caselle di testo ed elenchi come i controlli di Windows Forms (stato normale, sopra, premuto). -->
+          <SolidColorBrush x:Key="ButtonBackground" Color="#E1E1E1" />
+          <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#E5F1FB" />
+          <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#CCE4F7" />
+          <SolidColorBrush x:Key="ButtonBackgroundDisabled" Color="#CCCCCC" />
+          <SolidColorBrush x:Key="ButtonBorderBrush" Color="#ADADAD" />
+          <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#0078D7" />
+          <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#005499" />
+          <SolidColorBrush x:Key="ButtonForeground" Color="#000000" />
+          <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#000000" />
+          <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#000000" />
+          <SolidColorBrush x:Key="TextControlBackground" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="TextControlForeground" Color="#000000" />
+          <SolidColorBrush x:Key="TextControlBorderBrush" Color="#7A7A7A" />
+          <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#171717" />
+          <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#0078D7" />
+          <SolidColorBrush x:Key="TreeViewItemBackgroundSelected" Color="#0078D7" />
+          <SolidColorBrush x:Key="TreeViewItemBackgroundSelectedPointerOver" Color="#0078D7" />
+          <SolidColorBrush x:Key="TreeViewItemBackgroundPointerOver" Color="#E5F3FF" />
+          <SolidColorBrush x:Key="TreeViewItemForegroundSelected" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="TreeViewItemForegroundSelectedPointerOver" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="#F0F0F0" />
+          <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush" Color="#A0A0A0" />
+          <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPointerOver" Color="#91C9F7" />
+          <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPressed" Color="#91C9F7" />
+          <!-- Schede: linguetta scelta = colore delle caselle, le altre = colore dei controlli con testo grigio (Theme.DrawTabItem). -->
+          <SolidColorBrush x:Key="TabItemHeaderBackgroundUnselected" Color="#F0F0F0" />
+          <SolidColorBrush x:Key="TabItemHeaderBackgroundUnselectedPointerOver" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="TabItemHeaderBackgroundSelected" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="TabItemHeaderBackgroundSelectedPointerOver" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="TabItemHeaderForegroundUnselected" Color="#6D6D6D" />
+          <SolidColorBrush x:Key="TabItemHeaderForegroundUnselectedPointerOver" Color="#000000" />
+          <SolidColorBrush x:Key="TabItemHeaderForegroundSelected" Color="#000000" />
+          <SolidColorBrush x:Key="TabItemHeaderForegroundSelectedPointerOver" Color="#000000" />
+          <SolidColorBrush x:Key="TabItemHeaderSelectedPipeFill" Color="Transparent" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="Dark">
-          <Color x:Key="AppAccent">#60A5FA</Color>
-          <SolidColorBrush x:Key="AppAccentBrush" Color="#60A5FA" />
-          <SolidColorBrush x:Key="AppSidebarBrush" Color="#1B1E26" />
-          <SolidColorBrush x:Key="AppBarBrush" Color="#232731" />
-          <SolidColorBrush x:Key="AppSurfaceBrush" Color="#15171D" />
-          <SolidColorBrush x:Key="AppBorderBrush" Color="#323846" />
-          <SolidColorBrush x:Key="AppMutedBrush" Color="#9CA3AF" />
-          <SolidColorBrush x:Key="AppDangerBrush" Color="#F87171" />
+          <Color x:Key="AppAccent">#2D5FA5</Color>
+          <Color x:Key="SystemAccentColor">#2D5FA5</Color>
+          <SolidColorBrush x:Key="AppAccentBrush" Color="#2D5FA5" />
+          <SolidColorBrush x:Key="AppHighlightTextBrush" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="AppSidebarBrush" Color="#202124" />
+          <SolidColorBrush x:Key="AppBarBrush" Color="#2B2D31" />
+          <SolidColorBrush x:Key="AppSurfaceBrush" Color="#2B2D31" />
+          <SolidColorBrush x:Key="AppInputBrush" Color="#34363B" />
+          <SolidColorBrush x:Key="AppTextBrush" Color="#E8E8EB" />
+          <SolidColorBrush x:Key="AppBorderBrush" Color="#464850" />
+          <SolidColorBrush x:Key="AppMutedBrush" Color="#9698A0" />
+          <SolidColorBrush x:Key="AppDangerBrush" Color="#F0786E" />
+          <SolidColorBrush x:Key="ButtonBackground" Color="#34363B" />
+          <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#3E4147" />
+          <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#2D5FA5" />
+          <SolidColorBrush x:Key="ButtonBackgroundDisabled" Color="#2B2D31" />
+          <SolidColorBrush x:Key="ButtonBorderBrush" Color="#464850" />
+          <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#2D5FA5" />
+          <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#2D5FA5" />
+          <SolidColorBrush x:Key="ButtonForeground" Color="#E8E8EB" />
+          <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#E8E8EB" />
+          <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="TextControlBackground" Color="#34363B" />
+          <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#34363B" />
+          <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#34363B" />
+          <SolidColorBrush x:Key="TextControlForeground" Color="#E8E8EB" />
+          <SolidColorBrush x:Key="TextControlBorderBrush" Color="#464850" />
+          <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#9698A0" />
+          <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#2D5FA5" />
+          <SolidColorBrush x:Key="TreeViewItemBackgroundSelected" Color="#2D5FA5" />
+          <SolidColorBrush x:Key="TreeViewItemBackgroundSelectedPointerOver" Color="#2D5FA5" />
+          <SolidColorBrush x:Key="TreeViewItemBackgroundPointerOver" Color="#2B2D31" />
+          <SolidColorBrush x:Key="TreeViewItemForegroundSelected" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="TreeViewItemForegroundSelectedPointerOver" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="#2B2D31" />
+          <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush" Color="#464850" />
+          <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPointerOver" Color="#2D5FA5" />
+          <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPressed" Color="#2D5FA5" />
+          <SolidColorBrush x:Key="TabItemHeaderBackgroundUnselected" Color="#2B2D31" />
+          <SolidColorBrush x:Key="TabItemHeaderBackgroundUnselectedPointerOver" Color="#34363B" />
+          <SolidColorBrush x:Key="TabItemHeaderBackgroundSelected" Color="#34363B" />
+          <SolidColorBrush x:Key="TabItemHeaderBackgroundSelectedPointerOver" Color="#34363B" />
+          <SolidColorBrush x:Key="TabItemHeaderForegroundUnselected" Color="#9698A0" />
+          <SolidColorBrush x:Key="TabItemHeaderForegroundUnselectedPointerOver" Color="#E8E8EB" />
+          <SolidColorBrush x:Key="TabItemHeaderForegroundSelected" Color="#E8E8EB" />
+          <SolidColorBrush x:Key="TabItemHeaderForegroundSelectedPointerOver" Color="#E8E8EB" />
+          <SolidColorBrush x:Key="TabItemHeaderSelectedPipeFill" Color="Transparent" />
         </ResourceDictionary>
       </ResourceDictionary.ThemeDictionaries>
 
-      <!-- Misure comuni: bersagli da almeno 40 px per l'uso al tocco. -->
-      <x:Double x:Key="AppTouchSize">40</x:Double>
-      <x:Double x:Key="AppFontSize">14</x:Double>
+      <!-- Misure comuni, quelle di Windows Forms: controlli alti 24 px e carattere da 9 pt (12 px).
+           Per il tocco la finestra principale prende la classe «touch» (più sotto) e tutto si ingrandisce. -->
+      <x:Double x:Key="AppTouchSize">24</x:Double>
+      <x:Double x:Key="AppFontSize">12</x:Double>
       <x:Double x:Key="AppSmallFontSize">12</x:Double>
-      <x:Double x:Key="AppTitleFontSize">22</x:Double>
-      <CornerRadius x:Key="AppRadius">6</CornerRadius>
+      <x:Double x:Key="AppTitleFontSize">16</x:Double>
+      <CornerRadius x:Key="AppRadius">2</CornerRadius>
       <Thickness x:Key="AppPagePadding">20</Thickness>
 
       <!-- Icone vettoriali (niente dipendenza da font di simboli). -->
@@ -132,6 +215,9 @@
     <Style Selector="Path.icon.muted">
       <Setter Property="Fill" Value="{DynamicResource AppMutedBrush}" />
     </Style>
+
+    <!-- Aspetto da Windows Forms: colori, caratteri, schede, albero, menu (Styles/WindowsLook.axaml). -->
+    <StyleInclude Source="avares://RdpManager.Linux/Styles/WindowsLook.axaml" />
 
     <!-- Modalità tocco (#47): la finestra principale prende la classe «touch» e righe, schede, menu e pulsanti si ingrandiscono. -->
     <Style Selector="Window.touch Button">
