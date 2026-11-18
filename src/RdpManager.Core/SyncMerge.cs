@@ -86,6 +86,7 @@ public static class SyncMerge
         // Id ripetuti da una parte o dall'altra: la fusione lavora per Id e ne perderebbe una delle due connessioni.
         bool changed = local.RepairConnectionIds();
         remote.RepairConnectionIds();
+        SeparateUnrelatedSameId(local, remote, baseHashes);
 
         // Profili prima delle connessioni: una connessione importata trova già il suo profilo.
         changed |= MergeList(local.CredentialProfiles, remote.CredentialProfiles, baseHashes,
@@ -94,7 +95,7 @@ public static class SyncMerge
         changed |= MergeList(local.Connections, remote.Connections, baseHashes,
             SyncFingerprints.Key, fp.Of, CopyConnection, c => c.Clone(),
             // Al primo collegamento due PC possono avere già la stessa destinazione con Id diversi: si tiene una sola.
-            firstLink ? r => local.Connections.Any(l => l.Id != r.Id && l.IsSameTarget(r)) : null);
+            firstLink ? r => local.Connections.Any(l => l.Id != r.Id && l.IsSameTarget(r, strictGateway: true)) : null);
 
         changed |= MergeList(local.QuickTexts, remote.QuickTexts, baseHashes,
             SyncFingerprints.Key, fp.Of, CopyProperties, t => t.Clone(), null);
@@ -127,6 +128,38 @@ public static class SyncMerge
                 changed = true;
         }
         return changed;
+    }
+
+    /// <summary>
+    /// Una connessione nuova da entrambe le parti (mai sincronizzata prima) con lo stesso Id ma una destinazione diversa
+    /// non è la stessa connessione: due PC che partono da una copia degli stessi dati e poi aggiungono PC diversi. Fonderle
+    /// per Id farebbe sparire una delle due, o farebbe puntare la connessione di un PC all'indirizzo dell'altro. Quella del
+    /// server riceve un Id derivato (uguale su ogni PC, così non nascono doppioni).
+    /// </summary>
+    private static void SeparateUnrelatedSameId(ConnectionsDocument local, ConnectionsDocument remote,
+        IReadOnlyDictionary<string, string> baseHashes)
+    {
+        for (int i = 0; i < remote.Connections.Count; i++)
+        {
+            var r = remote.Connections[i];
+            if (baseHashes.ContainsKey(SyncFingerprints.Key(r)))
+                continue;
+            var l = local.Connections.FirstOrDefault(x => x.Id == r.Id);
+            if (l is null || l.IsSameTarget(r, strictGateway: true))
+                continue;
+            var seed = $"{r.Id}|{r.Host.Trim().ToLowerInvariant()}|{r.Port}|{r.Username.Trim().ToLowerInvariant()}|{r.Domain.Trim().ToLowerInvariant()}|{(r.HasGateway ? r.GatewayHost.Trim().ToLowerInvariant() : "")}";
+            Guid fresh;
+            for (int attempt = 0; ; attempt++)
+            {
+                var hash = SHA256.HashData(Encoding.UTF8.GetBytes(seed + "|sync|" + attempt));
+                fresh = new Guid(hash.AsSpan(0, 16));
+                if (fresh != Guid.Empty && !local.Connections.Any(x => x.Id == fresh) && !remote.Connections.Any(x => x.Id == fresh))
+                    break;
+            }
+            var copy = r.Clone();
+            copy.Id = fresh;
+            remote.Connections[i] = copy;
+        }
     }
 
     private static bool MergeList<T>(List<T> local, List<T> remote, IReadOnlyDictionary<string, string> baseHashes,
