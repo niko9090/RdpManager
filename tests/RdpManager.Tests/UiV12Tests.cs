@@ -401,14 +401,44 @@ public sealed class UiV12Tests : IDisposable
     [DllImport("user32.dll")]
     private static extern bool PostMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
 
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
+    /// <summary>
+    /// Una combinazione Ctrl+Alt+Maiusc+lettera libera in questo momento. Le scorciatoie globali sono una risorsa di
+    /// sistema: due processi di test in parallelo (per esempio dotnet test sulla soluzione e sul progetto insieme)
+    /// si scontrerebbero su una combinazione fissa. Si parte da una lettera a caso e si prova con RegisterHotKey.
+    /// </summary>
+    private static string FreeGlobalHotkeyText()
+    {
+        const string letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        int start = Random.Shared.Next(letters.Length);
+        for (int i = 0; i < letters.Length; i++)
+        {
+            var text = "Ctrl+Alt+Maiusc+" + letters[(start + i) % letters.Length];
+            if (!GlobalHotkey.TryParse(text, out var combo))
+                continue;
+            var (mods, vk) = GlobalHotkey.ToNative(combo);
+            if (RegisterHotKey(IntPtr.Zero, 0x5245, mods, vk))
+            {
+                UnregisterHotKey(IntPtr.Zero, 0x5245);
+                return text;
+            }
+        }
+        throw new InvalidOperationException("Nessuna scorciatoia Ctrl+Alt+Maiusc+lettera libera.");
+    }
+
     [Fact]
     public void Tray_MenuListsConnections_GlobalHotkeyRestoresTheWindow()
     {
         var doc = new ConnectionsDocument { Connections = [Unreachable("Uno"), Unreachable("Due")] };
         doc.Connections[0].Group = "Clienti";
         doc.Connections[1].IsFavorite = true;
-        // Combinazione insolita, per non scontrarsi con un RdpManager vero aperto sullo stesso PC.
-        doc.Settings.GlobalHotkey = "Ctrl+Alt+Maiusc+F9";
+        // Combinazione libera al momento: non deve scontrarsi con un RdpManager vero o con un'altra esecuzione dei test.
+        doc.Settings.GlobalHotkey = FreeGlobalHotkeyText();
         WithMainForm(StoreWith(doc), form =>
         {
             Assert.NotNull(form.TrayIcon);

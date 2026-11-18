@@ -1,5 +1,12 @@
 # Novità di RdpManager
 
+## 1.16.2 (2026-11-18)
+
+**Sincronizzazione fra PC: niente più connessioni sovrascritte**
+- La 1.16.1 sistemava i doppioni dentro un solo elenco; la 1.16.2 corregge la sincronizzazione fra PC.
+- Due connessioni nuove create su PC diversi con lo stesso codice interno non si sovrascrivono più: il codice in collisione viene rigenerato.
+- Due connessioni con lo stesso indirizzo ma gateway diversi non vengono più prese per la stessa: il gateway ora conta nel confronto.
+
 ## 1.16.1 (2026-11-18)
 
 **Due connessioni diverse non aprono più lo stesso PC**
