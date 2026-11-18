@@ -398,7 +398,10 @@ public static class RdpmFile
             c.GatewayProfileId = MapProfile(c.GatewayProfileId);
             if (c.GatewayCredentials == GatewayCredentialsSource.Profile && c.GatewayProfileId is null)
                 c.GatewayCredentials = GatewayCredentialsSource.SameAsConnection;
-            var existing = target.Connections.FirstOrDefault(e => e.Id == c.Id || e.IsSameTarget(c));
+            var existing = target.Connections.FirstOrDefault(e => e.IsSameTarget(c));
+            // Stesso Id ma computer diverso non è un doppione: è un'altra connessione (Id ripetuto per errore), si tiene con un Id nuovo.
+            if (existing is null && target.Connections.Any(e => e.Id == c.Id))
+                c.Id = Guid.NewGuid();
             if (existing is not null)
             {
                 // Il doppione non si aggiunge, ma se a quella esistente manca la password si prende quella del file;
