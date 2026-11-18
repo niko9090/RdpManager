@@ -83,7 +83,9 @@ public static class SyncMerge
         IReadOnlyDictionary<string, string> baseHashes, SyncFingerprints fp)
     {
         bool firstLink = baseHashes.Count == 0;
-        bool changed = false;
+        // Id ripetuti da una parte o dall'altra: la fusione lavora per Id e ne perderebbe una delle due connessioni.
+        bool changed = local.RepairConnectionIds();
+        remote.RepairConnectionIds();
 
         // Profili prima delle connessioni: una connessione importata trova già il suo profilo.
         changed |= MergeList(local.CredentialProfiles, remote.CredentialProfiles, baseHashes,

@@ -86,6 +86,35 @@ public sealed partial class ConnectionsDocument
 
     public RdpConnection? Find(Guid id) => Connections.FirstOrDefault(c => c.Id == id);
 
+    /// <summary>
+    /// Dà un Id nuovo alle connessioni che ne hanno uno vuoto o già usato da un'altra (la prima lo tiene): sessioni,
+    /// Preferiti, Recenti, spazi di lavoro e cronologia le cercano per Id, e con due Id uguali la seconda connessione
+    /// apriva la scheda della prima. Il nuovo Id deriva da quello vecchio e dalla destinazione, così PC diversi che
+    /// riparano gli stessi dati ottengono lo stesso risultato e la sincronizzazione non crea doppioni. Vero se ha cambiato qualcosa.
+    /// </summary>
+    public bool RepairConnectionIds()
+    {
+        var seen = new HashSet<Guid>();
+        bool changed = false;
+        foreach (var c in Connections)
+        {
+            if (c.Id != Guid.Empty && seen.Add(c.Id))
+                continue;
+            var seed = $"{c.Id}|{c.Host.Trim().ToLowerInvariant()}|{c.Port}|{c.Username.Trim().ToLowerInvariant()}|{c.Domain.Trim().ToLowerInvariant()}";
+            Guid fresh;
+            for (int attempt = 0; ; attempt++)
+            {
+                var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(seed + "|" + attempt));
+                fresh = new Guid(hash.AsSpan(0, 16));
+                if (fresh != Guid.Empty && !Connections.Any(x => x.Id == fresh) && seen.Add(fresh))
+                    break;
+            }
+            c.Id = fresh;
+            changed = true;
+        }
+        return changed;
+    }
+
     /// <summary>Connessioni della cartella e delle sue sottocartelle, nell'ordine dell'elenco ("Connetti tutta la cartella").</summary>
     public IReadOnlyList<RdpConnection> ConnectionsInFolder(string folder)
     {
@@ -249,6 +278,8 @@ public sealed class ConnectionStore
             }
             // Se la decifratura fallisce ProtectedPassword resta com'è e verrà riscritta tale e quale.
         }
+        // Id uguali o vuoti (dati vecchi, importazioni): ognuna delle connessioni deve avere il suo, rigenerato qui.
+        doc.RepairConnectionIds();
         return doc;
     }
 
