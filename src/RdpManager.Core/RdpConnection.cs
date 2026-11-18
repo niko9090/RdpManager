@@ -132,6 +132,15 @@ public sealed class RdpConnection
     [JsonIgnore]
     public bool HasPassword => !string.IsNullOrEmpty(Password) || !string.IsNullOrEmpty(ProtectedPassword);
 
+    private bool SameGateway(RdpConnection other, bool strict)
+    {
+        var mine = HasGateway ? GatewayHost.Trim() : "";
+        var theirs = other.HasGateway ? other.GatewayHost.Trim() : "";
+        if (!strict && (mine.Length == 0 || theirs.Length == 0))
+            return true;
+        return mine.Equals(theirs, StringComparison.OrdinalIgnoreCase);
+    }
+
     public RdpConnection Clone() => (RdpConnection)MemberwiseClone();
 
     /// <summary>Copia con nuovo Id e nome "(copia)", per il comando Duplica.</summary>
@@ -165,10 +174,15 @@ public sealed class RdpConnection
         return hex.Length == 6 && hex.All(Uri.IsHexDigit) ? "#" + hex.ToUpperInvariant() : null;
     }
 
-    /// <summary>Stessa destinazione: host (senza distinzione di maiuscole), porta e utente.</summary>
-    public bool IsSameTarget(RdpConnection other) =>
+    /// <summary>
+    /// Stessa destinazione: host (senza distinzione di maiuscole), porta, utente e gateway. Lo stesso indirizzo interno
+    /// (es. 192.168.1.10) dietro gateway diversi è un altro PC. Con <paramref name="strictGateway"/> anche «con gateway»
+    /// contro «senza» è un altro PC (sincronizzazione); altrimenti differiscono solo due gateway entrambi indicati e diversi.
+    /// </summary>
+    public bool IsSameTarget(RdpConnection other, bool strictGateway = false) =>
         Host.Trim().Equals(other.Host.Trim(), StringComparison.OrdinalIgnoreCase)
         && Port == other.Port
+        && SameGateway(other, strictGateway)
         && Username.Trim().Equals(other.Username.Trim(), StringComparison.OrdinalIgnoreCase)
         && Domain.Trim().Equals(other.Domain.Trim(), StringComparison.OrdinalIgnoreCase);
 }

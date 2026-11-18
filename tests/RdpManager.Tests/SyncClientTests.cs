@@ -131,6 +131,65 @@ public class SyncMergeTests
         Assert.Single(local.Connections);
     }
 
+    // k-119: «due PC diversi, salvati diversi, collegano allo stesso PC».
+    [Fact]
+    public void Primo_collegamento_stesso_Id_ma_PC_diverso_tiene_entrambe()
+    {
+        var mine = new RdpConnection { Name = "ufficio", Host = "10.0.0.5", Username = "u" };
+        var theirs = mine.Clone();
+        theirs.Name = "casa";
+        theirs.Host = "10.0.0.9";
+        var local = Doc(mine);
+        var remote = Doc(theirs);
+
+        SyncMerge.MergeInto(local, remote, new Dictionary<string, string>(), Fp);
+
+        Assert.Equal(["10.0.0.5", "10.0.0.9"], local.Connections.Select(c => c.Host).Order());
+        Assert.Equal(2, local.Connections.Select(c => c.Id).Distinct().Count());
+        Assert.Equal("10.0.0.5", mine.Host);
+    }
+
+    [Fact]
+    public void Connessione_nuova_da_entrambe_le_parti_con_lo_stesso_Id_non_si_sovrascrive_dopo_il_primo_collegamento()
+    {
+        var shared = Conn("x");
+        var baseHashes = Fp.Of(Doc(shared));
+        var mine = new RdpConnection { Name = "ufficio", Host = "10.0.0.5", Username = "u" };
+        var theirs = mine.Clone();
+        theirs.Name = "casa";
+        theirs.Host = "10.0.0.9";
+        var local = Doc(shared.Clone(), mine);
+        var remote = Doc(shared.Clone(), theirs);
+
+        SyncMerge.MergeInto(local, remote, baseHashes, Fp);
+
+        Assert.Equal(["10.0.0.5", "10.0.0.9", shared.Host], local.Connections.Select(c => c.Host).Order());
+    }
+
+    [Fact]
+    public void Primo_collegamento_stessa_destinazione_con_gateway_diversi_sono_due_PC()
+    {
+        var siteA = new RdpConnection { Name = "sede A", Host = "192.168.1.10", Username = "u", UseGateway = true, GatewayHost = "gw.a.it" };
+        var siteB = new RdpConnection { Name = "sede B", Host = "192.168.1.10", Username = "u", UseGateway = true, GatewayHost = "gw.b.it" };
+        var local = Doc(siteA);
+
+        SyncMerge.MergeInto(local, Doc(siteB), new Dictionary<string, string>(), Fp);
+
+        Assert.Equal(["gw.a.it", "gw.b.it"], local.Connections.Select(c => c.GatewayHost).Order());
+    }
+
+    [Fact]
+    public void Stessa_destinazione_con_gateway_diversi_non_e_la_stessa()
+    {
+        var a = new RdpConnection { Host = "192.168.1.10", UseGateway = true, GatewayHost = "gw.a.it" };
+        var b = new RdpConnection { Host = "192.168.1.10", UseGateway = true, GatewayHost = "GW.B.it" };
+        var direct = new RdpConnection { Host = "192.168.1.10" };
+        Assert.False(a.IsSameTarget(b));
+        Assert.False(a.IsSameTarget(direct, strictGateway: true));
+        Assert.True(a.IsSameTarget(direct)); // importando un .rdp: un solo gateway indicato non basta a dire «altro PC»
+        Assert.True(a.IsSameTarget(new RdpConnection { Host = "192.168.1.10", UseGateway = true, GatewayHost = " GW.A.it " }));
+    }
+
     [Fact]
     public void Cancellazione_sul_server_cancella_qui_ma_non_se_modificata()
     {
