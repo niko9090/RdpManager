@@ -1,5 +1,11 @@
 # Novità di RdpManager
 
+## 1.16.1 (2026-11-18)
+
+**Due connessioni diverse non aprono più lo stesso PC**
+- Corretto il problema per cui due connessioni diverse aprivano lo stesso PC: i codici interni delle connessioni duplicati o vuoti vengono ora rigenerati al caricamento e nella sincronizzazione.
+- L'importazione non salta più una connessione con lo stesso codice ma computer diverso.
+
 ## 1.16.0 (2026-11-14)
 
 **Linux: aggiornamenti automatici e aspetto come su Windows**
