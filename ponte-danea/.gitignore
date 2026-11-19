@@ -1,0 +1,11 @@
+# Configurazione vera (token, percorsi): mai nel repository. Il modello è ponte-danea.esempio.json.
+ponte-danea.json
+# Copie dell'archivio Easyfatt e zip di prova: dati dei clienti, mai nel repository.
+*.eft
+*.fdb
+*.zip
+# Firebird embedded: si scarica dallo zip ufficiale, non si versiona.
+fbclient.dll
+fbembed.dll
+bin/
+obj/
