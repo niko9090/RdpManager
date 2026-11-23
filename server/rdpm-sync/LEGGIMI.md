@@ -144,6 +144,14 @@ In RdpManager l'indirizzo del server va scritto (nessun valore predefinito); con
 | `RDPM_VPN_DNS` | vuota | DNS scritto nei profili |
 | `RDPM_VPN_INTERFACE`, `RDPM_VPN_WG` | `wg0`, `wg` | interfaccia e comando `wg` |
 | `RDPM_VPN_MAX_DEVICES` | `20` | PC per account |
+| `RDPM_SYNC_MAX_FILE_MB` | `100` | dimensione massima di un file scambiato fra i PC (1–2048) |
+| `RDPM_SYNC_FILE_DAYS` | `7` | giorni dopo cui un file non ritirato viene cancellato |
+| `RDPM_SYNC_MAX_PENDING_FILES` | `50` | file in attesa al massimo per account |
+| `RDPM_SYNC_FILES_DIR` | `transfers` accanto al database | cartella dei file in transito |
+
+Scambio di file fra i PC dello stesso account (stesso token della plancia, intestazione `X-Device-Name` = il PC che chiama):
+`POST /v1/vpn/files?to=<PC>&name=<file>` (corpo = contenuto), `GET /v1/vpn/files` (in arrivo per il PC che chiama),
+`POST /v1/vpn/files/{id}/accept` (scarica e cancella), `POST /v1/vpn/files/{id}/reject` (cancella).
 | `RDPM_SYNC_WEB_ADMINS` | vuoto | utenti (separati da virgola) che dalla plancia web `/vpn` possono revocare i dispositivi |
 
 Plancia web: `https://<server>/vpn` (accesso con gli account esistenti, senza accesso rimanda a `/vpn/accesso`).

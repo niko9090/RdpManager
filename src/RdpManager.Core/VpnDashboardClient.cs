@@ -49,7 +49,7 @@ public sealed class VpnDashboardClient : IDisposable
         }
     }
 
-    private static SyncServerException Error(HttpStatusCode status, string raw)
+    internal static SyncServerException Error(HttpStatusCode status, string raw)
     {
         string code = status == HttpStatusCode.Unauthorized ? "unauthorized" : "error";
         string message = status == HttpStatusCode.Unauthorized ? "Accesso scaduto o rifiutato." : $"Errore del server ({(int)status}).";

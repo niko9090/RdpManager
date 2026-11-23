@@ -87,6 +87,8 @@ public sealed partial class VpnEndpoints(SyncOptions options, Store store, IWire
             return null;
         }
 
+        MapFiles(app, (HttpContext ctx, out TokenInfo t) => Gate(ctx, out t));
+
         app.MapGet("/v1/vpn/devices", (HttpContext ctx) =>
             Gate(ctx, out var t) ?? Results.Json(store.ListDevices(t.AccountId).Select(d => new
             {

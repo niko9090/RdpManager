@@ -26,7 +26,11 @@ internal sealed class VpnDashboardWindow : ToolWindow
         error.Margin = new Thickness(14, 8, 14, 0);
         var info = DialogKit.BoundLabel(nameof(vm.InfoText), "muted");
         info.Margin = new Thickness(14, 8, 14, 0);
-        var top = new StackPanel { Children = { error, info } };
+        var sendInfo = DialogKit.BoundLabel(nameof(vm.SendInfoText), "muted");
+        sendInfo.Margin = new Thickness(14, 8, 14, 0);
+        var sendError = DialogKit.Error(nameof(vm.SendErrorText));
+        sendError.Margin = new Thickness(14, 8, 14, 0);
+        var top = new StackPanel { Children = { error, info, sendInfo, sendError } };
 
         var header = Row("Nome", "IP nella VPN", "Stato", "Ultimo contatto", null, bold: true);
         var list = new ListBox { ItemsSource = vm.Rows, Background = Brushes.Transparent }
@@ -42,8 +46,9 @@ internal sealed class VpnDashboardWindow : ToolWindow
         var refresh = new Button { Content = "Aggiorna", MinWidth = 96, Command = vm.RefreshCommand };
         var open = new Button { Content = "Apri desktop remoto", MinWidth = 96, Command = vm.OpenCommand };
         open.Classes.Add("accent");
+        var sendFile = new Button { Content = "Invia file…", MinWidth = 96, Command = vm.SendFileCommand, IsVisible = vm.CanSendFeature };
         Content = DialogKit.Frame(body,
-            DialogKit.Buttons(refresh, open, DialogKit.Button("Chiudi", (_, _) => Close(false), isCancel: true)), top);
+            DialogKit.Buttons(refresh, sendFile, open,DialogKit.Button("Chiudi", (_, _) => Close(false), isCancel: true)), top);
 
         vm.CloseRequested += (_, _) => Close(true);
         var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(VpnDashboardModel.RefreshSeconds) };

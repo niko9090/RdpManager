@@ -185,29 +185,103 @@ public sealed class SyncService : IDisposable
     /// <see cref="InvalidOperationException"/>.</summary>
     public async Task<IReadOnlyList<VpnDashboardDevice>> GetVpnDevicesAsync(CancellationToken ct = default)
     {
+        return await WithTokenAsync(async (url, token) =>
+        {
+            using var client = new VpnDashboardClient(url);
+            return await client.GetDevicesAsync(token, ct);
+        }, ct);
+    }
+
+    /// <summary>Nome di questo PC nella VPN (lo stesso con cui si registra: <see cref="VpnProvisioning.SafeName"/>).</summary>
+    public static string VpnDeviceName => VpnProvisioning.SafeName(Environment.MachineName);
+
+    /// <summary>Invia un file a un altro PC dell'account (che dovrà accettarlo).</summary>
+    public Task SendVpnFileAsync(string to, string path, CancellationToken ct = default) =>
+        WithTokenAsync(async (url, token) =>
+        {
+            using var client = new VpnFileTransferClient(url, VpnDeviceName);
+            await using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+            await client.SendAsync(token, to, Path.GetFileName(path), file, ct);
+            return true;
+        }, ct, holdGate: false);
+
+    public Task<IReadOnlyList<IncomingFile>> GetIncomingFilesAsync(CancellationToken ct = default) =>
+        WithTokenAsync(async (url, token) =>
+        {
+            using var client = new VpnFileTransferClient(url, VpnDeviceName);
+            return await client.ListIncomingAsync(token, ct);
+        }, ct, holdGate: false);
+
+    public Task<string> AcceptIncomingFileAsync(IncomingFile file, string folder, CancellationToken ct = default) =>
+        WithTokenAsync(async (url, token) =>
+        {
+            using var client = new VpnFileTransferClient(url, VpnDeviceName);
+            return await client.AcceptAsync(token, file, folder, ct);
+        }, ct, holdGate: false);
+
+    public Task RejectIncomingFileAsync(IncomingFile file, CancellationToken ct = default) =>
+        WithTokenAsync(async (url, token) =>
+        {
+            using var client = new VpnFileTransferClient(url, VpnDeviceName);
+            await client.RejectAsync(token, file, ct);
+            return true;
+        }, ct, holdGate: false);
+
+    /// <summary>
+    /// Esegue una chiamata col token salvato; se è scaduto rifà il login e riprova una volta. Con
+    /// <paramref name="holdGate"/> falso il blocco della sincronizzazione si tiene solo per leggere o rinnovare il token:
+    /// un file grande non ferma la sincronizzazione del documento.
+    /// </summary>
+    private async Task<T> WithTokenAsync<T>(Func<string, string, Task<T>> call, CancellationToken ct, bool holdGate = true)
+    {
         if (!SignedIn || !PasswordProtector.TryUnprotect(State.ProtectedPassword, out var password) || password is null)
             throw new InvalidOperationException("Serve prima l'accesso all'account.");
-        await EnterAsync(ct);
-        try
+
+        async Task<(string Url, string Token)> Credentials(bool renew)
         {
             var url = State.ServerUrl;
-            using var client = new VpnDashboardClient(url);
-            var token = PasswordProtector.TryUnprotect(State.ProtectedToken, out var saved) && saved is not null
+            var token = !renew && PasswordProtector.TryUnprotect(State.ProtectedToken, out var saved) && saved is not null
                 ? saved
                 : await LoginAsync(url, State.Username, password, ct);
+            return (url, token);
+        }
+
+        if (holdGate)
+        {
+            await EnterAsync(ct);
             try
             {
-                return await client.GetDevicesAsync(token, ct);
+                var (url, token) = await Credentials(false);
+                try
+                {
+                    return await call(url, token);
+                }
+                catch (SyncServerException ex) when (ex.Code == "unauthorized")
+                {
+                    (url, token) = await Credentials(true);
+                    return await call(url, token);
+                }
             }
-            catch (SyncServerException ex) when (ex.Code == "unauthorized")
+            finally
             {
-                token = await LoginAsync(url, State.Username, password, ct);
-                return await client.GetDevicesAsync(token, ct);
+                _gate.Release();
             }
         }
-        finally
+
+        await EnterAsync(ct);
+        string u, t;
+        try { (u, t) = await Credentials(false); }
+        finally { _gate.Release(); }
+        try
         {
-            _gate.Release();
+            return await call(u, t);
+        }
+        catch (SyncServerException ex) when (ex.Code == "unauthorized")
+        {
+            await EnterAsync(ct);
+            try { (u, t) = await Credentials(true); }
+            finally { _gate.Release(); }
+            return await call(u, t);
         }
     }
 

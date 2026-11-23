@@ -26,7 +26,8 @@ public sealed partial class MainForm
             open.Activate();
             return;
         }
-        _vpnDashboard = new VpnDashboardForm(() => _sync.SignedIn, ct => _sync.GetVpnDevicesAsync(ct), OpenVpnDashboardPc);
+        _vpnDashboard = new VpnDashboardForm(() => _sync.SignedIn, ct => _sync.GetVpnDevicesAsync(ct), OpenVpnDashboardPc,
+            sendFile: (to, path, ct) => _sync.SendVpnFileAsync(to, path, ct));
         _vpnDashboard.FormClosed += (_, _) => _vpnDashboard = null;
         _vpnDashboard.Show(this);
     }

@@ -52,6 +52,7 @@ public sealed partial class MainForm
                     ShowNotice(vpnLine);
             }
         };
+        InitFileTransfer();
         FormClosed += (_, _) =>
         {
             _syncDelay.Dispose();

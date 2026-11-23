@@ -12,6 +12,7 @@ internal sealed class VpnDashboardForm : TouchForm
     private readonly Func<CancellationToken, Task<IReadOnlyList<VpnDashboardDevice>>> _load;
     private readonly Action<string, string> _open;
     private readonly Func<DateTimeOffset> _now;
+    private readonly Func<string, string, CancellationToken, Task>? _sendFile;
 
     private readonly ListView _list = new()
     {
@@ -20,6 +21,7 @@ internal sealed class VpnDashboardForm : TouchForm
     private readonly Label _message = new() { Dock = DockStyle.Top, AutoSize = true, MaximumSize = new Size(760, 0), Padding = new Padding(0, 4, 0, 8) };
     private readonly Button _refresh = DialogStyle.Button("Aggiorna");
     private readonly Button _openRdp = DialogStyle.Button("Apri desktop remoto");
+    private readonly Button _sendFileButton = DialogStyle.Button("Invia file…");
     private readonly Button _close = DialogStyle.Button("Chiudi", DialogResult.Cancel);
     private readonly System.Windows.Forms.Timer _timer = new() { Interval = VpnDashboardModel.RefreshSeconds * 1000 };
     private readonly CancellationTokenSource _cts = new();
@@ -28,11 +30,12 @@ internal sealed class VpnDashboardForm : TouchForm
     public VpnDashboardView Current { get; private set; } = VpnDashboardModel.NotSignedIn();
 
     public VpnDashboardForm(Func<bool> signedIn, Func<CancellationToken, Task<IReadOnlyList<VpnDashboardDevice>>> load,
-        Action<string, string> open, Func<DateTimeOffset>? now = null)
+        Action<string, string> open, Func<DateTimeOffset>? now = null, Func<string, string, CancellationToken, Task>? sendFile = null)
     {
         _signedIn = signedIn;
         _load = load;
         _open = open;
+        _sendFile = sendFile;
         _now = now ?? (() => DateTimeOffset.UtcNow);
         DialogStyle.Setup(this, "Plancia VPN", resizable: true);
         ShowInTaskbar = true;
@@ -42,13 +45,20 @@ internal sealed class VpnDashboardForm : TouchForm
         foreach (var (text, width) in new[] { ("Nome", 200), ("IP nella VPN", 130), ("Stato", 110), ("Ultimo contatto", 160) })
             _list.Columns.Add(text, width);
         _openRdp.Enabled = false;
-        _list.SelectedIndexChanged += (_, _) => _openRdp.Enabled = SelectedRow is not null;
+        _sendFileButton.Enabled = false;
+        _sendFileButton.Visible = sendFile is not null;
+        _list.SelectedIndexChanged += (_, _) =>
+        {
+            _openRdp.Enabled = SelectedRow is not null;
+            _sendFileButton.Enabled = SelectedRow is not null && !_sending;
+        };
         _list.DoubleClick += (_, _) => OpenSelected();
         _openRdp.Click += (_, _) => OpenSelected();
+        _sendFileButton.Click += async (_, _) => await SendFileAsync();
         _refresh.Click += async (_, _) => await RefreshAsync();
         _close.Click += (_, _) => Close();
 
-        var buttons = DialogStyle.Buttons(_refresh, _openRdp, _close);
+        var buttons = DialogStyle.Buttons(_refresh, _sendFileButton, _openRdp, _close);
         buttons.Dock = DockStyle.Bottom;
         Controls.Add(_list);
         Controls.Add(_message);
@@ -75,6 +85,46 @@ internal sealed class VpnDashboardForm : TouchForm
     {
         if (SelectedRow is { } row && VpnDashboardView.CanOpen(row))
             _open(row.Name, row.Address);
+    }
+
+    private bool _sending;
+
+    /// <summary>«Invia file…»: sceglie il file, lo manda al PC selezionato e dice com'è andata sotto l'elenco.</summary>
+    private async Task SendFileAsync()
+    {
+        if (_sendFile is null || _sending || SelectedRow is not { } row)
+            return;
+        using var dlg = new OpenFileDialog { Title = $"Invia a {row.Name}", CheckFileExists = true };
+        if (dlg.ShowDialog(this) != DialogResult.OK)
+            return;
+        _sending = true;
+        _sendFileButton.Enabled = false;
+        _message.ForeColor = SystemColors.ControlText;
+        _message.Text = $"Invio di «{Path.GetFileName(dlg.FileName)}» a {row.Name}…";
+        try
+        {
+            await _sendFile(row.Name, dlg.FileName, _cts.Token);
+            if (!IsDisposed)
+                _message.Text = VpnFileModel.SentText(row.Name, Path.GetFileName(dlg.FileName));
+        }
+        catch (OperationCanceledException) when (_cts.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex) when (ex is SyncServerException or SyncUnreachableException or InvalidOperationException
+                                       or HttpRequestException or IOException or UnauthorizedAccessException)
+        {
+            if (!IsDisposed)
+            {
+                _message.ForeColor = Color.Firebrick;
+                _message.Text = VpnFileModel.SendError(ex);
+            }
+        }
+        finally
+        {
+            _sending = false;
+            if (!IsDisposed)
+                _sendFileButton.Enabled = SelectedRow is not null;
+        }
     }
 
     public async Task RefreshAsync()
@@ -134,5 +184,6 @@ internal sealed class VpnDashboardForm : TouchForm
         _message.Text = view.Message;
         _message.ForeColor = view.Status is VpnDashboardStatus.Ok or VpnDashboardStatus.Empty ? SystemColors.ControlText : Color.Firebrick;
         _openRdp.Enabled = SelectedRow is not null;
+        _sendFileButton.Enabled = SelectedRow is not null && !_sending;
     }
 }
