@@ -182,6 +182,75 @@ begin
   StopVpnService;
 end;
 
+// ---- Ruolo dell'installazione (k-151) ----
+// Pagina «Come userai RdpManager?»: «Desktop remoto + VPN» (predefinito) o «Gestore VPN» (all'avvio si apre la Plancia
+// VPN). Il ruolo sta in %APPDATA%\RdpManager\role.json, {"role":"VpnManager"} o {"role":"DesktopAndVpn"}: lo legge
+// il programma (AppRoleStore, in Core). Negli aggiornamenti la pagina parte dal ruolo già presente e l'installazione
+// silenziosa (compresi gli aggiornamenti automatici) NON tocca il file: il ruolo resta quello che c'era. Per
+// sceglierlo da riga di comando: /ROLE=vpn (Gestore VPN) oppure /ROLE=desktop.
+var
+  RolePage: TInputOptionWizardPage;
+
+function RoleFilePath: String;
+begin
+  Result := ExpandConstant('{userappdata}\RdpManager\role.json');
+end;
+
+function ExistingRoleIsVpn: Boolean;
+var
+  Text: AnsiString;
+begin
+  Result := False;
+  if LoadStringFromFile(RoleFilePath, Text) then
+    Result := Pos('"VpnManager"', String(Text)) > 0;
+end;
+
+// Valore di /ROLE=...: 'vpn', 'desktop' oppure '' se assente o non riconosciuto.
+function RoleFromCommandLine: String;
+begin
+  Result := Lowercase(ExpandConstant('{param:ROLE|}'));
+  if (Result <> 'vpn') and (Result <> 'desktop') then
+    Result := '';
+end;
+
+procedure InitializeWizard;
+begin
+  RolePage := CreateInputOptionPage(wpWelcome, 'Ruolo di questa installazione', 'Come userai RdpManager su questo PC?',
+    'Il ruolo si può cambiare in ogni momento da Impostazioni.', True, False);
+  RolePage.Add('Desktop remoto + VPN (consigliato): si apre la finestra con le schede dei desktop remoti');
+  RolePage.Add('Gestore VPN: all''avvio si apre la Plancia VPN in primo piano; la finestra con le schede resta raggiungibile');
+  RolePage.SelectedValueIndex := 0;
+  if (RoleFromCommandLine = 'vpn') or ((RoleFromCommandLine = '') and ExistingRoleIsVpn) then
+    RolePage.SelectedValueIndex := 1;
+end;
+
+procedure SaveRole(const Vpn: Boolean);
+var
+  Json: String;
+begin
+  if Vpn then
+    Json := '{"role":"VpnManager"}'
+  else
+    Json := '{"role":"DesktopAndVpn"}';
+  ForceDirectories(ExtractFilePath(RoleFilePath));
+  if SaveStringToFile(RoleFilePath, Json, False) then
+    Log('Ruolo salvato: ' + Json)
+  else
+    Log('Ruolo: impossibile scrivere ' + RoleFilePath);
+end;
+
+// Scrive il ruolo solo se è stato scelto (pagina mostrata, o /ROLE=): un'installazione silenziosa senza /ROLE lascia
+// intatto il file, quindi gli aggiornamenti automatici conservano il ruolo; senza file vale il predefinito.
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep <> ssPostInstall then
+    Exit;
+  if RoleFromCommandLine <> '' then
+    SaveRole(RoleFromCommandLine = 'vpn')
+  else if not WizardSilent then
+    SaveRole(RolePage.SelectedValueIndex = 1);
+end;
+
 // Vero se l'installer è stato avviato con /RELAUNCH=1 (o /RELAUNCH): solo allora l'app si riapre da sola.
 function ShouldRelaunch: Boolean;
 var

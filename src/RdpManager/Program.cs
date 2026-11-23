@@ -54,6 +54,8 @@ internal static class Program
         // «RdpManager.exe file.rdpmconfig» (anche col doppio clic): il file di configurazione si importa appena si apre la finestra.
         if (RdpmConfigFile.FindArgument(args) is { } configFile)
             form.PendingConfigFile = configFile;
+        // Ruolo scelto all'installazione (role.json): «Gestore VPN» apre la plancia VPN in primo piano all'avvio.
+        form.OpenVpnDashboardOnStart = AppRoleStore.Load() == AppRole.VpnManager;
         ShutdownWatchdog.Enabled = true; // solo qui il cane da guardia della chiusura può far uscire il processo
         Application.Run(form);
     }

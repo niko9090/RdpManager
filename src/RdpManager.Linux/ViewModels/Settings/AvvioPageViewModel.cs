@@ -9,8 +9,15 @@ public sealed class AvvioPageViewModel : SettingsPageViewModel
     private readonly AppSettings _settings;
     private bool _reopen, _history, _verbose;
 
-    public AvvioPageViewModel(AppSettings settings, string dataFilePath, IShellService? shell = null)
+    private readonly string _rolePath;
+    private readonly AppRole _initialRole;
+    private AppRole _role;
+
+    /// <param name="rolePath">File del ruolo (null = quello dell'utente); le prove ne passano uno temporaneo.</param>
+    public AvvioPageViewModel(AppSettings settings, string dataFilePath, IShellService? shell = null, string? rolePath = null)
     {
+        _rolePath = rolePath ?? AppRoleStore.DefaultPath;
+        _initialRole = _role = AppRoleStore.Load(_rolePath);
         _settings = settings;
         DataFilePath = dataFilePath;
         _reopen = settings.ReopenSessionsOnStartup;
@@ -34,6 +41,17 @@ public sealed class AvvioPageViewModel : SettingsPageViewModel
 
     public bool VerboseLog { get => _verbose; set => Set(ref _verbose, value); }
 
+    /// <summary>Ruolo dell'installazione (indice in <see cref="RoleChoices"/>): «Desktop remoto + VPN» o «Gestore VPN».</summary>
+    public int RoleIndex
+    {
+        get => (int)_role;
+        set { if (Enum.IsDefined((AppRole)value)) Set(ref _role, (AppRole)value); }
+    }
+
+    public IReadOnlyList<string> RoleChoices { get; } = Enum.GetValues<AppRole>().Select(AppRoleStore.Describe).ToList();
+
+    public string RoleNote => "Con «Gestore VPN» all'avvio si apre la Plancia VPN; la finestra con le schede resta raggiungibile. Vale dal prossimo avvio.";
+
     public RelayCommand OpenLogFolderCommand { get; }
 
     public RelayCommand OpenDataFolderCommand { get; }
@@ -43,5 +61,8 @@ public sealed class AvvioPageViewModel : SettingsPageViewModel
         _settings.ReopenSessionsOnStartup = ReopenSessionsOnStartup;
         _settings.HistoryEnabled = HistoryEnabled;
         _settings.VerboseLog = VerboseLog;
+        // Si scrive solo se è cambiato (o se il file non c'era e si è scelto qualcosa di diverso dal predefinito).
+        if (_role != _initialRole)
+            AppRoleStore.Save(_role, _rolePath);
     }
 }

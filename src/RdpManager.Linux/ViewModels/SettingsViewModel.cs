@@ -14,11 +14,11 @@ public sealed class SettingsViewModel : ViewModelBase
 
     /// <param name="shell">Per aprire le cartelle dei dati e dei log (null = pulsanti inattivi).</param>
     /// <param name="dialogs">Per le finestre delle pagine (il PIN); null = pulsanti inattivi.</param>
-    public SettingsViewModel(AppSettings settings, string dataFilePath, IShellService? shell = null, IDialogService? dialogs = null)
+    public SettingsViewModel(AppSettings settings, string dataFilePath, IShellService? shell = null, IDialogService? dialogs = null, string? rolePath = null)
     {
         DataFilePath = dataFilePath;
         var look = new AspettoPageViewModel(settings);
-        var startup = new AvvioPageViewModel(settings, dataFilePath, shell);
+        var startup = new AvvioPageViewModel(settings, dataFilePath, shell, rolePath);
         var list = new ElencoPageViewModel(settings);
         var tray = new VassoioPageViewModel(settings);
         var pin = new PinPageViewModel(settings, dialogs);

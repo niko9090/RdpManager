@@ -67,11 +67,26 @@ public sealed class App : Application
                 viewModel.StartBlockB(shell);
                 SetupHotkey();
                 _ = DetectTrayHostAsync();
+                _ = OpenRoleStartupAsync(viewModel);
             };
             window.Closing += OnWindowClosing;
             viewModel.Tabs.CollectionChanged += (_, _) => RebuildTrayMenu();
         }
         base.OnFrameworkInitializationCompleted();
+    }
+
+    /// <summary>Ruolo «Gestore VPN»: all'avvio si apre la Plancia VPN in primo piano; la finestra con le schede resta sotto.</summary>
+    private static async Task OpenRoleStartupAsync(MainWindowViewModel viewModel)
+    {
+        try
+        {
+            if (await viewModel.ResolveStartupRoleAsync() == AppRole.VpnManager)
+                viewModel.VpnDashboardCommand.Execute(null);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException)
+        {
+            // il ruolo non deve mai impedire l'avvio
+        }
     }
 
     private void ApplyTheme(AppTheme theme) => RequestedThemeVariant = theme switch
