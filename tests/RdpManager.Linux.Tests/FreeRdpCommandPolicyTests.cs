@@ -42,6 +42,22 @@ public class FreeRdpCommandPolicyTests
         Assert.Contains("+heartbeat", FreeRdpCommandBuilder.Build(c, V2).Arguments);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Con_adatta_alla_finestra_xfreerdp_parte_con_risoluzione_dinamica_e_dimensione_della_scheda(bool v3)
+    {
+        var ctx = new FreeRdpLaunchContext { ParentWindow = 4194311, AvailableWidth = 1280, AvailableHeight = 720 };
+        var args = FreeRdpCommandBuilder.Build(Conn(), v3 ? V3 : V2, ctx).Arguments;
+        Assert.Contains("/dynamic-resolution", args);
+        Assert.Contains("/size:1280x720", args);
+        Assert.DoesNotContain("/smart-sizing", args);
+
+        // Anche nella finestra separata (non incorporata) il ridimensionamento resta dinamico.
+        var detached = FreeRdpCommandBuilder.Build(Conn(), v3 ? V3 : V2, new FreeRdpLaunchContext { AvailableWidth = 1280, AvailableHeight = 720 }).Arguments;
+        Assert.Contains("/dynamic-resolution", detached);
+    }
+
     [Fact]
     public void La_risoluzione_della_cartella_ereditata_arriva_alla_riga_di_comando()
     {
