@@ -12,7 +12,8 @@ public sealed record DocumentInfo(long Version, byte[] Blob, DateTimeOffset Upda
 
 public enum PutResult { Ok, Conflict }
 
-public sealed record VpnDevice(long Id, long AccountId, string Name, string PublicKey, string Address, DateTimeOffset CreatedUtc);
+public sealed record VpnDevice(long Id, long AccountId, string Name, string PublicKey, string Address, DateTimeOffset CreatedUtc,
+    DateTimeOffset? LastSeenUtc = null);
 
 /// <summary>Database SQLite: account, token (se ne salva solo l'hash) e un documento cifrato per account.</summary>
 public sealed class Store
@@ -59,8 +60,16 @@ public sealed class Store
               public_key TEXT NOT NULL UNIQUE,
               address TEXT NOT NULL UNIQUE,
               created_utc INTEGER NOT NULL,
+              last_seen_utc INTEGER,
               UNIQUE(account_id, name));
             """);
+        // Database creati prima della plancia web: aggiunge la colonna dell'ultimo contatto.
+        using (var check = c.CreateCommand())
+        {
+            check.CommandText = "SELECT COUNT(*) FROM pragma_table_info('vpn_devices') WHERE name = 'last_seen_utc'";
+            if (Convert.ToInt64(check.ExecuteScalar()) == 0)
+                Exec(c, "ALTER TABLE vpn_devices ADD COLUMN last_seen_utc INTEGER");
+        }
     }
 
     private SqliteConnection Open()
@@ -227,9 +236,47 @@ public sealed class Store
     // ---------- VPN: dispositivi (peer WireGuard) ----------
 
     private static VpnDevice ReadDevice(SqliteDataReader r) =>
-        new(r.GetInt64(0), r.GetInt64(1), r.GetString(2), r.GetString(3), r.GetString(4), DateTimeOffset.FromUnixTimeSeconds(r.GetInt64(5)));
+        new(r.GetInt64(0), r.GetInt64(1), r.GetString(2), r.GetString(3), r.GetString(4), DateTimeOffset.FromUnixTimeSeconds(r.GetInt64(5)),
+            r.IsDBNull(6) ? null : DateTimeOffset.FromUnixTimeSeconds(r.GetInt64(6)));
 
-    private const string DeviceColumns = "id, account_id, name, public_key, address, created_utc";
+    private const string DeviceColumns = "id, account_id, name, public_key, address, created_utc, last_seen_utc";
+
+    /// <summary>Registra un contatto del PC col server (nuova registrazione o richiesta ripetuta).</summary>
+    public void TouchDevice(long deviceId)
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "UPDATE vpn_devices SET last_seen_utc = $t WHERE id = $i";
+        cmd.Parameters.AddWithValue("$t", Now);
+        cmd.Parameters.AddWithValue("$i", deviceId);
+        cmd.ExecuteNonQuery();
+    }
+
+    /// <summary>Dispositivi con il nome dell'account proprietario, per la plancia.</summary>
+    public List<(VpnDevice Device, string Owner)> ListDevicesWithOwner()
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = """
+            SELECT d.id, d.account_id, d.name, d.public_key, d.address, d.created_utc, d.last_seen_utc, a.username
+            FROM vpn_devices d JOIN accounts a ON a.id = d.account_id ORDER BY d.id
+            """;
+        using var r = cmd.ExecuteReader();
+        var list = new List<(VpnDevice, string)>();
+        while (r.Read())
+            list.Add((ReadDevice(r), r.GetString(7)));
+        return list;
+    }
+
+    public VpnDevice? GetDevice(long deviceId)
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = $"SELECT {DeviceColumns} FROM vpn_devices WHERE id = $i";
+        cmd.Parameters.AddWithValue("$i", deviceId);
+        using var r = cmd.ExecuteReader();
+        return r.Read() ? ReadDevice(r) : null;
+    }
 
     public List<VpnDevice> ListDevices(long? accountId = null)
     {

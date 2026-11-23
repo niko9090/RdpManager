@@ -4,6 +4,12 @@ namespace RdpmSync;
 
 public sealed record VpnDeviceRequest(string? Name, string? PublicKey);
 
+public sealed record VpnDeviceView(long Id, string Name, string Address, string Owner, bool FromHandshake, DateTimeOffset? LastContact,
+    DateTimeOffset CreatedUtc);
+
+public sealed record VpnOverview(bool Enabled, string Network, string Endpoint, string Dns,
+    IReadOnlyList<VpnDeviceView> Devices);
+
 /// <summary>
 /// Dispositivi VPN dell'account: un utente autenticato registra un suo PC (nome + chiave pubblica generata sul PC, la
 /// privata non arriva mai qui) e riceve i dati per il profilo WireGuard. Il server assegna il primo 10.66.0.N libero,
@@ -97,9 +103,12 @@ public sealed partial class VpnEndpoints(SyncOptions options, Store store, IWire
             {
                 // Stessa chiave già registrata: se è di questo account è lo stesso PC (idempotente), altrimenti è di altri.
                 if (store.FindDeviceByKey(key!) is { } byKey)
-                    return byKey.AccountId == t.AccountId
-                        ? Results.Json(Profile(byKey))
-                        : SyncApp.Err(409, "key_in_use", "Questa chiave pubblica è già registrata.");
+                {
+                    if (byKey.AccountId != t.AccountId)
+                        return SyncApp.Err(409, "key_in_use", "Questa chiave pubblica è già registrata.");
+                    store.TouchDevice(byKey.Id);
+                    return Results.Json(Profile(byKey));
+                }
 
                 if (store.FindDevice(t.AccountId, name!) is { } existing)
                 {
@@ -113,6 +122,7 @@ public sealed partial class VpnEndpoints(SyncOptions options, Store store, IWire
                         log.LogError(ex, "VPN: chiave non sostituita per {User}/{Name}", t.Username, name);
                         return SyncApp.Err(503, "vpn_unavailable", "Il server WireGuard non risponde: riprova fra poco.");
                     }
+                    store.TouchDevice(existing.Id);
                     log.LogInformation("VPN: chiave sostituita per {User}/{Name} ({Address})", t.Username, name, existing.Address);
                     return Results.Json(Profile(existing with { PublicKey = key! }));
                 }
@@ -132,6 +142,7 @@ public sealed partial class VpnEndpoints(SyncOptions options, Store store, IWire
 
                 store.InsertDevice(t.AccountId, name!, key!, ip);
                 var created = store.FindDevice(t.AccountId, name!)!;
+                store.TouchDevice(created.Id);
                 try { await wg.ApplyAsync(Desired()); }
                 catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
                 {
@@ -173,6 +184,44 @@ public sealed partial class VpnEndpoints(SyncOptions options, Store store, IWire
                 _gate.Release();
             }
         });
+    }
+
+    /// <summary>Dati per la plancia web: nessuna chiave privata esiste qui; la pubblica non viene esposta.</summary>
+    public async Task<VpnOverview> OverviewAsync()
+    {
+        var handshakes = wg is null ? new Dictionary<string, DateTimeOffset>() : await wg.HandshakesAsync();
+        var devices = store.ListDevicesWithOwner().Select(x =>
+        {
+            DateTimeOffset? hs = handshakes.TryGetValue(x.Device.PublicKey, out var h) ? h : null;
+            var last = hs ?? x.Device.LastSeenUtc;
+            return new VpnDeviceView(x.Device.Id, x.Device.Name, x.Device.Address, x.Owner, hs is not null, last, x.Device.CreatedUtc);
+        }).ToList();
+        return new VpnOverview(Enabled, Network, options.VpnEndpoint, options.VpnDns, devices);
+    }
+
+    /// <summary>Revoca un dispositivo qualunque (azione da amministratore). False se non esiste.</summary>
+    public async Task<bool> RevokeAsync(long deviceId, string by)
+    {
+        if (!Enabled)
+            return false;
+        await _gate.WaitAsync();
+        try
+        {
+            if (store.GetDevice(deviceId) is not { } d)
+                return false;
+            store.DeleteDevice(d.Id);
+            try { await wg!.ApplyAsync(Desired()); }
+            catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
+            {
+                log.LogError(ex, "VPN: peer {Name} tolto dal database ma non dal tunnel", d.Name);
+            }
+            log.LogInformation("VPN: dispositivo {Name} ({Address}) revocato da {Admin}", d.Name, d.Address, by);
+            return true;
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
 
     /// <summary>Toglie i peer di un account in via di eliminazione (prima che il database li cancelli a cascata).</summary>

@@ -132,41 +132,52 @@ public static class SyncApp
         });
 
         // ---------- accesso ----------
-        app.MapPost("/v1/login", (HttpContext ctx, CredentialsRequest? body) =>
+        // Verifica credenziali con i limiti di tentativi: condivisa tra /v1/login e il login della pagina web.
+        (Account? Account, IResult? Error) CheckCredentials(HttpContext ctx, string username, string secret)
         {
-            if (body?.Username is not { Length: > 0 } || !ValidSecret(body.Password))
-                return Err(400, "invalid_request", "Servono username e password (segreto derivato dal cliente).");
             var ip = Ip(ctx);
-            var user = ClientKeys.NormalizeUser(body.Username);
+            var user = ClientKeys.NormalizeUser(username);
             string kIpUser = ip + "|" + user;
             foreach (var (limiter, key) in new[] { (byIpUser, kIpUser), (byIp, ip), (byUser, user) })
                 if (limiter.Blocked(key) is { } wait)
                 {
                     log.LogWarning("Accesso bloccato per troppi tentativi: utente {User} da {Ip}", user, ip);
-                    return TooMany(wait);
+                    return (null, TooMany(wait));
                 }
 
-            var account = Store.ValidUsername(body.Username) ? store.FindAccount(body.Username) : null;
+            var account = Store.ValidUsername(username) ? store.FindAccount(username) : null;
             bool ok = false;
             if (account is null)
-                PasswordHasher.Verify(body.Password!, dummyHash, dummySalt, options.ServerHashIterations);
+                PasswordHasher.Verify(secret, dummyHash, dummySalt, options.ServerHashIterations);
             else
-                ok = PasswordHasher.Verify(body.Password!, account.Hash, account.Salt, account.Iterations) && !account.Disabled;
+                ok = PasswordHasher.Verify(secret, account.Hash, account.Salt, account.Iterations) && !account.Disabled;
             if (!ok)
             {
                 byIpUser.Fail(kIpUser);
                 byIp.Fail(ip);
                 byUser.Fail(user);
                 log.LogWarning("Accesso fallito: utente {User} da {Ip}", user, ip);
-                return Err(401, "invalid_credentials", "Utente o password sbagliati.");
+                return (null, Err(401, "invalid_credentials", "Utente o password sbagliati."));
             }
 
             byIpUser.Reset(kIpUser);
+            log.LogInformation("Accesso riuscito: utente {User} da {Ip}", user, ip);
+            return (account, null);
+        }
+
+        app.MapPost("/v1/login", (HttpContext ctx, CredentialsRequest? body) =>
+        {
+            if (body?.Username is not { Length: > 0 } || !ValidSecret(body.Password))
+                return Err(400, "invalid_request", "Servono username e password (segreto derivato dal cliente).");
+            var (account, error) = CheckCredentials(ctx, body.Username, body.Password!);
+            if (error is not null)
+                return error;
             var label = body.DeviceName is { Length: > 0 } d ? d[..Math.Min(d.Length, 64)] : null;
             var (token, expires) = store.IssueToken(account!.Id, options.TokenLifetime, label);
-            log.LogInformation("Accesso riuscito: utente {User} da {Ip}", user, ip);
             return Results.Json(new { token, tokenType = "Bearer", expiresUtc = expires, username = account.Username });
         });
+
+        new VpnWeb(options, store, vpn, time).Map(app, CheckCredentials);
 
         TokenInfo? Authenticate(HttpContext ctx)
         {
@@ -328,7 +339,7 @@ public static class SyncApp
         return new RetryResult(seconds);
     }
 
-    private sealed class RetryResult(int seconds) : IResult
+    internal sealed class RetryResult(int seconds) : IResult
     {
         public async Task ExecuteAsync(HttpContext ctx)
         {

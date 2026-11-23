@@ -15,6 +15,10 @@ public sealed class FakeWireGuard : IWireGuardPeers
     /// <summary>Simula wg0.conf / socket illeggibili per permessi (UnauthorizedAccessException).</summary>
     public bool Denied { get; set; }
     public string[] Reserved { get; set; } = [];
+    public Dictionary<string, DateTimeOffset> Handshakes { get; } = [];
+
+    public Task<IReadOnlyDictionary<string, DateTimeOffset>> HandshakesAsync(CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyDictionary<string, DateTimeOffset>>(Handshakes);
 
     public IReadOnlyCollection<string> ReservedAddresses() =>
         Denied ? throw new UnauthorizedAccessException("permesso negato") : Reserved;

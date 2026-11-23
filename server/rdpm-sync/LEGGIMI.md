@@ -144,6 +144,11 @@ In RdpManager l'indirizzo del server va scritto (nessun valore predefinito); con
 | `RDPM_VPN_DNS` | vuota | DNS scritto nei profili |
 | `RDPM_VPN_INTERFACE`, `RDPM_VPN_WG` | `wg0`, `wg` | interfaccia e comando `wg` |
 | `RDPM_VPN_MAX_DEVICES` | `20` | PC per account |
+| `RDPM_SYNC_WEB_ADMINS` | vuoto | utenti (separati da virgola) che dalla plancia web `/vpn` possono revocare i dispositivi |
+
+Plancia web: `https://<server>/vpn` (accesso con gli account esistenti, senza accesso rimanda a `/vpn/accesso`).
+Mostra dispositivi, IP VPN, connesso sì/no (ultimo handshake da `wg show`, altrimenti ultimo contatto registrato) e dati
+del server; mai chiavi. Usarla solo dietro HTTPS (la password viaggia nel modulo; il cookie è HttpOnly e Secure).
 
 ## Senza Docker (prove)
 

@@ -18,6 +18,10 @@ public interface IWireGuardPeers
 
     /// <summary>Porta il tunnel (e il file di configurazione) esattamente allo stato <paramref name="desired"/>.</summary>
     Task ApplyAsync(IReadOnlyCollection<WgPeer> desired, CancellationToken ct = default);
+
+    /// <summary>Ultimo handshake per chiave pubblica (solo peer che ne hanno avuto uno). Vuoto se il server non può leggerlo.</summary>
+    Task<IReadOnlyDictionary<string, DateTimeOffset>> HandshakesAsync(CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyDictionary<string, DateTimeOffset>>(new Dictionary<string, DateTimeOffset>());
 }
 
 /// <summary>Lettura e scrittura del blocco gestito dal server dentro wg0.conf (il resto del file non si tocca).</summary>
@@ -109,6 +113,36 @@ public sealed class WgCliPeers(string confPath, string iface = "wg0", string wgP
             await WgAsync(["set", iface, "peer", gone, "remove"], ct);
         foreach (var p in desired)
             await WgAsync(["set", iface, "peer", p.PublicKey, "allowed-ips", p.Address], ct);
+    }
+
+    /// <summary>Legge <c>wg show &lt;if&gt; latest-handshakes</c>: righe «chiave pubblica TAB secondi unix» (0 = mai).</summary>
+    public async Task<IReadOnlyDictionary<string, DateTimeOffset>> HandshakesAsync(CancellationToken ct = default)
+    {
+        var result = new Dictionary<string, DateTimeOffset>();
+        try
+        {
+            var psi = new ProcessStartInfo(wgPath) { RedirectStandardError = true, RedirectStandardOutput = true, UseShellExecute = false };
+            foreach (var a in new[] { "show", iface, "latest-handshakes" })
+                psi.ArgumentList.Add(a);
+            using var p = Process.Start(psi);
+            if (p is null)
+                return result;
+            var output = await p.StandardOutput.ReadToEndAsync(ct);
+            await p.WaitForExitAsync(ct);
+            if (p.ExitCode != 0)
+                return result;
+            foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var parts = line.Trim().Split('\t', ' ');
+                if (parts.Length >= 2 && long.TryParse(parts[^1], out var secs) && secs > 0)
+                    result[parts[0]] = DateTimeOffset.FromUnixTimeSeconds(secs);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            // wg non disponibile: la pagina userà l'ultimo contatto registrato.
+        }
+        return result;
     }
 
     private async Task WgAsync(string[] args, CancellationToken ct)
