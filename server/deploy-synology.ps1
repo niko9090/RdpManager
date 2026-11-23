@@ -47,7 +47,7 @@ try {
     # Passa in base64, cosi' simboli come ! non danno problemi nella shell.
     if ($cfg.CodiceRegistrazione -match "[\s|&\\']") { throw 'codiceRegistrazione: niente spazi ne i simboli | & \ e apice' }
     $codice = if ($cfg.CodiceRegistrazione) { ' DEPLOY_REG_CODE_B64=' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($cfg.CodiceRegistrazione)) } else { '' }
-    $remote = "sudo -n env DEPLOY_HOST=$PublicHost$codiceDEPLOY_LAN=$($cfg.ReteLan) DEPLOY_BASE=$($cfg.CartellaNas) DEPLOY_PORT_VPN=$($cfg.PortaVpn) bash /tmp/rdpm-deploy.sh; rc=`$?; rm -f /tmp/rdpm-deploy.sh; exit `$rc"
+    $remote = "sudo -n env DEPLOY_HOST=$PublicHost${codice} DEPLOY_LAN=$($cfg.ReteLan) DEPLOY_BASE=$($cfg.CartellaNas) DEPLOY_PORT_VPN=$($cfg.PortaVpn) bash /tmp/rdpm-deploy.sh; rc=`$?; rm -f /tmp/rdpm-deploy.sh; exit `$rc"
     ssh -o BatchMode=yes $Alias $remote
     if ($LASTEXITCODE) { throw 'deploy fallito sul Synology' }
 }
