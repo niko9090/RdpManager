@@ -43,6 +43,15 @@ public sealed class SyncOptions
     public string VpnDns { get; set; } = "";
     public int MaxDevicesPerAccount { get; set; } = 20;
 
+    /// <summary>Nomi utente (separati da virgola) che nella pagina web /vpn possono revocare i dispositivi. Vuoto = nessuno.</summary>
+    public string WebAdmins { get; set; } = "";
+
+    /// <summary>Iterazioni con cui il server deriva il segreto dalla password digitata nel modulo web (come farebbe l'app).</summary>
+    public int WebKdfIterations { get; set; } = ClientKeys.Iterations;
+
+    /// <summary>Durata dell'accesso dalla pagina web.</summary>
+    public TimeSpan WebSessionLifetime { get; set; } = TimeSpan.FromHours(12);
+
     public static SyncOptions FromEnvironment()
     {
         var o = new SyncOptions();
@@ -64,6 +73,7 @@ public sealed class SyncOptions
         o.VpnServerPublicKey = V("RDPM_VPN_SERVER_PUBLIC_KEY") ?? "";
         o.VpnEndpoint = V("RDPM_VPN_ENDPOINT") ?? o.VpnEndpoint;
         o.VpnDns = V("RDPM_VPN_DNS") ?? "";
+        o.WebAdmins = V("RDPM_SYNC_WEB_ADMINS") ?? "";
         if (int.TryParse(V("RDPM_VPN_MAX_DEVICES"), out var md) && md is > 0 and <= 250)
             o.MaxDevicesPerAccount = md;
         return o;
