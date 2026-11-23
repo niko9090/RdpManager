@@ -45,6 +45,8 @@ public sealed class App : Application
             desktop.Exit += (_, _) =>
             {
                 viewModel.ShutdownBlockB();
+                // Uscita vera: la VPN integrata si spegne, quella del programma di riferimento (Gestore VPN) resta accesa.
+                Task.Run(() => viewModel.StopIntegratedVpnOnExitAsync()).Wait(TimeSpan.FromSeconds(20));
                 _hotkey?.Dispose();
                 sessions.ShutdownAll(TimeSpan.FromSeconds(4));
             };
@@ -64,6 +66,7 @@ public sealed class App : Application
             viewModel.HasTouchScreen = DesktopSupport.DetectTouchScreen();
             window.Opened += (_, _) =>
             {
+                viewModel.ApplyCloseToTrayDefaultOnce();
                 viewModel.StartBlockB(shell);
                 SetupHotkey();
                 _ = DetectTrayHostAsync();
@@ -186,13 +189,40 @@ public sealed class App : Application
 
     private void OnWindowClosing(object? sender, WindowClosingEventArgs e)
     {
-        if (_exiting || _viewModel is not { } vm)
+        if (_viewModel is not { } vm || _window is not { } window)
             return;
-        // «Resta nell'area di notifica» solo se l'icona c'è davvero: altrimenti la finestra sparirebbe senza modo di riaprirla.
-        if (vm.Document.Settings is { ShowTrayIcon: true, CloseToTray: true } && _trayHost && _tray is { IsVisible: true })
+        // Con l'icona la finestra si nasconde; senza (desktop senza area delle icone) si riduce a icona, così non si perde.
+        switch (vm.DecideClose(_trayHost && _tray is { IsVisible: true }, _exiting))
         {
-            e.Cancel = true;
-            _window?.Hide();
+            case CloseAction.HideToTray:
+                e.Cancel = true;
+                if (_hintOpen)
+                    return;
+                if (vm.TakeTrayHint() is { } hint)
+                    _ = HideAfterHintAsync(window, hint);
+                else
+                    window.Hide();
+                break;
+            case CloseAction.Minimize:
+                e.Cancel = true;
+                window.WindowState = WindowState.Minimized;
+                break;
+        }
+    }
+
+    private bool _hintOpen;
+
+    private async Task HideAfterHintAsync(MainWindow window, string hint)
+    {
+        _hintOpen = true;
+        try
+        {
+            await new DialogService { Owner = window }.ShowMessageAsync("RdpManager", hint);
+        }
+        finally
+        {
+            _hintOpen = false;
+            window.Hide();
         }
     }
 
