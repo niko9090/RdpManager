@@ -27,14 +27,12 @@ public sealed class RdpSessionView : UserControl
         Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter,
         ForeColor = Color.Gainsboro, Font = new Font(SystemFonts.MessageBoxFont!.FontFamily, 11f),
     };
-    private readonly System.Windows.Forms.Timer _resizeTimer = new() { Interval = 700 };
     private readonly System.Windows.Forms.Timer _reconnectTimer = new();
+    private readonly SessionResizeCoordinator _resizer;
 
     private RdpClientHost? _rdp;
     private bool _pendingConnect;
-    private bool _resizeUnsupported;
     private Size _lastSentSize;
-    private int _lastSentScale;
     private int _reconnectAttempts;
     private bool _closing;
     private readonly SessionTouchInput _touch;
@@ -95,11 +93,20 @@ public sealed class RdpSessionView : UserControl
         HandleCreated += (_, _) => ApplyBarTouch();
         DpiChangedAfterParent += (_, _) => ApplyBarTouch();
 
-        _host.Resize += (_, _) => { if (State == SessionState.Connected) { _resizeTimer.Stop(); _resizeTimer.Start(); } };
-        _resizeTimer.Tick += (_, _) => { _resizeTimer.Stop(); ApplyFitToWindow(); };
+        _resizer = new SessionResizeCoordinator(new ResizeTarget(this), new WinFormsResizeTimer());
+        // Ogni evento chiede l'aggiornamento anche se la sessione non è (ancora) connessa o la scheda è nascosta:
+        // il coordinatore tiene la richiesta in sospeso e la esegue appena possibile.
+        _host.Resize += (_, _) => _resizer.Request();
         _reconnectTimer.Tick += (_, _) => { _reconnectTimer.Stop(); Connect(keepAttempts: true); };
-        VisibleChanged += (_, _) => TryStartPendingConnect();
-        DpiChangedAfterParent += (_, _) => { if (State == SessionState.Connected) { _resizeTimer.Stop(); _resizeTimer.Start(); } };
+        VisibleChanged += (_, _) =>
+        {
+            TryStartPendingConnect();
+            if (Visible)
+                _resizer.Request(); // scheda tornata in primo piano dopo che la finestra è cambiata
+        };
+        DpiChangedAfterParent += (_, _) => _resizer.Request();
+        HandleCreated += (_, _) => Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
+        HandleDestroyed += (_, _) => Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
 
         SetState(SessionState.Idle, "Pronta");
     }
@@ -295,7 +302,7 @@ public sealed class RdpSessionView : UserControl
         if (!keepAttempts)
             _reconnectAttempts = 0;
         DisposeClient();
-        _resizeUnsupported = false;
+        _resizer.Reset();
         AuthenticationWarningCount = 0;
         try
         {
@@ -313,7 +320,7 @@ public sealed class RdpSessionView : UserControl
         {
             _reconnectAttempts = 0;
             SetState(SessionState.Connected, "Connessa");
-            ApplyFitToWindow();
+            _resizer.Request(); // la finestra può essere cambiata durante la connessione
         };
         _rdp.Disconnected += (_, reason) => OnDisconnected(reason);
         _rdp.AuthenticationWarningDisplayed += (_, _) =>
@@ -692,9 +699,10 @@ public sealed class RdpSessionView : UserControl
         Try(() => ocx.FullScreenTitle = $"{c.DisplayName} - RdpManager");
 
         // Scala del desktop remoto uguale a quella del monitor su cui è la sessione.
-        _lastSentScale = MonitorLayout.DesktopScaleFactor(DeviceDpi);
-        Try(() => ocx.SetExtendedProperty("DesktopScaleFactor", (uint)_lastSentScale));
-        Try(() => ocx.SetExtendedProperty("DeviceScaleFactor", (uint)DeviceScaleFactor(_lastSentScale)));
+        int startScale = MonitorLayout.DesktopScaleFactor(DeviceDpi);
+        _resizer.SetBaseline(size, startScale);
+        Try(() => ocx.SetExtendedProperty("DesktopScaleFactor", (uint)startScale));
+        Try(() => ocx.SetExtendedProperty("DeviceScaleFactor", (uint)DeviceScaleFactor(startScale)));
 
         dynamic adv = ocx.AdvancedSettings2;
         adv.RDPPort = c.Port;
@@ -808,34 +816,66 @@ public sealed class RdpSessionView : UserControl
     /// Adatta la risoluzione remota alla scheda o finestra (e alla scala del monitor) senza riconnettere,
     /// se il server lo permette; altrimenti l'immagine viene scalata.
     /// </summary>
-    private void ApplyFitToWindow()
+    private void OnDisplaySettingsChanged(object? sender, EventArgs e)
     {
-        if (_rdp is not null && State == SessionState.Connected && Connection.ResolutionMode == ResolutionMode.Fixed)
+        if (IsDisposed || !IsHandleCreated)
+            return;
+        // L'evento arriva da un altro thread, e il monitor sta ancora cambiando: la finestra si assesta e poi si aggiorna.
+        try { BeginInvoke(() => _resizer.Request()); } catch (InvalidOperationException) { }
+    }
+
+    /// <summary>Il coordinatore (logica in Core) agisce sul controllo tramite questa classe.</summary>
+    private sealed class ResizeTarget(RdpSessionView v) : IResizeTarget
+    {
+        public bool IsConnected => v._rdp is not null && v.State == SessionState.Connected;
+        public bool IsShown => v.Visible && v.IsHandleCreated && v._host.ClientSize.Width > 0 && v._host.ClientSize.Height > 0;
+        public ResolutionMode Mode => v.Connection.ResolutionMode;
+        public Size ClientSize => v._host.ClientSize;
+        public int Scale => MonitorLayout.DesktopScaleFactor(v.DeviceDpi);
+
+        public bool TryUpdate(Size size, int scale)
+        {
+            if (v._rdp is null)
+                return false;
+            v._rdp.Ocx.UpdateSessionDisplaySettings((uint)size.Width, (uint)size.Height, (uint)size.Width, (uint)size.Height, 0u,
+                (uint)scale, (uint)DeviceScaleFactor(scale));
+            v._lastSentSize = size;
+            return true;
+        }
+
+        public void UpdateSmartSizing()
         {
             // Risoluzione fissa: se il tablet è piccolo o ruota, l'immagine si scala per stare nello schermo.
-            bool smart = SessionFit.ShouldSmartSize(ResolutionMode.Fixed, _lastSentSize, _host.ClientSize);
-            Try(() => _rdp.Ocx.AdvancedSettings2.SmartSizing = smart);
-            return;
+            if (v._rdp is null)
+                return;
+            bool smart = SessionFit.ShouldSmartSize(ResolutionMode.Fixed, v._lastSentSize, v._host.ClientSize);
+            Try(() => v._rdp.Ocx.AdvancedSettings2.SmartSizing = smart);
         }
-        if (_rdp is null || State != SessionState.Connected || Connection.ResolutionMode != ResolutionMode.FitToWindow || _resizeUnsupported)
-            return;
-        var size = ClampSize(_host.ClientSize);
-        int scale = MonitorLayout.DesktopScaleFactor(DeviceDpi);
-        if (size == _lastSentSize && scale == _lastSentScale)
-            return;
-        try
-        {
-            _rdp.Ocx.UpdateSessionDisplaySettings((uint)size.Width, (uint)size.Height, (uint)size.Width, (uint)size.Height, 0u,
-                (uint)scale, (uint)DeviceScaleFactor(scale));
-            _lastSentSize = size;
-            _lastSentScale = scale;
-        }
-        catch (Exception)
+
+        public void GiveUp()
         {
             // Server o controllo senza ridimensionamento dinamico: si scala l'immagine.
-            _resizeUnsupported = true;
-            Try(() => _rdp.Ocx.AdvancedSettings2.SmartSizing = true);
+            if (v._rdp is not null)
+                Try(() => v._rdp.Ocx.AdvancedSettings2.SmartSizing = true);
         }
+    }
+
+    private sealed class WinFormsResizeTimer : IResizeTimer
+    {
+        private readonly System.Windows.Forms.Timer _timer = new();
+
+        public WinFormsResizeTimer() => _timer.Tick += (_, _) => Elapsed?.Invoke();
+
+        public event Action? Elapsed;
+
+        public void Restart(int delayMs)
+        {
+            _timer.Stop();
+            _timer.Interval = delayMs;
+            _timer.Start();
+        }
+
+        public void Stop() => _timer.Stop();
     }
 
     private void OnDisconnected(int reason)
@@ -969,7 +1009,8 @@ public sealed class RdpSessionView : UserControl
         if (disposing)
         {
             _closing = true;
-            _resizeTimer.Dispose();
+            _resizer.Reset();
+            Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
             _reconnectTimer.Dispose();
             _touch.Dispose();
             DisposeClient();

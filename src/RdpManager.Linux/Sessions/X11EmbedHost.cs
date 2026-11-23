@@ -13,6 +13,30 @@ public sealed class X11EmbedHost : NativeControlHost
     private IntPtr _display;
     private IntPtr _window;
 
+    public X11EmbedHost()
+    {
+        // La finestra figlia (e con essa la finestra di FreeRDP, che ascolta i ConfigureNotify del genitore) deve seguire
+        // sempre la dimensione della scheda: senza, /dynamic-resolution non riceve mai il nuovo formato.
+        SizeChanged += (_, _) => ResizeChild();
+    }
+
+    private void ResizeChild()
+    {
+        if (_display == IntPtr.Zero || _window == IntPtr.Zero)
+            return;
+        var scale = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1.0;
+        var w = (uint)Math.Max(1, (int)(Bounds.Width * scale));
+        var h = (uint)Math.Max(1, (int)(Bounds.Height * scale));
+        try
+        {
+            XResizeWindow(_display, _window, w, h);
+            XFlush(_display);
+        }
+        catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
+        {
+        }
+    }
+
     /// <summary>Handle X11 creato (finestra figlia pronta, già mostrata).</summary>
     public event Action<long>? Created;
 
@@ -61,6 +85,8 @@ public sealed class X11EmbedHost : NativeControlHost
     [DllImport("libX11.so.6")]
     private static extern IntPtr XCreateSimpleWindow(IntPtr display, IntPtr parent, int x, int y, uint width, uint height,
         uint borderWidth, ulong border, ulong background);
+    [DllImport("libX11.so.6")] private static extern int XResizeWindow(IntPtr display, IntPtr window, uint width, uint height);
+    [DllImport("libX11.so.6")] private static extern int XFlush(IntPtr display);
     [DllImport("libX11.so.6")] private static extern int XMapWindow(IntPtr display, IntPtr window);
     [DllImport("libX11.so.6")] private static extern int XDestroyWindow(IntPtr display, IntPtr window);
     [DllImport("libX11.so.6")] private static extern int XSync(IntPtr display, [MarshalAs(UnmanagedType.Bool)] bool discard);
