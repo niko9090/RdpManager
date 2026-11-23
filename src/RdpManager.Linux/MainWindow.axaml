@@ -64,7 +64,7 @@
               <TextBlock Classes="sidebarTitle" Text="Connessioni" Margin="4,0,0,0" />
               <Button Grid.Column="1" Classes="flat" Content="Cerca PC" MinHeight="22" Padding="6,0"
                       Command="{Binding NetworkScanCommand}"
-                      ToolTip.Tip="Cerca PC in rete (rete locale, Tailscale, altre VPN)" />
+                      ToolTip.Tip="Cerca PC in rete (rete locale, Tailscale, marshmelloVPN, altre VPN)" />
               <Button Grid.Column="2" Classes="flat" Content="{Binding PinButtonText}" MinHeight="22" Padding="6,0"
                       Command="{Binding PinSidebarCommand}" ToolTip.Tip="{Binding PinButtonTip}" />
             </Grid>

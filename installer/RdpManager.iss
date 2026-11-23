@@ -217,8 +217,8 @@ procedure InitializeWizard;
 begin
   RolePage := CreateInputOptionPage(wpWelcome, 'Ruolo di questa installazione', 'Come userai RdpManager su questo PC?',
     'Il ruolo si può cambiare in ogni momento da Impostazioni.', True, False);
-  RolePage.Add('Desktop remoto + VPN (consigliato): si apre la finestra con le schede dei desktop remoti');
-  RolePage.Add('Gestore VPN: all''avvio si apre la Plancia VPN in primo piano; la finestra con le schede resta raggiungibile');
+  RolePage.Add('Desktop remoto + marshmelloVPN (consigliato): si apre la finestra con le schede dei desktop remoti');
+  RolePage.Add('Gestore marshmelloVPN: all''avvio si apre la Plancia marshmelloVPN in primo piano; la finestra con le schede resta raggiungibile');
   RolePage.SelectedValueIndex := 0;
   if (RoleFromCommandLine = 'vpn') or ((RoleFromCommandLine = '') and ExistingRoleIsVpn) then
     RolePage.SelectedValueIndex := 1;

@@ -41,8 +41,8 @@ public sealed class ClientServiceInstaller(ICommandRunner sc)
         var name = ClientPaths.ServiceName;
         string verb = sc.Run("sc.exe", "query", name) == 0 ? "config" : "create"; // già presente (reinstallazione): si aggiorna
         Require(sc.Run("sc.exe", verb, name, "binPath=", ServiceCommandLine(exePath), "start=", "auto",
-            "DisplayName=", "RdpManager VPN", "depend=", "Nsi/TcpIp"), verb);
-        Require(sc.Run("sc.exe", "description", name, "Tunnel VPN WireGuard di RdpManager VPN"), "description");
+            "DisplayName=", "marshmelloVPN", "depend=", "Nsi/TcpIp"), verb);
+        Require(sc.Run("sc.exe", "description", name, "Tunnel VPN WireGuard di marshmelloVPN"), "description");
         Require(sc.Run("sc.exe", "failure", name, "reset=", "86400", "actions=", "restart/5000/restart/30000/restart/60000"), "failure");
         Require(sc.Run("sc.exe", "sdset", name, Sddl), "sdset");
     }

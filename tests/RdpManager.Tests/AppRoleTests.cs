@@ -92,8 +92,8 @@ public class AppRoleTests : IDisposable
     [Fact]
     public void I_titoli_sono_quelli_dell_installer()
     {
-        Assert.Equal("Desktop remoto + VPN", AppRoleStore.Describe(AppRole.DesktopAndVpn));
-        Assert.Equal("Gestore VPN", AppRoleStore.Describe(AppRole.VpnManager));
+        Assert.Equal("Desktop remoto + marshmelloVPN", AppRoleStore.Describe(AppRole.DesktopAndVpn));
+        Assert.Equal("Gestore marshmelloVPN", AppRoleStore.Describe(AppRole.VpnManager));
     }
 
     [Fact]
@@ -101,8 +101,8 @@ public class AppRoleTests : IDisposable
     {
         var iss = File.ReadAllText(RepoFile("installer/RdpManager.iss"));
         Assert.Contains("CreateInputOptionPage", iss);
-        Assert.Contains("Desktop remoto + VPN", iss);
-        Assert.Contains("Gestore VPN", iss);
+        Assert.Contains("Desktop remoto + marshmelloVPN", iss);
+        Assert.Contains("Gestore marshmelloVPN", iss);
         Assert.Contains("role.json", iss);
         Assert.Contains("not WizardSilent", iss); // silenziosa senza /ROLE: il file resta com'è
     }

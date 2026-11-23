@@ -34,7 +34,7 @@ public sealed class VpnForm : TouchForm
         if (_profile.PcName.Length == 0)
             _profile.PcName = Environment.MachineName;
 
-        Text = "VPN (WireGuard)";
+        Text = "marshmelloVPN (WireGuard)";
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = MinimizeBox = false;
         StartPosition = FormStartPosition.CenterParent;
@@ -55,8 +55,8 @@ public sealed class VpnForm : TouchForm
         {
             layout.Controls.Add(new Label
             {
-                Text = "Per usare la VPN basta caricare il file di configurazione che ti ha dato chi gestisce il server:\n"
-                       + "il programma fa il resto (registra questo PC e accende la VPN). Niente da compilare.",
+                Text = "Per usare marshmelloVPN basta caricare il file di configurazione che ti ha dato chi gestisce il server:\n"
+                       + "il programma fa il resto (registra questo PC e accende marshmelloVPN). Niente da compilare.",
                 AutoSize = true,
                 MaximumSize = new Size(400, 0),
             });
@@ -155,7 +155,7 @@ public sealed class VpnForm : TouchForm
     {
         if (_profile.HasKey && MessageBox.Show(this,
                 "Esiste già una chiave. Crearne una nuova scollega questo PC dal server finché non aggiungi il nuovo frammento. Continuare?",
-                "VPN", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+                "marshmelloVPN", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
             return;
         _profile.GenerateKeys();
         Persist();
@@ -191,7 +191,7 @@ public sealed class VpnForm : TouchForm
         }
         catch (Exception ex) when (ex is VpnException or ArgumentException or InvalidOperationException)
         {
-            MessageBox.Show(this, ex.Message, "VPN", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, ex.Message, "marshmelloVPN",MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
         finally
         {
@@ -218,6 +218,6 @@ public sealed class VpnForm : TouchForm
             TunnelState.Errore => "Errore",
             _ => "Spento",
         };
-        _toggle.Text = s is TunnelState.Acceso or TunnelState.InAvvio ? "Spegni la VPN" : "Accendi la VPN";
+        _toggle.Text = s is TunnelState.Acceso or TunnelState.InAvvio ? "Spegni marshmelloVPN" : "Accendi marshmelloVPN";
     }
 }

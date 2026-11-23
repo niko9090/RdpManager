@@ -37,7 +37,7 @@ if ($perPc) {
 $version = ($csproj.Project.PropertyGroup | ForEach-Object { $_.Version } | Where-Object { $_ }) | Select-Object -First 1
 if (-not $version) { throw "Versione non trovata in $project" }
 $version = $version.Trim()
-Write-Host ("RdpManager VPN $version " + $(if ($perPc) { "per '$Nome'" } else { '(installer generico)' }))
+Write-Host ("marshmelloVPN $version " + $(if ($perPc) { "per '$Nome'" } else { '(installer generico)' }))
 
 $publishDir = Join-Path $root 'artifacts\publish-vpn'
 $dist = Join-Path $root 'dist'

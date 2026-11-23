@@ -30,7 +30,7 @@
   #endif
 #endif
 
-#define AppName "RdpManager VPN"
+#define AppName "marshmelloVPN"
 #define AppExe "RdpManagerVpn.exe"
 #define ProgId "RdpManagerVPN.ConfigFile"
 
@@ -42,10 +42,10 @@ AppVerName={#AppName} {#AppVersion}
 AppPublisher=niko9090
 VersionInfoVersion={#AppVersion}
 #ifdef ProfilePath
-VersionInfoDescription=Installazione di RdpManager VPN per {#ClientName}
+VersionInfoDescription=Installazione di marshmelloVPN per {#ClientName}
 OutputBaseFilename=RdpManagerVPN-Setup-{#ClientName}
 #else
-VersionInfoDescription=Installazione di RdpManager VPN
+VersionInfoDescription=Installazione di marshmelloVPN
 OutputBaseFilename=RdpManagerVPN-Setup
 #endif
 VersionInfoProductName={#AppName}
@@ -90,9 +90,9 @@ Root: HKCU; Subkey: "Software\Classes\.rdpmconfig"; ValueType: string; ValueName
 ; Profilo leggibile solo da SYSTEM e amministratori (SID noti: funziona in ogni lingua di Windows).
 Filename: "{sys}\icacls.exe"; Parameters: """{app}\vpn.conf"" /inheritance:r /grant:r *S-1-5-18:F *S-1-5-32-544:F"; Flags: runhidden waituntilterminated; StatusMsg: "Protezione del profilo..."
 #endif
-Filename: "{app}\{#AppExe}"; Parameters: "--installa-servizio"; Flags: runhidden waituntilterminated; StatusMsg: "Installazione del servizio VPN..."
+Filename: "{app}\{#AppExe}"; Parameters: "--installa-servizio"; Flags: runhidden waituntilterminated; StatusMsg: "Installazione del servizio marshmelloVPN..."
 ; Con il file di configurazione (accanto all'installer o /CONFIG): chiave, registrazione, profilo, tunnel; poi il riepilogo.
-Filename: "{app}\{#AppExe}"; Parameters: "--configura ""{code:ConfigFile}"""; Check: HasConfigFile; Flags: waituntilterminated; StatusMsg: "Configurazione della VPN..."
+Filename: "{app}\{#AppExe}"; Parameters: "--configura ""{code:ConfigFile}"""; Check: HasConfigFile; Flags: waituntilterminated; StatusMsg: "Configurazione di marshmelloVPN..."
 ; L'icona parte con l'utente che ha avviato l'installazione (non con l'amministratore dell'UAC).
 Filename: "{app}\{#AppExe}"; Description: "Avvia {#AppName}"; Flags: nowait postinstall runasoriginaluser
 
@@ -122,7 +122,7 @@ begin
     if (ConfigPath <> '') and not FileExists(ConfigPath) then
     begin
       MsgBox('Il file indicato con /CONFIG non esiste:' + #13#10 + ConfigPath + #13#10#13#10 +
-        'Si installa lo stesso: dopo potrai caricare il file dall''icona di RdpManager VPN.', mbError, MB_OK);
+        'Si installa lo stesso: dopo potrai caricare il file dall''icona di marshmelloVPN.', mbError, MB_OK);
       ConfigPath := '';
     end
     else if ConfigPath = '' then

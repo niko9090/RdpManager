@@ -105,7 +105,7 @@ public class VpnDashboardViewModelTests
         await vm.RefreshAsync();
         Assert.Null(vm.ErrorText);
         Assert.True(vm.HasInfo);
-        Assert.Equal("Nessun PC registrato nella VPN.", vm.InfoText);
+        Assert.Equal("Nessun PC registrato in marshmelloVPN.", vm.InfoText);
     }
 
     [Fact]
@@ -152,7 +152,7 @@ public class VpnDashboardViewModelTests
     public void Il_menu_Strumenti_ha_Plancia_VPN_con_lo_stesso_testo_di_Windows()
     {
         var axaml = File.ReadAllText(SettingsViewModelTests.RepoFile("src/RdpManager.Linux/Menus/MainMenu.axaml"));
-        Assert.Contains("Header=\"Pl_ancia VPN…\" Command=\"{Binding VpnDashboardCommand}\"", axaml);
+        Assert.Contains("Header=\"Pl_ancia marshmelloVPN…\" Command=\"{Binding VpnDashboardCommand}\"", axaml);
     }
 
     [Fact]

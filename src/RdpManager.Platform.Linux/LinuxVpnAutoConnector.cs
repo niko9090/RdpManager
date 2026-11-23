@@ -36,7 +36,7 @@ public sealed class LinuxVpnAutoConnector(LinuxWireGuard vpn, Func<VpnProfile> l
             if (_warnedMissingTools)
                 return "";
             _warnedMissingTools = true;
-            return "WireGuard non è installato: apri VPN e premi «Installa WireGuard» per collegarti da solo.";
+            return "WireGuard non è installato: apri marshmelloVPN e premi «Installa WireGuard» per collegarti da solo.";
         }
         _warnedMissingTools = false;
 

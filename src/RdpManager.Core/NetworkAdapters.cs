@@ -162,7 +162,7 @@ public sealed record AdapterCard(string Name, string Description, NetworkKind Ki
 /// </summary>
 public sealed class NetworkOverview
 {
-    public const string VpnLabel = "VPN";
+    public const string VpnLabel = "marshmelloVPN";
 
     private NetworkOverview(IReadOnlyList<AdapterCard> cards, AdapterInfo? suggested)
     {
@@ -184,9 +184,9 @@ public sealed class NetworkOverview
     /// <summary>Frase di stato ben visibile: collegata con IP e rete, oppure non collegata.</summary>
     public string Headline => Vpn switch
     {
-        { Connected: true } v => $"{VpnLabel} COLLEGATA - il tuo IP nella VPN è {v.AddressText}, rete {v.NetworkText} (scheda «{v.Name}»).",
-        { } v => $"{VpnLabel} NON COLLEGATA - la scheda «{v.Name}» c'è ma è spenta: collega la VPN per cercare i PC nella sua rete.",
-        null => $"{VpnLabel} NON COLLEGATA - su questo PC non si vede nessuna scheda della VPN: collega la VPN (o configurala) per cercare i PC nella sua rete.",
+        { Connected: true } v => $"{VpnLabel} COLLEGATA - il tuo IP in marshmelloVPN è {v.AddressText}, rete {v.NetworkText} (scheda «{v.Name}»).",
+        { } v => $"{VpnLabel} NON COLLEGATA - la scheda «{v.Name}» c'è ma è spenta: collega marshmelloVPN per cercare i PC nella sua rete.",
+        null => $"{VpnLabel} NON COLLEGATA - su questo PC non si vede nessuna scheda di marshmelloVPN: collega marshmelloVPN (o configurala) per cercare i PC nella sua rete.",
     };
 
     public static NetworkOverview Build(IReadOnlyList<AdapterInfo> active, IReadOnlyList<AdapterCard>? inactive = null)

@@ -59,8 +59,8 @@ internal sealed class TrayApp : ApplicationContext
             _firstRun.Tick += (_, _) =>
             {
                 _firstRun.Stop();
-                var answer = MessageBox.Show("RdpManager VPN non è ancora configurata su questo PC.\n\nScegli il file di configurazione (.rdpmconfig) che ti ha dato chi gestisce il server.",
-                    "RdpManager VPN", MessageBoxButtons.OKCancel, MessageBoxIcon.Information);
+                var answer = MessageBox.Show("marshmelloVPN non è ancora configurata su questo PC.\n\nScegli il file di configurazione (.rdpmconfig) che ti ha dato chi gestisce il server.",
+                    "marshmelloVPN", MessageBoxButtons.OKCancel, MessageBoxIcon.Information);
                 if (answer == DialogResult.OK)
                     LoadConfigFile();
             };
@@ -83,7 +83,7 @@ internal sealed class TrayApp : ApplicationContext
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or Win32Exception)
         {
-            MessageBox.Show("Configurazione non riuscita: " + ex.Message, "RdpManager VPN", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show("Configurazione non riuscita: " + ex.Message, "marshmelloVPN", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
         finally
         {
@@ -121,7 +121,7 @@ internal sealed class TrayApp : ApplicationContext
         bool on = state is TunnelState.Acceso or TunnelState.InAvvio;
         _toggleItem.Text = on ? "Disconnetti" : "Connetti";
         _toggleItem.Enabled = state is not (TunnelState.InArresto);
-        _icon.Text = Truncate("RdpManager VPN - " + text, 63);
+        _icon.Text = Truncate("marshmelloVPN - " + text, 63);
 
         var key = text;
         if (key != _lastStateKey)
@@ -147,7 +147,7 @@ internal sealed class TrayApp : ApplicationContext
             if (!ServiceInstalled)
             {
                 var risposta = MessageBox.Show("Il servizio della VPN non è installato su questo PC. Installarlo ora? (serve l'autorizzazione di amministratore)",
-                    "RdpManager VPN", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                    "marshmelloVPN", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
                 if (risposta == DialogResult.Yes)
                     RunElevated("--installa-servizio");
                 Refresh();
@@ -161,7 +161,7 @@ internal sealed class TrayApp : ApplicationContext
         }
         catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
         {
-            MessageBox.Show(ex.Message, "RdpManager VPN", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(ex.Message, "marshmelloVPN", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
         Refresh();
     }
@@ -190,7 +190,7 @@ internal sealed class TrayApp : ApplicationContext
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            MessageBox.Show("Le impostazioni non si riescono a salvare: " + ex.Message, "RdpManager VPN", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show("Le impostazioni non si riescono a salvare: " + ex.Message, "marshmelloVPN", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return false;
         }
     }

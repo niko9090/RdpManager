@@ -83,7 +83,7 @@ public sealed partial class VpnEndpoints(SyncOptions options, Store store, IWire
                 return unauthorized(ctx);
             t = info;
             if (!Enabled)
-                return SyncApp.Err(503, "vpn_disabled", "La VPN automatica non è attiva su questo server.");
+                return SyncApp.Err(503, "vpn_disabled", "La marshmelloVPN automatica non è attiva su questo server.");
             return null;
         }
 
@@ -156,7 +156,7 @@ public sealed partial class VpnEndpoints(SyncOptions options, Store store, IWire
                 }
 
                 if (store.ListDevices(t.AccountId).Count >= options.MaxDevicesPerAccount)
-                    return SyncApp.Err(409, "too_many_devices", $"Hai già {options.MaxDevicesPerAccount} PC nella VPN: togline uno.");
+                    return SyncApp.Err(409, "too_many_devices", $"Hai già {options.MaxDevicesPerAccount} PC in marshmelloVPN: togline uno.");
 
                 IEnumerable<string> used;
                 try { used = store.ListDevices().Select(d => d.Address).Concat(wg!.ReservedAddresses()).ToList(); }
@@ -166,7 +166,7 @@ public sealed partial class VpnEndpoints(SyncOptions options, Store store, IWire
                     return SyncApp.Err(503, "vpn_unavailable", "Il server WireGuard non risponde: riprova fra poco.");
                 }
                 if (NextFree(used) is not { } ip)
-                    return SyncApp.Err(409, "network_full", "La rete VPN è piena.");
+                    return SyncApp.Err(409, "network_full", "La rete marshmelloVPN è piena.");
 
                 store.InsertDevice(t.AccountId, name!, key!, ip);
                 var created = store.FindDevice(t.AccountId, name!)!;

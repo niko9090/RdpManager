@@ -401,11 +401,11 @@ public sealed class NetworkScanViewModel : ViewModelBase
         TailscaleTab = new TailscaleTabViewModel(this);
         Overview = NetworkOverview.Build(adapters, SafeInactive());
         // Nella scheda VPN la VPN nostra viene per prima, così è la rete proposta quando è collegata.
-        VpnTab = new RangeScanTabViewModel(this, NetworkOverview.VpnLabel, adapters.Where(a => a.IsVpn).OrderBy(a => a.Kind == NetworkKind.WireGuard ? 0 : 1).ToList(),
-            "Reti VPN attive su questo computer: la VPN nostra per prima, poi le altre (ZeroTier, OpenVPN, Tailscale…). Si cerca nella " +
+        VpnTab = new RangeScanTabViewModel(this, "VPN",adapters.Where(a => a.IsVpn).OrderBy(a => a.Kind == NetworkKind.WireGuard ? 0 : 1).ToList(),
+            "Reti VPN attive su questo computer: marshmelloVPN per prima, poi le altre (ZeroTier, OpenVPN, Tailscale…). Si cerca nella " +
             "rete della VPN scelta; se è più grande di una /22 si propone la /24 del tuo indirizzo. Per Tailscale è " +
             "meglio la scheda «Tailscale», che conosce già i nomi dei dispositivi.",
-            Overview.VpnConnected ? "Nessun'altra VPN attiva." : "VPN non collegata: collega la VPN, oppure scrivi l'intervallo a mano.");
+            Overview.VpnConnected ? "Nessun'altra VPN attiva." : "marshmelloVPN non collegata: collega marshmelloVPN, oppure scrivi l'intervallo a mano.");
         Tabs = [LocalTab, TailscaleTab, VpnTab];
         _selectedTab = Overview.VpnConnected ? VpnTab : LocalTab; // VPN collegata: si propone la sua rete
         Folders = [.. doc.AllGroups().Prepend(DiscoveryImport.DefaultFolder).Distinct(StringComparer.CurrentCultureIgnoreCase)];

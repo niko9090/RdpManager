@@ -8,7 +8,7 @@ namespace RdpManagerVpn;
 /// <summary>Carica un file di configurazione (<c>.rdpmconfig</c>) dall'icona, da riga di comando o dall'installer, e mostra il riepilogo.</summary>
 internal static class ConfigCommand
 {
-    public const string Title = "RdpManager VPN";
+    public const string Title = "marshmelloVPN";
 
     /// <summary>Finestra «Apri» per scegliere il file; null se si annulla.</summary>
     public static string? PickFile(IWin32Window? owner = null)
@@ -37,7 +37,7 @@ internal static class ConfigCommand
         {
             using var wait = new WaitCursor();
             var report = await ClientConfigApplier.ApplyFileAsync(path, work, installer);
-            MessageBox.Show(owner, report.Text, "RdpManager VPN: " + report.Title, MessageBoxButtons.OK,
+            MessageBox.Show(owner, report.Text, "marshmelloVPN: " + report.Title, MessageBoxButtons.OK,
                 report.Complete ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
             return report.Complete ? 0 : 1;
         }

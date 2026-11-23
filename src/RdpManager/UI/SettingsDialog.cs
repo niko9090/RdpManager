@@ -108,7 +108,7 @@ public sealed class SettingsDialog : TouchForm
         _initialRole = AppRoleStore.Load();
         _role.SelectedIndex = (int)_initialRole;
         general.Controls.Add(Group("Ruolo di questa installazione", _role,
-            Note("Con «Gestore VPN» all'avvio si apre la Plancia VPN; la finestra con le schede resta raggiungibile. Vale dal prossimo avvio.")));
+            Note("Con «Gestore marshmelloVPN» all'avvio si apre la Plancia marshmelloVPN; la finestra con le schede resta raggiungibile. Vale dal prossimo avvio.")));
 
         _sessionTouch.Items.AddRange(Enum.GetValues<SessionTouchMode>().Select(m => (object)SessionTouchModes.Describe(m)).ToArray());
         _sessionTouch.SelectedIndex = (int)settings.SessionTouch;

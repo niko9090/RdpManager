@@ -73,7 +73,7 @@ public sealed class VpnHelper(IServiceManager services, string programDataDirect
         {
             if (services.Exists(name))
                 RemoveService(name); // ricreato ogni volta: il percorso dell'exe può essere cambiato con un aggiornamento
-            services.Create(name, "RdpManager VPN (WireGuard)", $"\"{exePath}\" {VpnServiceArgs.Argument} {VpnDefaults.TunnelName}");
+            services.Create(name, "marshmelloVPN (WireGuard)", $"\"{exePath}\" {VpnServiceArgs.Argument} {VpnDefaults.TunnelName}");
             services.GrantUserControl(name);
             services.Start(name);
             if (!WaitFor(name, TunnelState.Acceso))
