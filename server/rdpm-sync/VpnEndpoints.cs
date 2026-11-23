@@ -15,8 +15,14 @@ public sealed record VpnOverview(bool Enabled, string Network, string Endpoint, 
 /// privata non arriva mai qui) e riceve i dati per il profilo WireGuard. Il server assegna il primo 10.66.0.N libero,
 /// salva il peer, lo scrive in wg0.conf e lo applica al tunnel in esecuzione.
 /// </summary>
-public sealed partial class VpnEndpoints(SyncOptions options, Store store, IWireGuardPeers? wg, string serverPublicKey, ILogger log)
+public sealed partial class VpnEndpoints(SyncOptions options, Store store, IWireGuardPeers? wg, string serverPublicKey, ILogger log,
+    TimeProvider? time = null)
 {
+    /// <summary>Un PC è «collegato» se l'ultimo contatto è più recente di così (stessa regola della pagina web /vpn).</summary>
+    public static readonly TimeSpan ConnectedWindow = TimeSpan.FromMinutes(3);
+
+    private readonly TimeProvider _time = time ?? TimeProvider.System;
+
     public const string Network = "10.66.0.0/24";
     public const int Keepalive = 25;
 
@@ -86,6 +92,26 @@ public sealed partial class VpnEndpoints(SyncOptions options, Store store, IWire
             {
                 name = d.Name, address = d.Address + "/32", publicKey = d.PublicKey, createdUtc = d.CreatedUtc,
             })));
+
+        // Plancia per l'app: gli stessi dati della pagina web /vpn (tutti i PC della VPN), con il token del client.
+        app.MapGet("/v1/vpn/overview", async (HttpContext ctx) =>
+        {
+            if (Gate(ctx, out _) is { } denied)
+                return denied;
+            var ov = await OverviewAsync();
+            var now = _time.GetUtcNow();
+            return Results.Json(new
+            {
+                network = ov.Network,
+                devices = ov.Devices.Select(d => new
+                {
+                    name = d.Name,
+                    address = d.Address,
+                    connected = d.LastContact is { } lc && now - lc <= ConnectedWindow,
+                    lastContact = d.LastContact,
+                }),
+            });
+        });
 
         app.MapPost("/v1/vpn/devices", async (HttpContext ctx, VpnDeviceRequest? body) =>
         {

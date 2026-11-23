@@ -193,6 +193,30 @@ public class VpnTests
         Assert.Equal(HttpStatusCode.Unauthorized, (await s.Http.GetAsync("/v1/vpn/devices")).StatusCode);
     }
 
+    [Fact]
+    public async Task Overview_senza_token_401_e_con_token_elenca_tutti_i_pc_con_stato()
+    {
+        var wg = new FakeWireGuard();
+        await using var s = Server(wg);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await s.Http.GetAsync("/v1/vpn/overview")).StatusCode);
+        var mario = await UserAsync(s, "mario");
+        var luisa = await UserAsync(s, "luisa");
+        var key = NewKey();
+        await Request(s, mario, "Casa", key);
+        await Request(s, luisa, "Ufficio", NewKey());
+        s.Time.Advance(TimeSpan.FromMinutes(10)); // la registrazione di Ufficio è ormai vecchia
+        wg.Handshakes[key] = s.Time.GetUtcNow().AddSeconds(-30);
+
+        var ov = await Json(await s.SendAsync(luisa, HttpMethod.Get, "/v1/vpn/overview"));
+        var devices = ov.GetProperty("devices");
+        Assert.Equal(2, devices.GetArrayLength());
+        var casa = devices.EnumerateArray().First(d => d.GetProperty("name").GetString() == "Casa");
+        Assert.Equal("10.66.0.2", casa.GetProperty("address").GetString());
+        Assert.True(casa.GetProperty("connected").GetBoolean());
+        var uff = devices.EnumerateArray().First(d => d.GetProperty("name").GetString() == "Ufficio");
+        Assert.False(uff.GetProperty("connected").GetBoolean());
+    }
+
     [Theory]
     [InlineData("A", "non-e-una-chiave")]
     [InlineData("A", "")]

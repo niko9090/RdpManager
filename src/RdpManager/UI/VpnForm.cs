@@ -186,6 +186,7 @@ public sealed class VpnForm : TouchForm
                 if (!WireGuardNative.DllPresent)
                     throw new VpnException("Manca wireguard.dll nella cartella del programma.");
                 _tunnel.Accendi(_profile.ToConfig());
+                VpnAutoStart.ManualConnectSucceeded(_profile, p => p.Save());
             }
         }
         catch (Exception ex) when (ex is VpnException or ArgumentException or InvalidOperationException)

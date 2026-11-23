@@ -16,6 +16,18 @@ public sealed class SessionTabViewModel : ViewModelBase
             OnPropertyChanged(nameof(Title));
             OnPropertyChanged(nameof(StateColor));
         };
+        // Il collegamento cambia senza che il titolo cambi (connesso, riconnessione): il cerchio segue lo stato.
+        if (session is FreeRdpSession f)
+        {
+            f.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName is nameof(FreeRdpSession.IsRunning) or nameof(FreeRdpSession.IsConnected))
+                {
+                    OnPropertyChanged(nameof(IsConnected));
+                    OnPropertyChanged(nameof(StateColor));
+                }
+            };
+        }
     }
 
     /// <summary>Pallino dello stato nella linguetta, come in Windows: verde se collegata, rosso se disconnessa.</summary>

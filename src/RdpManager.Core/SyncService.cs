@@ -181,6 +181,36 @@ public sealed class SyncService : IDisposable
         }
     }
 
+    /// <summary>Legge i PC della VPN con l'account attuale (rifà il login se il token è scaduto). Senza account lancia
+    /// <see cref="InvalidOperationException"/>.</summary>
+    public async Task<IReadOnlyList<VpnDashboardDevice>> GetVpnDevicesAsync(CancellationToken ct = default)
+    {
+        if (!SignedIn || !PasswordProtector.TryUnprotect(State.ProtectedPassword, out var password) || password is null)
+            throw new InvalidOperationException("Serve prima l'accesso all'account.");
+        await EnterAsync(ct);
+        try
+        {
+            var url = State.ServerUrl;
+            using var client = new VpnDashboardClient(url);
+            var token = PasswordProtector.TryUnprotect(State.ProtectedToken, out var saved) && saved is not null
+                ? saved
+                : await LoginAsync(url, State.Username, password, ct);
+            try
+            {
+                return await client.GetDevicesAsync(token, ct);
+            }
+            catch (SyncServerException ex) when (ex.Code == "unauthorized")
+            {
+                token = await LoginAsync(url, State.Username, password, ct);
+                return await client.GetDevicesAsync(token, ct);
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     private static string Device => Environment.MachineName;
 
     /// <summary>Crea l'account sul server con la chiave di amministrazione (la password non lascia il PC).</summary>

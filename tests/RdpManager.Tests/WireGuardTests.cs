@@ -341,7 +341,7 @@ public class WireGuardTunnelTests : IDisposable
     public void Accendi_UacCancelled_GivesClearMessageAndCleansUp()
     {
         var (t, _, _) = Make(WireGuardNtTunnel.ExitCancelled);
-        var ex = Assert.Throws<VpnException>(() => t.Accendi(Config()));
+        var ex = Assert.Throws<VpnElevationDeclinedException>(() => t.Accendi(Config()));
         Assert.Contains("amministratore", ex.Message);
         Assert.Empty(Directory.GetFiles(_dir, "*.conf", SearchOption.AllDirectories));
     }
