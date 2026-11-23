@@ -49,6 +49,13 @@ public sealed partial class FreeRdpSessionView : UserControl
             host.SizeChanged += OnSize;
             TryStart();
         };
+        // Dopo l'avvio la sessione tiene a mente la dimensione corrente: il ricollegamento ripartirebbe, altrimenti, con
+        // quella della prima apertura (e a schermo intero resterebbe piccola).
+        host.SizeChanged += (_, _) =>
+        {
+            var scale = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1.0;
+            session.UpdateAvailableSize((int)(host.Bounds.Width * scale), (int)(host.Bounds.Height * scale));
+        };
         SurfaceHost.Children.Add(host);
 
         // Se dopo qualche secondo la superficie non è nata (X11 senza libX11, ecc.) si ripiega sulla finestra separata.

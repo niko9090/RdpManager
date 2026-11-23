@@ -32,6 +32,26 @@ public class FreeRdpCommandTests
     }
 
     [Fact]
+    public void Ricollegamento_a_schermo_intero_usa_la_dimensione_aggiornata_e_non_quella_della_prima_apertura()
+    {
+        var first = new FreeRdpLaunchContext { ParentWindow = 4194311, AvailableWidth = 1000, AvailableHeight = 600 };
+        // La scheda passa a schermo intero: la sessione aggiorna il contesto, il ricollegamento riparte da lì.
+        var full = first.WithAvailableSize(1920, 1080);
+        var args = FreeRdpCommandBuilder.Build(Conn(), X3, full).Arguments;
+        Assert.Contains("/size:1920x1080", args);
+        Assert.Contains("/dynamic-resolution", args);
+        Assert.DoesNotContain("/size:1000x600", args);
+    }
+
+    [Fact]
+    public void Dimensione_troppo_piccola_della_scheda_nascosta_si_ignora()
+    {
+        var ctx = new FreeRdpLaunchContext { AvailableWidth = 1920, AvailableHeight = 1080 };
+        Assert.Equal(ctx, ctx.WithAvailableSize(0, 0));
+        Assert.Equal(ctx, ctx.WithAvailableSize(1920, 100));
+    }
+
+    [Fact]
     public void Port_OnlyWhenNotDefault()
     {
         var c = Conn();

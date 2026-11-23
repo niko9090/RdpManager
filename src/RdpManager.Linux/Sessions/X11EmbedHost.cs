@@ -30,6 +30,15 @@ public sealed class X11EmbedHost : NativeControlHost
         try
         {
             XResizeWindow(_display, _window, w, h);
+            // xfreerdp non guarda i cambi del genitore: la sua finestra (figlia della superficie) resta della dimensione
+            // iniziale, e a schermo intero il desktop non riempie lo schermo. La si porta alla dimensione della superficie:
+            // con /dynamic-resolution è il suo ConfigureNotify a far chiedere al server la nuova risoluzione.
+            if (XQueryTree(_display, _window, out _, out _, out var children, out var count) != 0 && children != IntPtr.Zero)
+            {
+                for (var i = 0; i < count; i++)
+                    XResizeWindow(_display, Marshal.ReadIntPtr(children, i * IntPtr.Size), w, h);
+                XFree(children);
+            }
             XFlush(_display);
         }
         catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
@@ -86,6 +95,9 @@ public sealed class X11EmbedHost : NativeControlHost
     private static extern IntPtr XCreateSimpleWindow(IntPtr display, IntPtr parent, int x, int y, uint width, uint height,
         uint borderWidth, ulong border, ulong background);
     [DllImport("libX11.so.6")] private static extern int XResizeWindow(IntPtr display, IntPtr window, uint width, uint height);
+    [DllImport("libX11.so.6")]
+    private static extern int XQueryTree(IntPtr display, IntPtr window, out IntPtr root, out IntPtr parent, out IntPtr children, out uint count);
+    [DllImport("libX11.so.6")] private static extern int XFree(IntPtr data);
     [DllImport("libX11.so.6")] private static extern int XFlush(IntPtr display);
     [DllImport("libX11.so.6")] private static extern int XMapWindow(IntPtr display, IntPtr window);
     [DllImport("libX11.so.6")] private static extern int XDestroyWindow(IntPtr display, IntPtr window);
