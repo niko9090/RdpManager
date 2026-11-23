@@ -13,6 +13,9 @@ public interface IShellUi
 
     Task ShowVpnAsync(VpnViewModel vpn);
 
+    /// <summary>Plancia VPN: finestra con i PC della VPN; se ne sceglie uno, <see cref="VpnDashboardViewModel.Chosen"/> lo indica alla chiusura.</summary>
+    Task ShowVpnDashboardAsync(VpnDashboardViewModel dashboard);
+
     Task ShowWorkspacesAsync(WorkspacesViewModel workspaces);
 
     /// <summary>Finestra di sola lettura con un testo (pagina delle scorciatoie).</summary>
@@ -105,6 +108,7 @@ public class NullShellUi : IShellUi
 
     public virtual Task ShowAccountAsync(AccountViewModel account) => Task.CompletedTask;
     public virtual Task ShowVpnAsync(VpnViewModel vpn) => Task.CompletedTask;
+    public virtual Task ShowVpnDashboardAsync(VpnDashboardViewModel dashboard) => Task.CompletedTask;
     public virtual Task ShowWorkspacesAsync(WorkspacesViewModel workspaces) => Task.CompletedTask;
 
     public virtual Task ShowTextAsync(string title, string text)
