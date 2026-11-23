@@ -36,6 +36,8 @@ public sealed class AvaloniaShellUi : IShellUi
         return window.ShowDialogTracked(RequireOwner());
     }
 
+    public Task ShowVpnDashboardAsync(VpnDashboardViewModel dashboard) => new VpnDashboardWindow(dashboard).ShowDialogTracked(RequireOwner());
+
     public Task ShowWorkspacesAsync(WorkspacesViewModel workspaces)
     {
         var window = new WorkspacesWindow { DataContext = workspaces };

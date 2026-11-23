@@ -670,6 +670,29 @@ public sealed partial class MainWindowViewModel
         finally { vpn.Persist(); }
     });
 
+    /// <summary>Strumenti, Plancia VPN: i PC della VPN; da uno si apre il desktop remoto.</summary>
+    public RelayCommand VpnDashboardCommand => AsyncCmd(async () =>
+    {
+        var dashboard = new VpnDashboardViewModel(() => SyncService.SignedIn, ct => SyncService.GetVpnDevicesAsync(ct));
+        await Ui.ShowVpnDashboardAsync(dashboard);
+        if (dashboard.Chosen is { } pc)
+            OpenVpnDashboardPc(pc.Name, pc.Address);
+    });
+
+    /// <summary>Apre il desktop remoto verso l'IP VPN: usa la connessione salvata con quell'indirizzo, se c'è; altrimenti ne tiene una temporanea.</summary>
+    internal void OpenVpnDashboardPc(string name, string address)
+    {
+        var connection = Document.Connections.FirstOrDefault(c => string.Equals(c.Host, address, StringComparison.OrdinalIgnoreCase));
+        if (connection is null && !_vpnDashboardConnections.TryGetValue(address, out connection))
+        {
+            connection = new RdpConnection { Name = name, Host = address };
+            _vpnDashboardConnections[address] = connection;
+        }
+        OpenOrSwitch(connection);
+    }
+
+    private readonly Dictionary<string, RdpConnection> _vpnDashboardConnections = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>L'accesso al documento che usa la sincronizzazione (per le prove).</summary>
     internal ISyncDocumentAccess SyncDocumentAccess => new SyncAccess(this);
 
