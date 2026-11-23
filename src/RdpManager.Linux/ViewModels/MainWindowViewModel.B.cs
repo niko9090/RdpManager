@@ -95,7 +95,33 @@ public sealed partial class MainWindowViewModel
         _ = AutoConnectVpnAsync();
         _vpnWatch = new Timer(_ => _ = AutoConnectVpnAsync(), null, TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60));
         _syncPoll = new Timer(_ => _ = RunSyncAsync(manual: false), null, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
+        _filesWatch = new Timer(_ => _ = CheckIncomingFilesAsync(), null, TimeSpan.FromSeconds(VpnDashboardModel.RefreshSeconds),
+            TimeSpan.FromSeconds(VpnDashboardModel.RefreshSeconds));
         _ = CheckUpdatesAtStartupAsync();
+    }
+
+    private Timer? _filesWatch;
+    private IncomingFilesCoordinator? _incomingFiles;
+
+    /// <summary>File in arrivo dagli altri PC dell'account: un giro ogni 30 s; l'avviso offre «Accetta» e «Rifiuta».</summary>
+    internal async Task CheckIncomingFilesAsync()
+    {
+        if (_shutdown.IsCancellationRequested)
+            return;
+        _incomingFiles ??= new IncomingFilesCoordinator(
+            () => SyncService.SignedIn,
+            ct => SyncService.GetIncomingFilesAsync(ct),
+            (file, _) => Ui.AskIncomingFileAsync(file),
+            (file, folder, ct) => SyncService.AcceptIncomingFileAsync(file, folder, ct),
+            (file, ct) => SyncService.RejectIncomingFileAsync(file, ct),
+            Notice);
+        try
+        {
+            await _incomingFiles.CheckAsync(_shutdown.Token);
+        }
+        catch (OperationCanceledException)
+        {
+        }
     }
 
     private LinuxVpnAutoConnector? _vpnAuto;
@@ -134,6 +160,7 @@ public sealed partial class MainWindowViewModel
         _syncDelay?.Dispose();
         _syncPoll?.Dispose();
         _vpnWatch?.Dispose();
+        _filesWatch?.Dispose();
         _sync?.Dispose();
     }
 
@@ -673,7 +700,9 @@ public sealed partial class MainWindowViewModel
     /// <summary>Strumenti, Plancia VPN: i PC della VPN; da uno si apre il desktop remoto.</summary>
     public RelayCommand VpnDashboardCommand => AsyncCmd(async () =>
     {
-        var dashboard = new VpnDashboardViewModel(() => SyncService.SignedIn, ct => SyncService.GetVpnDevicesAsync(ct));
+        var dashboard = new VpnDashboardViewModel(() => SyncService.SignedIn, ct => SyncService.GetVpnDevicesAsync(ct),
+            send: (to, path, ct) => SyncService.SendVpnFileAsync(to, path, ct),
+            pickFile: to => Ui.PickFileAsync($"Invia a {to}", "Tutti i file", "*"));
         await Ui.ShowVpnDashboardAsync(dashboard);
         if (dashboard.Chosen is { } pc)
             OpenVpnDashboardPc(pc.Name, pc.Address);

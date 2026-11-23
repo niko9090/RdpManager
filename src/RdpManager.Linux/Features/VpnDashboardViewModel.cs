@@ -31,14 +31,83 @@ public sealed class VpnDashboardViewModel : ViewModelBase
     private VpnDashboardView _view = VpnDashboardModel.NotSignedIn();
     private bool _loading;
 
+    private readonly Func<string, string, CancellationToken, Task>? _send;
+    private readonly Func<string, Task<string?>>? _pickFile;
+    private bool _sending;
+    private string _sendInfo = "";
+    private string? _sendError;
+
+    /// <param name="send">Invia il file (nome del PC, percorso): senza, «Invia file…» non c'è.</param>
+    /// <param name="pickFile">Sceglie il file da inviare al PC indicato; null se annullato.</param>
     public VpnDashboardViewModel(Func<bool> signedIn, Func<CancellationToken, Task<IReadOnlyList<VpnDashboardDevice>>> load,
-        Func<DateTimeOffset>? now = null)
+        Func<DateTimeOffset>? now = null, Func<string, string, CancellationToken, Task>? send = null,
+        Func<string, Task<string?>>? pickFile = null)
     {
         _signedIn = signedIn;
         _load = load;
         _now = now ?? (() => DateTimeOffset.UtcNow);
+        _send = send;
+        _pickFile = pickFile;
         RefreshCommand = new RelayCommand(() => _ = RefreshAsync(), () => !Loading);
         OpenCommand = new RelayCommand(OpenSelected, () => CanOpen);
+        SendFileCommand = new RelayCommand(() => _ = SendFileAsync(), () => CanSendFile);
+    }
+
+    public RelayCommand SendFileCommand { get; }
+
+    /// <summary>La plancia offre «Invia file…» (c'è chi invia e chi sceglie il file).</summary>
+    public bool CanSendFeature => _send is not null && _pickFile is not null;
+
+    public bool CanSendFile => CanSendFeature && !_sending && Selected is not null;
+
+    /// <summary>Esito dell'invio andato bene (vuoto altrimenti).</summary>
+    public string SendInfoText
+    {
+        get => _sendInfo;
+        private set => Set(ref _sendInfo, value);
+    }
+
+    /// <summary>Motivo dell'invio non riuscito (vuoto altrimenti).</summary>
+    public string? SendErrorText
+    {
+        get => _sendError;
+        private set => Set(ref _sendError, value);
+    }
+
+    /// <summary>«Invia file…»: sceglie il file, lo manda al PC selezionato e riporta l'esito (nessuna finestra qui).</summary>
+    public async Task SendFileAsync()
+    {
+        if (_send is null || _pickFile is null || _sending || Selected is not { } pc || _cts.IsCancellationRequested)
+            return;
+        var to = pc.Name;
+        var path = await _pickFile(to);
+        if (string.IsNullOrEmpty(path))
+            return;
+        var fileName = Path.GetFileName(path);
+        _sending = true;
+        SendErrorText = null;
+        SendInfoText = $"Invio di «{fileName}» a {to}…";
+        SendFileCommand.RaiseCanExecuteChanged();
+        try
+        {
+            await _send(to, path, _cts.Token);
+            SendInfoText = VpnFileModel.SentText(to, fileName);
+        }
+        catch (OperationCanceledException) when (_cts.IsCancellationRequested)
+        {
+            SendInfoText = "";
+        }
+        catch (Exception ex) when (ex is SyncServerException or SyncUnreachableException or InvalidOperationException
+                                       or HttpRequestException or IOException or UnauthorizedAccessException)
+        {
+            SendInfoText = "";
+            SendErrorText = VpnFileModel.SendError(ex);
+        }
+        finally
+        {
+            _sending = false;
+            SendFileCommand.RaiseCanExecuteChanged();
+        }
     }
 
     public ObservableCollection<VpnDashboardItem> Rows { get; } = [];
@@ -60,7 +129,10 @@ public sealed class VpnDashboardViewModel : ViewModelBase
         set
         {
             if (Set(ref _selected, value))
+            {
                 OpenCommand.RaiseCanExecuteChanged();
+                SendFileCommand.RaiseCanExecuteChanged();
+            }
         }
     }
 
@@ -144,5 +216,6 @@ public sealed class VpnDashboardViewModel : ViewModelBase
         OnPropertyChanged(nameof(InfoText));
         OnPropertyChanged(nameof(HasInfo));
         OpenCommand.RaiseCanExecuteChanged();
+        SendFileCommand.RaiseCanExecuteChanged();
     }
 }

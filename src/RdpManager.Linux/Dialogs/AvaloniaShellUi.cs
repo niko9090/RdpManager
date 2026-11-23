@@ -38,6 +38,22 @@ public sealed class AvaloniaShellUi : IShellUi
 
     public Task ShowVpnDashboardAsync(VpnDashboardViewModel dashboard) => new VpnDashboardWindow(dashboard).ShowDialogTracked(RequireOwner());
 
+    public Task<IncomingFileDecision> AskIncomingFileAsync(IncomingFile file) => Dispatcher.UIThread.InvokeAsync(async () =>
+    {
+        var window = new IncomingFileWindow(file, start => PickFolderAsync("Dove salvare il file", start));
+        var result = await window.ShowDialogTracked<int>(RequireOwner());
+        return window.ToDecision(result);
+    });
+
+    public async Task<string?> PickFolderAsync(string title, string? startFolder)
+    {
+        var options = new FolderPickerOpenOptions { Title = title, AllowMultiple = false };
+        if (!string.IsNullOrEmpty(startFolder) && Directory.Exists(startFolder))
+            options.SuggestedStartLocation = await RequireOwner().StorageProvider.TryGetFolderFromPathAsync(startFolder);
+        var folders = await RequireOwner().StorageProvider.OpenFolderPickerAsync(options);
+        return folders.Count == 0 ? null : folders[0].TryGetLocalPath();
+    }
+
     public Task ShowWorkspacesAsync(WorkspacesViewModel workspaces)
     {
         var window = new WorkspacesWindow { DataContext = workspaces };

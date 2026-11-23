@@ -18,6 +18,12 @@ public interface IShellUi
 
     Task ShowWorkspacesAsync(WorkspacesViewModel workspaces);
 
+    /// <summary>Avviso «File in arrivo» con mittente, nome e dimensione: «Accetta» (con la cartella scelta) o «Rifiuta»; chiuderlo vale «più tardi».</summary>
+    Task<IncomingFileDecision> AskIncomingFileAsync(IncomingFile file);
+
+    /// <summary>Selettore di cartella; null se annullato.</summary>
+    Task<string?> PickFolderAsync(string title, string? startFolder);
+
     /// <summary>Finestra di sola lettura con un testo (pagina delle scorciatoie).</summary>
     Task ShowTextAsync(string title, string text);
 
@@ -110,6 +116,18 @@ public class NullShellUi : IShellUi
     public virtual Task ShowVpnAsync(VpnViewModel vpn) => Task.CompletedTask;
     public virtual Task ShowVpnDashboardAsync(VpnDashboardViewModel dashboard) => Task.CompletedTask;
     public virtual Task ShowWorkspacesAsync(WorkspacesViewModel workspaces) => Task.CompletedTask;
+
+    public IncomingFileDecision IncomingFileAnswer { get; set; } = new(IncomingFileChoice.Later);
+    public List<IncomingFile> IncomingFilePrompts { get; } = [];
+    public string? FolderAnswer { get; set; }
+
+    public virtual Task<IncomingFileDecision> AskIncomingFileAsync(IncomingFile file)
+    {
+        IncomingFilePrompts.Add(file);
+        return Task.FromResult(IncomingFileAnswer);
+    }
+
+    public virtual Task<string?> PickFolderAsync(string title, string? startFolder) => Task.FromResult(FolderAnswer);
 
     public virtual Task ShowTextAsync(string title, string text)
     {
