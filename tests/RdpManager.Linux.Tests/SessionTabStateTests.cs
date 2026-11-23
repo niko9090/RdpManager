@@ -18,6 +18,17 @@ public class SessionTabStateTests
         typeof(FreeRdpSession).GetProperty(nameof(FreeRdpSession.IsRunning))!.SetValue(s, value);
 
     [Fact]
+    public void UpdateAvailableSize_aggiorna_la_dimensione_usata_dal_ricollegamento()
+    {
+        var session = NewSession();
+        session.UpdateAvailableSize(1920, 1080);
+        Assert.Equal(1920, session.LaunchContext.AvailableWidth);
+        Assert.Equal(1080, session.LaunchContext.AvailableHeight);
+        session.UpdateAvailableSize(0, 0);
+        Assert.Equal(1920, session.LaunchContext.AvailableWidth);
+    }
+
+    [Fact]
     public void StateColor_TurnsGreenWhenSessionConnects_WithoutTitleChange()
     {
         var session = NewSession();

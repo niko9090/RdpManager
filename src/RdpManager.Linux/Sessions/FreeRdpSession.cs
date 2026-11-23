@@ -190,6 +190,15 @@ public sealed class FreeRdpSession : ViewModelBase, ISession
         }
     }
 
+    /// <summary>
+    /// La superficie ha una nuova dimensione (schermo intero, finestra ridimensionata): i ricollegamenti e i nuovi tentativi
+    /// ripartono con questa, non con quella della prima apertura.
+    /// </summary>
+    public void UpdateAvailableSize(int width, int height) => _context = _context.WithAvailableSize(width, height);
+
+    /// <summary>Il contesto con cui partirà il prossimo avvio (per le prove).</summary>
+    internal FreeRdpLaunchContext LaunchContext => _context;
+
     public void Reconnect()
     {
         if (_isRunning || _starting || _closed)

@@ -192,6 +192,29 @@ public sealed class SyncService : IDisposable
         }, ct);
     }
 
+    /// <summary>
+    /// Tiene aggiornata la cartella «marshmelloVPN» con i PC della plancia VPN (vedi <see cref="VpnFolder"/>). Senza account,
+    /// senza VPN o con il server non raggiungibile non fa niente e non segnala errori. Vero se l'elenco è cambiato
+    /// (l'interfaccia lo salva dentro <see cref="ISyncDocumentAccess.Apply"/>).
+    /// </summary>
+    public async Task<bool> RefreshVpnFolderAsync(ISyncDocumentAccess access, CancellationToken ct = default)
+    {
+        if (!SignedIn)
+            return false;
+        IReadOnlyList<VpnDashboardDevice> devices;
+        try
+        {
+            devices = await GetVpnDevicesAsync(ct);
+        }
+        catch (Exception ex) when (ex is SyncUnreachableException or SyncServerException or InvalidOperationException
+            or ObjectDisposedException or OperationCanceledException or IOException or HttpRequestException
+            or ArgumentException or CryptographicException)
+        {
+            return false;
+        }
+        return access.Apply(doc => VpnFolder.Apply(doc, devices));
+    }
+
     /// <summary>Nome di questo PC nella VPN (lo stesso con cui si registra: <see cref="VpnProvisioning.SafeName"/>).</summary>
     public static string VpnDeviceName => VpnProvisioning.SafeName(Environment.MachineName);
 

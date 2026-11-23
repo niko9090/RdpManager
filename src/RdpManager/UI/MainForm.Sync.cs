@@ -107,6 +107,7 @@ public sealed partial class MainForm
         SyncOutcome outcome;
         try
         {
+            await _sync.RefreshVpnFolderAsync(new FormSyncAccess(this), _shutdownCts.Token);
             outcome = await _sync.SyncAsync(new FormSyncAccess(this), _shutdownCts.Token);
         }
         catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException or OperationCanceledException)

@@ -92,6 +92,16 @@ public sealed record FreeRdpLaunchContext
     public int AvailableWidth { get; init; } = 1280;
     public int AvailableHeight { get; init; } = 720;
 
+    /// <summary>
+    /// Lo stesso contesto con la nuova dimensione disponibile (la scheda è cambiata, per esempio a schermo intero). Una dimensione
+    /// troppo piccola (scheda nascosta o non ancora disegnata) si ignora. Serve perché un ricollegamento riparta con la
+    /// dimensione di adesso e non con quella della prima apertura.
+    /// </summary>
+    public FreeRdpLaunchContext WithAvailableSize(int width, int height) =>
+        width < FreeRdpCommandBuilder.MinSize || height < FreeRdpCommandBuilder.MinSize
+            ? this
+            : this with { AvailableWidth = width, AvailableHeight = height };
+
     /// <summary>Schermo intero (solo finestra separata).</summary>
     public bool Fullscreen { get; init; }
 
