@@ -43,6 +43,20 @@ public class MarshmelloVpnNameTests
         Assert.Contains("Gestore marshmelloVPN", main);
     }
 
+    [Fact]
+    public void L_installer_VPN_toglie_la_vecchia_voce_del_menu_Start()
+    {
+        var vpn = File.ReadAllText(RepoFile("installer/RdpManagerVpn.iss"));
+        var start = vpn.IndexOf("[InstallDelete]", StringComparison.Ordinal);
+        Assert.True(start >= 0, "manca la sezione [InstallDelete]");
+        var end = vpn.IndexOf("\n[", start + 1, StringComparison.Ordinal);
+        var section = vpn[start..(end < 0 ? vpn.Length : end)];
+        Assert.Contains("Type: files; Name: \"{autoprograms}\\RdpManager VPN.lnk\"", section);
+        Assert.Contains("Type: filesandordirs; Name: \"{autoprograms}\\RdpManager VPN\"", section);
+        // la voce nuova resta
+        Assert.Contains("Name: \"{autoprograms}\\{#AppName}\"; Filename", vpn);
+    }
+
     private static string RepoFile(string relative)
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

@@ -73,6 +73,12 @@ Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 Source: "{#ProfilePath}"; DestDir: "{app}"; DestName: "vpn.conf"; Flags: ignoreversion
 #endif
 
+[InstallDelete]
+; Aggiornamento da una versione col vecchio nome «RdpManager VPN»: via la vecchia voce del menu Start (collegamento e cartella),
+; così non resta accanto a quella nuova.
+Type: files; Name: "{autoprograms}\RdpManager VPN.lnk"
+Type: filesandordirs; Name: "{autoprograms}\RdpManager VPN"
+
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"; IconFilename: "{app}\{#AppExe}"
 
