@@ -15,10 +15,11 @@ internal sealed class AvaloniaUpdateProgress : IUpdateProgressView
     private readonly Window _window;
     private readonly ProgressBar _bar = new() { Minimum = 0, Maximum = 1, Value = 0 };
     private readonly TextBlock _text = new() { TextWrapping = TextWrapping.Wrap };
+    private readonly Button _cancelButton = new() { Content = "Annulla", IsCancel = true, MinWidth = 96, HorizontalAlignment = HorizontalAlignment.Right };
 
     public AvaloniaUpdateProgress(ReleaseInfo release)
     {
-        var cancel = new Button { Content = "Annulla", IsCancel = true, MinWidth = 96, HorizontalAlignment = HorizontalAlignment.Right };
+        var cancel = _cancelButton;
         cancel.Click += (_, _) =>
         {
             cancel.IsEnabled = false;
@@ -50,6 +51,12 @@ internal sealed class AvaloniaUpdateProgress : IUpdateProgressView
     public void Report(double fraction) => Dispatcher.UIThread.Post(() => _bar.Value = Math.Clamp(fraction, 0, 1));
 
     public void SetText(string text) => Dispatcher.UIThread.Post(() => _text.Text = text);
+
+    public void SetIndeterminate(bool on) => Dispatcher.UIThread.Post(() =>
+    {
+        _bar.IsIndeterminate = on;
+        _cancelButton.IsEnabled = !on; // durante l'installazione non si annulla più
+    });
 
     public void Dispose() => Dispatcher.UIThread.Post(() =>
     {

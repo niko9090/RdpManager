@@ -373,6 +373,68 @@ public class LinuxUpdateFlowTests
     }
 
     [Fact]
+    public async Task Esito_riuscito_mostra_avanzamento_installazione_e_messaggio_di_riavvio()
+    {
+        var (vm, ui, _, sys, data) = Make();
+        using var _ = data;
+        vm.UpdateDownload = (_, asset, progress, _) =>
+        {
+            progress.Report(0.5);
+            return Task.FromResult(new UpdateDownloadResult(UpdateDownloadStatus.Verified, "/tmp/" + asset.Name, "ok", new string('a', 64)));
+        };
+        await vm.CheckUpdatesAsync(manual: true);
+        var p = Assert.Single(ui.Progresses);
+        Assert.True(p.Indeterminate);
+        Assert.Contains(p.Texts, t => t.Contains("Installo la versione 99.0.0"));
+        var msg = Assert.Single(ui.UpdateMessages);
+        Assert.Equal("Aggiornamento riuscito", msg.Title);
+        Assert.Contains("99.0.0", msg.Message);
+        Assert.Contains("riapre", msg.Message);
+        Assert.Equal("/usr/bin/rdpmanager", sys.Relaunched);
+    }
+
+    [Fact]
+    public async Task Permessi_negati_mostrano_un_messaggio_chiaro_in_italiano()
+    {
+        var (vm, ui, runner, _, data) = Make();
+        using var _ = data;
+        runner.Script = (f, _) => f == "pkexec" ? new ProcessResult(127, "", "") : new ProcessResult(0, "", "");
+        vm.UpdateDownload = (_, asset, _, _) =>
+            Task.FromResult(new UpdateDownloadResult(UpdateDownloadStatus.Verified, "/tmp/" + asset.Name, "ok", new string('a', 64)));
+        await vm.CheckUpdatesAsync(manual: true);
+        var msg = Assert.Single(ui.UpdateMessages);
+        Assert.Equal("Aggiornamento non riuscito", msg.Title);
+        Assert.Contains("non hai autorizzato", msg.Message);
+        Assert.Contains("pagina della release", msg.Message);
+    }
+
+    [Fact]
+    public async Task Scaricamento_fallito_mostra_il_motivo()
+    {
+        var (vm, ui, _, _, data) = Make();
+        using var _ = data;
+        vm.UpdateDownload = (_, _, _, _) =>
+            Task.FromResult(new UpdateDownloadResult(UpdateDownloadStatus.Failed, null, "Connessione interrotta."));
+        await vm.CheckUpdatesAsync(manual: true);
+        var msg = Assert.Single(ui.UpdateMessages);
+        Assert.Contains("99.0.0", msg.Message);
+        Assert.Contains("Connessione interrotta.", msg.Message);
+        Assert.Equal([Rel.PageUrl], ui.OpenedUrls);
+    }
+
+    [Fact]
+    public async Task Controllo_automatico_che_va_in_errore_lo_dice_nella_barra_di_stato()
+    {
+        var (vm, _, _, _, data) = Make();
+        using var _ = data;
+        vm.UpdateCheck = _ => throw new InvalidOperationException("guasto di prova");
+        vm.StartBlockB(vm.Ui, background: true);
+        for (var i = 0; i < 50 && !vm.StatusMessage.Contains("Aggiornamento automatico non riuscito"); i++)
+            await Task.Delay(100);
+        Assert.Contains("guasto di prova", vm.StatusMessage);
+    }
+
+    [Fact]
     public async Task Piu_tardi_non_scarica_nulla()
     {
         var (vm, ui, _, _, data) = Make();
