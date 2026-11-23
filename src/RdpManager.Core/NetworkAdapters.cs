@@ -59,6 +59,24 @@ public sealed class KeywordVpnProvider(NetworkKind kind, string displayName, par
         Keywords.Any(k => name.Contains(k, StringComparison.OrdinalIgnoreCase) || description.Contains(k, StringComparison.OrdinalIgnoreCase));
 }
 
+/// <summary>
+/// La VPN nostra (WireGuard): «WireGuard» nel nome o nella descrizione (Windows), il nome del tunnel di RdpManager
+/// oppure un nome tipo «wg0» (Linux, dove la scheda porta solo il nome dell'interfaccia).
+/// </summary>
+public sealed class WireGuardVpnProvider : IVpnProvider
+{
+    public NetworkKind Kind => NetworkKind.WireGuard;
+    public string DisplayName => "WireGuard";
+
+    public bool Matches(string name, string description, NetworkInterfaceType type, IPAddress? address) =>
+        name.Contains("WireGuard", StringComparison.OrdinalIgnoreCase) || description.Contains("WireGuard", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(name, VpnDefaults.TunnelName, StringComparison.OrdinalIgnoreCase)
+        || IsWgInterfaceName(name);
+
+    private static bool IsWgInterfaceName(string name) =>
+        name.Length is >= 2 and <= 6 && name.StartsWith("wg", StringComparison.OrdinalIgnoreCase) && name.Skip(2).All(char.IsDigit);
+}
+
 /// <summary>VPN generiche: collegamenti PPP o tunnel, oppure client VPN noti o con «VPN» nel nome.</summary>
 public sealed class GenericVpnProvider : IVpnProvider
 {
@@ -84,7 +102,7 @@ public static class VpnProviders
     [
         new KeywordVpnProvider(NetworkKind.Tailscale, "Tailscale", "Tailscale"),
         new KeywordVpnProvider(NetworkKind.ZeroTier, "ZeroTier", "ZeroTier"),
-        new KeywordVpnProvider(NetworkKind.WireGuard, "WireGuard", "WireGuard"),
+        new WireGuardVpnProvider(),
         new KeywordVpnProvider(NetworkKind.OpenVPN, "OpenVPN", "OpenVPN", "TAP-Windows", "TAP-Win32", "ovpn-dco", "Data Channel Offload"),
         new GenericVpnProvider(),
     ];
@@ -111,8 +129,125 @@ public static class VpnProviders
     };
 }
 
+/// <summary>Una scheda di rete come la si mostra all'utente: collegata o no, con IP del PC e rete (es. 10.66.0.0/24).</summary>
+public sealed record AdapterCard(string Name, string Description, NetworkKind Kind, bool Connected, IPAddress? Address, int Prefix)
+{
+    public bool IsVpn => Kind != NetworkKind.Local;
+
+    /// <summary>La VPN nostra (WireGuard).</summary>
+    public bool IsOurVpn => Kind == NetworkKind.WireGuard;
+
+    public string StateText => Connected ? "collegata" : "non collegata";
+
+    /// <summary>Rete della scheda nella forma «10.66.0.0/24» (vuota se la scheda non ha un indirizzo).</summary>
+    public string NetworkText => Address is null ? "" : NetworkOf(Address, Prefix);
+
+    public string AddressText => Address?.ToString() ?? "";
+
+    public static string NetworkOf(IPAddress address, int prefix)
+    {
+        var b = address.GetAddressBytes();
+        uint ip = (uint)(b[0] << 24 | b[1] << 16 | b[2] << 8 | b[3]);
+        uint mask = prefix <= 0 ? 0 : prefix >= 32 ? uint.MaxValue : uint.MaxValue << (32 - prefix);
+        uint net = ip & mask;
+        return $"{net >> 24}.{net >> 16 & 255}.{net >> 8 & 255}.{net & 255}/{prefix}";
+    }
+
+    public static AdapterCard From(AdapterInfo a) => new(a.Name, a.Description, a.Kind, true, a.Address, a.Prefix);
+}
+
+/// <summary>
+/// Quadro delle schede di rete per la ricerca reti: le schede VPN (la nostra per prima) in cima, poi le locali, e lo
+/// stato della VPN nostra. La rete da proporre è quella della VPN solo quando è collegata.
+/// </summary>
+public sealed class NetworkOverview
+{
+    public const string VpnLabel = "VPN";
+
+    private NetworkOverview(IReadOnlyList<AdapterCard> cards, AdapterInfo? suggested)
+    {
+        Cards = cards;
+        Suggested = suggested;
+        Vpn = cards.FirstOrDefault(c => c.IsOurVpn && c.Connected) ?? cards.FirstOrDefault(c => c.IsOurVpn);
+    }
+
+    public IReadOnlyList<AdapterCard> Cards { get; }
+
+    /// <summary>La scheda della VPN nostra (collegata se c'è, altrimenti una non collegata); null se non esiste nessuna.</summary>
+    public AdapterCard? Vpn { get; }
+
+    public bool VpnConnected => Vpn is { Connected: true };
+
+    /// <summary>La scheda collegata della VPN, da proporre per la scansione (null se la VPN non è collegata).</summary>
+    public AdapterInfo? Suggested { get; }
+
+    /// <summary>Frase di stato ben visibile: collegata con IP e rete, oppure non collegata.</summary>
+    public string Headline => Vpn switch
+    {
+        { Connected: true } v => $"{VpnLabel} COLLEGATA - il tuo IP nella VPN è {v.AddressText}, rete {v.NetworkText} (scheda «{v.Name}»).",
+        { } v => $"{VpnLabel} NON COLLEGATA - la scheda «{v.Name}» c'è ma è spenta: collega la VPN per cercare i PC nella sua rete.",
+        null => $"{VpnLabel} NON COLLEGATA - su questo PC non si vede nessuna scheda della VPN: collega la VPN (o configurala) per cercare i PC nella sua rete.",
+    };
+
+    public static NetworkOverview Build(IReadOnlyList<AdapterInfo> active, IReadOnlyList<AdapterCard>? inactive = null)
+    {
+        var all = active.Select(AdapterCard.From)
+            .Concat((inactive ?? []).Where(c => !active.Any(a => a.Name == c.Name)))
+            .ToList();
+        // Prima la VPN nostra (collegate prima), poi le altre VPN, poi le reti locali; a parità si tiene l'ordine di lettura.
+        var ordered = all
+            .Select((c, i) => (c, i))
+            .OrderBy(x => x.c.IsOurVpn ? 0 : x.c.IsVpn ? 1 : 2)
+            .ThenBy(x => x.c.Connected ? 0 : 1)
+            .ThenBy(x => x.i)
+            .Select(x => x.c)
+            .ToList();
+        var suggested = active.FirstOrDefault(a => a.Kind == NetworkKind.WireGuard);
+        return new NetworkOverview(ordered, suggested);
+    }
+
+    /// <summary>Come <see cref="Build"/>, leggendo anche le schede VPN spente dal sistema.</summary>
+    public static NetworkOverview Read(IReadOnlyList<AdapterInfo> active) => Build(active, NetworkAdapters.ReadInactiveVpn());
+}
+
 public static class NetworkAdapters
 {
+    /// <summary>
+    /// Schede VPN presenti ma spente o senza indirizzo IPv4 (per dire «VPN non collegata»). Solo lettura.
+    /// </summary>
+    public static IReadOnlyList<AdapterCard> ReadInactiveVpn()
+    {
+        var result = new List<AdapterCard>();
+        try
+        {
+            foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (nic.NetworkInterfaceType == NetworkInterfaceType.Loopback)
+                    continue;
+                var kind = VpnProviders.Classify(nic.Name, nic.Description, nic.NetworkInterfaceType);
+                if (kind != NetworkKind.WireGuard)
+                    continue; // basta la VPN nostra: le schede spente delle altre non interessano
+                bool hasIpv4 = false;
+                if (nic.OperationalStatus == OperationalStatus.Up)
+                {
+                    try
+                    {
+                        hasIpv4 = nic.GetIPProperties().UnicastAddresses.Any(u => u.Address.AddressFamily == AddressFamily.InterNetwork);
+                    }
+                    catch (NetworkInformationException)
+                    {
+                    }
+                }
+                if (!hasIpv4)
+                    result.Add(new AdapterCard(nic.Name, nic.Description, kind, false, null, 0));
+            }
+        }
+        catch (NetworkInformationException)
+        {
+        }
+        return result;
+    }
+
     /// <summary>
     /// Schede di rete attive con un indirizzo IPv4 (escluse loopback e indirizzi 169.254 automatici), con il tipo
     /// di rete riconosciuto. Solo lettura: nessuna impostazione viene cambiata.

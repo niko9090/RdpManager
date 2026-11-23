@@ -42,6 +42,7 @@ public sealed class UiV16Tests : IDisposable
         public NetworkScanSources Sources => new()
         {
             Adapters = () => Adapters,
+            InactiveVpn = () => [],
             Tailscale = _ => { TailscaleCalls++; return Task.FromResult(Tailscale); },
             Scanner = new NetworkScanner(
                 (ip, _) => Task.FromResult<string?>(ip.GetAddressBytes()[3] == 10 ? "server-prova.esempio.lan" : null),
@@ -153,7 +154,7 @@ public sealed class UiV16Tests : IDisposable
                 .Single(b => b.Text == "Cerca PC");
             Assert.Contains("Tailscale", sidebarButton.ToolTipText);
 
-            Assert.Equal(["Rete locale", "Tailscale", "Altre VPN"], scan.Tabs.TabPages.Cast<TabPage>().Select(p => p.Text));
+            Assert.Equal(["Rete locale", "Tailscale", "VPN"], scan.Tabs.TabPages.Cast<TabPage>().Select(p => p.Text));
             Pump(300);
             Assert.Equal(0, fake.Probes);
             Assert.Equal(0, fake.TailscaleCalls);

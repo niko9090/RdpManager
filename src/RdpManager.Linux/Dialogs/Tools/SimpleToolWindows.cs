@@ -317,8 +317,32 @@ internal sealed class NetworkScanWindow : ToolWindow
         bottom.Children.Add(new Button { Content = "Aggiungi i selezionati", Command = vm.AddCommand });
         bottom.Children.Add(DialogKit.BoundLabel(nameof(vm.Summary), "muted"));
         DockPanel.SetDock(bottom, Dock.Bottom);
-        Content = DialogKit.Frame(tabs, DialogKit.Buttons(DialogKit.Button("Chiudi", (_, _) => Close(true), isCancel: true)), bottom);
+        var above = new StackPanel();
+        above.Children.Add(BuildVpnBanner(vm));
+        above.Children.Add(bottom);
+        Content = DialogKit.Frame(tabs, DialogKit.Buttons(DialogKit.Button("Chiudi", (_, _) => Close(true), isCancel: true)), above);
         Closing += (_, _) => vm.CancelAll();
+    }
+
+    /// <summary>Riquadro in alto: stato della VPN (verde se collegata, rosso se no) e le schede di rete, la VPN per prima.</summary>
+    private static Control BuildVpnBanner(NetworkScanViewModel vm)
+    {
+        var headline = new TextBlock
+        {
+            Text = vm.VpnHeadline, FontWeight = Avalonia.Media.FontWeight.Bold, TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+            Foreground = Avalonia.Media.Brush.Parse(vm.VpnForeground),
+        };
+        var cards = new StackPanel { Spacing = 2, Margin = new Thickness(0, 6, 0, 0) };
+        foreach (var line in vm.CardLines)
+            cards.Children.Add(DialogKit.Label(line, "muted"));
+        var inner = new StackPanel();
+        inner.Children.Add(headline);
+        inner.Children.Add(cards);
+        return new Border
+        {
+            Background = Avalonia.Media.Brush.Parse(vm.VpnBackground), Padding = new Thickness(14, 8), Margin = new Thickness(10, 8, 10, 0),
+            CornerRadius = new CornerRadius(4), Child = inner,
+        };
     }
 
     private static Control BuildTab(ScanTabViewModel? tab)

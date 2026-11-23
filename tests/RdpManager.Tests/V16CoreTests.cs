@@ -357,6 +357,74 @@ public sealed class V16CoreTests : IDisposable
     public void Vpn_ClassifiesAdapters(string name, string description, NetworkInterfaceType type, NetworkKind kind) =>
         Assert.Equal(kind, VpnProviders.Classify(name, description, type));
 
+    [Theory]
+    [InlineData("RdpManager", "RdpManager", NetworkInterfaceType.Unknown)]
+    [InlineData("wg0", "wg0", NetworkInterfaceType.Unknown)]
+    [InlineData("wg12", "wg12", NetworkInterfaceType.Tunnel)]
+    public void Vpn_RecognisesOurWireGuardByTunnelNameToo(string name, string description, NetworkInterfaceType type) =>
+        Assert.Equal(NetworkKind.WireGuard, VpnProviders.Classify(name, description, type));
+
+    [Fact]
+    public void Vpn_WgPrefixIsNotEnough()
+    {
+        Assert.Equal(NetworkKind.Local, VpnProviders.Classify("wgx", "wgx", NetworkInterfaceType.Ethernet));
+        Assert.Equal(NetworkKind.Local, VpnProviders.Classify("wgetter0", "x", NetworkInterfaceType.Ethernet));
+    }
+
+    private static readonly AdapterInfo Lan = new("Ethernet", "x", NetworkInterfaceType.Ethernet, IPAddress.Parse("192.168.1.20"), 24, NetworkKind.Local);
+    private static readonly AdapterInfo Zt = new("ZeroTier One", "ZeroTier Virtual Port", NetworkInterfaceType.Ethernet, IPAddress.Parse("10.147.20.7"), 24, NetworkKind.ZeroTier);
+    private static readonly AdapterInfo Wg = new("RdpManager", "WireGuard Tunnel", NetworkInterfaceType.Unknown, IPAddress.Parse("10.66.0.12"), 24, NetworkKind.WireGuard);
+
+    [Fact]
+    public void Overview_ConnectedVpn_IsFirstAndSuggested()
+    {
+        var o = NetworkOverview.Build([Lan, Zt, Wg]);
+        Assert.True(o.VpnConnected);
+        Assert.Equal(["RdpManager", "ZeroTier One", "Ethernet"], o.Cards.Select(c => c.Name));
+        Assert.Same(Wg, o.Suggested);
+        Assert.Equal("10.66.0.0/24", o.Vpn!.NetworkText);
+        Assert.Equal("10.66.0.12", o.Vpn.AddressText);
+        Assert.Contains("COLLEGATA", o.Headline);
+        Assert.DoesNotContain("NON COLLEGATA", o.Headline);
+        Assert.Contains("10.66.0.12", o.Headline);
+        Assert.Contains("10.66.0.0/24", o.Headline);
+    }
+
+    [Fact]
+    public void Overview_DisconnectedVpn_SaysSoAndSuggestsNothing()
+    {
+        var off = new AdapterCard("RdpManager", "WireGuard Tunnel", NetworkKind.WireGuard, false, null, 0);
+        var o = NetworkOverview.Build([Lan], [off]);
+        Assert.False(o.VpnConnected);
+        Assert.Null(o.Suggested);
+        Assert.Equal("RdpManager", o.Cards[0].Name);
+        Assert.Equal("non collegata", o.Cards[0].StateText);
+        Assert.Contains("NON COLLEGATA", o.Headline);
+        Assert.Contains("RdpManager", o.Headline);
+
+        var none = NetworkOverview.Build([Lan]);
+        Assert.Null(none.Vpn);
+        Assert.Contains("NON COLLEGATA", none.Headline);
+        Assert.Null(none.Suggested);
+    }
+
+    [Fact]
+    public void Overview_ActiveCardWinsOverAnInactiveOneWithTheSameName()
+    {
+        var stale = new AdapterCard("RdpManager", "x", NetworkKind.WireGuard, false, null, 0);
+        var o = NetworkOverview.Build([Wg], [stale]);
+        Assert.Single(o.Cards);
+        Assert.True(o.VpnConnected);
+    }
+
+    [Theory]
+    [InlineData("10.66.0.12", 24, "10.66.0.0/24")]
+    [InlineData("172.16.5.9", 20, "172.16.0.0/20")]
+    [InlineData("100.64.3.1", 10, "100.64.0.0/10")]
+    [InlineData("192.168.1.5", 32, "192.168.1.5/32")]
+    public void AdapterCard_ShowsTheNetworkAddress(string ip, int prefix, string expected) =>
+        Assert.Equal(expected, AdapterCard.NetworkOf(IPAddress.Parse(ip), prefix));
+
     [Fact]
     public void Vpn_ProvidersAreExtensible()
     {
