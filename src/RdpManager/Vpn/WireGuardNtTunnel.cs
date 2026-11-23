@@ -171,7 +171,7 @@ public sealed class WireGuardNtTunnel(IVpnElevator elevator, IVpnServiceControl 
             case ExitOk:
                 return;
             case ExitCancelled:
-                throw new VpnException($"Per {action} la VPN servono i diritti di amministratore: operazione annullata.");
+                throw new VpnElevationDeclinedException($"Per {action} la VPN servono i diritti di amministratore: operazione annullata.");
             default:
                 throw new VpnException($"Impossibile {action} la VPN (codice {code}). Controlla che wireguard.dll sia nella cartella del programma e che il server sia raggiungibile.");
         }

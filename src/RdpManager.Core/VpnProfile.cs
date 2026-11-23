@@ -20,6 +20,9 @@ public sealed class VpnProfile
     /// <summary>Connessione automatica: all'avvio del programma e se la VPN cade. Attiva di default (anche per i vpn.json già esistenti, dove il campo manca).</summary>
     public bool AutoConnect { get; set; } = true;
 
+    /// <summary>Segno: all'avvio l'utente ha rifiutato la richiesta di amministratore per installare il servizio; l'accensione automatica non la ripropone finché la VPN non si accende a mano.</summary>
+    public bool AutoConnectSkipsInstall { get; set; }
+
     public static string DefaultPath => Path.Combine(AppPaths.ConfigFolder, "vpn.json");
 
     public bool HasKey => PrivateKeyProtected.Length > 0;

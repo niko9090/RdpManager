@@ -122,15 +122,7 @@ public sealed partial class MainForm
                 return "";
             if (!Vpn.WireGuardNative.DllPresent)
                 return "VPN non collegata: manca wireguard.dll accanto al programma.";
-            var config = profile.ToConfig();
-            return await Task.Run(() =>
-            {
-                var tunnel = CreateTunnel();
-                if (tunnel.Stato is TunnelState.Acceso or TunnelState.InAvvio)
-                    return "";
-                tunnel.Accendi(config);
-                return "VPN collegata.";
-            });
+            return await Task.Run(() => VpnAutoStart.Run(profile, CreateTunnel(), new ScControl(), p => p.Save()));
         }
         catch (Exception ex) when (ex is Vpn.VpnException or ArgumentException or InvalidOperationException)
         {

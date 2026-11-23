@@ -12,7 +12,10 @@ public enum TunnelState
 }
 
 /// <summary>Errore nell'accendere o spegnere il tunnel (messaggio già leggibile dall'utente).</summary>
-public sealed class VpnException(string message) : Exception(message);
+public class VpnException(string message) : Exception(message);
+
+/// <summary>La richiesta di amministratore (UAC) è stata rifiutata o annullata.</summary>
+public sealed class VpnElevationDeclinedException(string message) : VpnException(message);
 
 /// <summary>Il tunnel WireGuard di RdpManager.</summary>
 public interface IWireGuardTunnel
