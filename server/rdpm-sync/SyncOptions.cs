@@ -52,6 +52,15 @@ public sealed class SyncOptions
     /// <summary>Durata dell'accesso dalla pagina web.</summary>
     public TimeSpan WebSessionLifetime { get; set; } = TimeSpan.FromHours(12);
 
+    /// <summary>Cartella dei file in transito fra i PC; vuota = «transfers» accanto al database.</summary>
+    public string TransferDirectory { get; set; } = "";
+    /// <summary>Dimensione massima di un file scambiato fra i PC (RDPM_SYNC_MAX_FILE_MB, da 1 a 2048 MB).</summary>
+    public long MaxFileBytes { get; set; } = 100L * 1024 * 1024;
+    /// <summary>Dopo quanto un file non ritirato viene cancellato (RDPM_SYNC_FILE_DAYS).</summary>
+    public TimeSpan FileRetention { get; set; } = TimeSpan.FromDays(7);
+    /// <summary>File in attesa al massimo per account (RDPM_SYNC_MAX_PENDING_FILES).</summary>
+    public int MaxPendingFiles { get; set; } = 50;
+
     public static SyncOptions FromEnvironment()
     {
         var o = new SyncOptions();
@@ -76,6 +85,13 @@ public sealed class SyncOptions
         o.WebAdmins = V("RDPM_SYNC_WEB_ADMINS") ?? "";
         if (int.TryParse(V("RDPM_VPN_MAX_DEVICES"), out var md) && md is > 0 and <= 250)
             o.MaxDevicesPerAccount = md;
+        o.TransferDirectory = V("RDPM_SYNC_FILES_DIR") ?? "";
+        if (int.TryParse(V("RDPM_SYNC_MAX_FILE_MB"), out var fmb) && fmb is > 0 and <= 2048)
+            o.MaxFileBytes = fmb * 1024L * 1024;
+        if (double.TryParse(V("RDPM_SYNC_FILE_DAYS"), NumberStyles.Float, CultureInfo.InvariantCulture, out var fd) && fd > 0)
+            o.FileRetention = TimeSpan.FromDays(fd);
+        if (int.TryParse(V("RDPM_SYNC_MAX_PENDING_FILES"), out var pf) && pf is > 0 and <= 1000)
+            o.MaxPendingFiles = pf;
         return o;
     }
 }

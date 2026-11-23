@@ -15,6 +15,9 @@ public enum PutResult { Ok, Conflict }
 public sealed record VpnDevice(long Id, long AccountId, string Name, string PublicKey, string Address, DateTimeOffset CreatedUtc,
     DateTimeOffset? LastSeenUtc = null);
 
+public sealed record TransferInfo(string Id, long AccountId, string FromName, string ToName, string FileName, long Size,
+    DateTimeOffset CreatedUtc);
+
 /// <summary>Database SQLite: account, token (se ne salva solo l'hash) e un documento cifrato per account.</summary>
 public sealed class Store
 {
@@ -62,6 +65,12 @@ public sealed class Store
               created_utc INTEGER NOT NULL,
               last_seen_utc INTEGER,
               UNIQUE(account_id, name));
+            CREATE TABLE IF NOT EXISTS transfers(
+              id TEXT PRIMARY KEY,
+              account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+              from_name TEXT NOT NULL, to_name TEXT NOT NULL COLLATE NOCASE,
+              file_name TEXT NOT NULL, size INTEGER NOT NULL,
+              created_utc INTEGER NOT NULL);
             """);
         // Database creati prima della plancia web: aggiunge la colonna dell'ultimo contatto.
         using (var check = c.CreateCommand())
@@ -336,4 +345,62 @@ public sealed class Store
     }
 
     public bool DeleteDevice(long deviceId) => Run("DELETE FROM vpn_devices WHERE id = $x", deviceId) == 1;
+
+    // ---------- VPN: file in transito fra i PC dello stesso account ----------
+
+    private const string TransferColumns = "id, account_id, from_name, to_name, file_name, size, created_utc";
+
+    private static TransferInfo ReadTransfer(SqliteDataReader r) =>
+        new(r.GetString(0), r.GetInt64(1), r.GetString(2), r.GetString(3), r.GetString(4), r.GetInt64(5),
+            DateTimeOffset.FromUnixTimeSeconds(r.GetInt64(6)));
+
+    public void InsertTransfer(TransferInfo t)
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = $"INSERT INTO transfers({TransferColumns}) VALUES($i,$a,$f,$t,$n,$s,$c)";
+        cmd.Parameters.AddWithValue("$i", t.Id);
+        cmd.Parameters.AddWithValue("$a", t.AccountId);
+        cmd.Parameters.AddWithValue("$f", t.FromName);
+        cmd.Parameters.AddWithValue("$t", t.ToName);
+        cmd.Parameters.AddWithValue("$n", t.FileName);
+        cmd.Parameters.AddWithValue("$s", t.Size);
+        cmd.Parameters.AddWithValue("$c", t.CreatedUtc.ToUnixTimeSeconds());
+        cmd.ExecuteNonQuery();
+    }
+
+    private List<TransferInfo> QueryTransfers(string where, params (string Name, object Value)[] args)
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = $"SELECT {TransferColumns} FROM transfers WHERE {where} ORDER BY created_utc, id";
+        foreach (var (n, v) in args)
+            cmd.Parameters.AddWithValue(n, v);
+        using var r = cmd.ExecuteReader();
+        var list = new List<TransferInfo>();
+        while (r.Read())
+            list.Add(ReadTransfer(r));
+        return list;
+    }
+
+    public List<TransferInfo> ListTransfersFor(long accountId, string toName) =>
+        QueryTransfers("account_id = $a AND to_name = $t", ("$a", accountId), ("$t", toName));
+
+    public int CountTransfers(long accountId) =>
+        QueryTransfers("account_id = $a", ("$a", accountId)).Count;
+
+    public TransferInfo? FindTransfer(long accountId, string toName, string id) =>
+        QueryTransfers("id = $i AND account_id = $a AND to_name = $t", ("$i", id), ("$a", accountId), ("$t", toName)).FirstOrDefault();
+
+    public List<TransferInfo> ListTransfersOlderThan(DateTimeOffset cutoff) =>
+        QueryTransfers("created_utc < $c", ("$c", cutoff.ToUnixTimeSeconds()));
+
+    public bool DeleteTransfer(string id)
+    {
+        using var c = Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "DELETE FROM transfers WHERE id = $i";
+        cmd.Parameters.AddWithValue("$i", id);
+        return cmd.ExecuteNonQuery() == 1;
+    }
 }

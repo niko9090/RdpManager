@@ -23,7 +23,7 @@ public static class SyncApp
         builder.WebHost.ConfigureKestrel(k =>
         {
             k.AddServerHeader = false;
-            k.Limits.MaxRequestBodySize = options.MaxDocumentBytes + 4096;
+            k.Limits.MaxRequestBodySize = Math.Max(options.MaxDocumentBytes, options.MaxFileBytes) + 4096;
         });
         // Log senza dati sensibili: niente log delle richieste (contengono l'intestazione Authorization nei dettagli).
         builder.Logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
