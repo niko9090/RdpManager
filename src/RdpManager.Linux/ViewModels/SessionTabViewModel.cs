@@ -31,7 +31,7 @@ public sealed class SessionTabViewModel : ViewModelBase
     }
 
     /// <summary>Pallino dello stato nella linguetta, come in Windows: verde se collegata, rosso se disconnessa.</summary>
-    public string StateColor => IsConnected ? "#2EA043" : "#C83C32";
+    public string StateColor => IsConnected ? UiColors.Connected : UiColors.Disconnected;
 
     public ISession Session { get; }
 

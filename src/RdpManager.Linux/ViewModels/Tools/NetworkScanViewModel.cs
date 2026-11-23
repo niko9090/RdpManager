@@ -423,9 +423,9 @@ public sealed class NetworkScanViewModel : ViewModelBase
     public string VpnHeadline => Overview.Headline;
 
     /// <summary>Colori del riquadro dello stato VPN: verde se collegata, rosso se no.</summary>
-    public string VpnBackground => VpnConnected ? "#D6F0DC" : "#F8DAD6";
+    public string VpnBackground => VpnConnected ? UiColors.VpnUpBackground : UiColors.VpnDownBackground;
 
-    public string VpnForeground => VpnConnected ? "#105A24" : "#8A1C14";
+    public string VpnForeground => VpnConnected ? UiColors.VpnUpForeground : UiColors.VpnDownForeground;
 
     /// <summary>Una riga per scheda: «collegata - nome - tipo - IP - rete».</summary>
     public IReadOnlyList<string> CardLines => [.. Overview.Cards.Select(c =>

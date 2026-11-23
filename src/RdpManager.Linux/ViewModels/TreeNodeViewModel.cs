@@ -46,7 +46,7 @@ public sealed class TreeNodeViewModel : ViewModelBase
     public bool IsConnection => Connection is not null;
 
     /// <summary>Colore dello schermo nell'icona del PC: l'etichetta della connessione oppure l'azzurro di Windows.</summary>
-    public string ScreenColor => HasLabelColor ? LabelColor : "#4688DC";
+    public string ScreenColor => HasLabelColor ? LabelColor : UiColors.DefaultScreen;
 
     /// <summary>Il pallino di stato nell'icona si vede (la raggiungibilità è nota).</summary>
     public bool HasStatusColor => StatusColor.Length > 0;
@@ -104,8 +104,8 @@ public sealed class TreeNodeViewModel : ViewModelBase
     /// <summary>Colore del pallino di stato: verde se raggiungibile, grigio se no, vuoto se non verificata.</summary>
     public string StatusColor => _reachability switch
     {
-        ReachabilityStatus.Reachable => "#2EA043",
-        ReachabilityStatus.Unreachable => "#969696",
+        ReachabilityStatus.Reachable => UiColors.Connected,
+        ReachabilityStatus.Unreachable => UiColors.Unreachable,
         _ => "",
     };
 }
