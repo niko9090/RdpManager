@@ -108,6 +108,38 @@ public sealed partial class MainForm
     }, ct);
 
     /// <summary>
+    /// Connessione automatica all'avvio: con un profilo completo e l'opzione attiva accende il tunnel (wireguard-nt è già
+    /// dentro il programma, niente da installare), anche senza account. Restituisce una riga di stato ("" = niente da dire).
+    /// </summary>
+    internal async Task<string> AutoConnectVpnAsync()
+    {
+        try
+        {
+            if (IsDisposed || _shutdownCts.IsCancellationRequested)
+                return "";
+            var profile = VpnProfile.Load();
+            if (!VpnProvisioning.ShouldAutoConnect(profile))
+                return "";
+            if (!Vpn.WireGuardNative.DllPresent)
+                return "VPN non collegata: manca wireguard.dll accanto al programma.";
+            var config = profile.ToConfig();
+            return await Task.Run(() =>
+            {
+                var tunnel = CreateTunnel();
+                if (tunnel.Stato is TunnelState.Acceso or TunnelState.InAvvio)
+                    return "";
+                tunnel.Accendi(config);
+                return "VPN collegata.";
+            });
+        }
+        catch (Exception ex) when (ex is Vpn.VpnException or ArgumentException or InvalidOperationException)
+        {
+            AppLog.Default?.Info("Connessione automatica della VPN non riuscita: " + ex.Message);
+            return "VPN non collegata: " + ex.Message;
+        }
+    }
+
+    /// <summary>
     /// VPN automatica: se questo PC non ha ancora un profilo e si è nell'account, lo ottiene dal server (chiavi create qui,
     /// al server va solo la pubblica) e accende il tunnel. Restituisce una riga di stato per chi l'ha chiamata ("" = niente da fare).
     /// </summary>

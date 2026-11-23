@@ -21,10 +21,84 @@ public sealed class VpnViewModel : ViewModelBase
     private bool _connected, _busy;
 
     private readonly string? _dataFolder;
+    private readonly LinuxWireGuardInstaller _installer;
+    private bool _toolsMissing, _installing;
+    private string _installMessage = "";
+
+    public RelayCommand InstallCommand { get; }
+
+    /// <summary>Vero se mancano wg / wg-quick (pacchetto wireguard-tools): la finestra lo dice e offre «Installa WireGuard».</summary>
+    public bool ToolsMissing
+    {
+        get => _toolsMissing;
+        private set { if (Set(ref _toolsMissing, value)) { OnPropertyChanged(nameof(InstallNotice)); InstallCommand.RaiseCanExecuteChanged(); } }
+    }
+
+    public string InstallNotice => ToolsMissing
+        ? "WireGuard non è installato su questo PC (mancano wg e wg-quick). Senza, la VPN non si può accendere con wg-quick."
+        : "";
+
+    /// <summary>Avanzamento ed esito dell'installazione.</summary>
+    public string InstallMessage
+    {
+        get => _installMessage;
+        private set { if (Set(ref _installMessage, value)) OnPropertyChanged(nameof(HasInstallMessage)); }
+    }
+
+    public bool HasInstallMessage => _installMessage.Length > 0;
+
+    public bool Installing { get => _installing; private set => Set(ref _installing, value); }
+
+    /// <summary>Connessione automatica (all'avvio e se cade): attiva di default.</summary>
+    public bool AutoConnect
+    {
+        get => _profile.AutoConnect;
+        set
+        {
+            if (_profile.AutoConnect == value)
+                return;
+            _profile.AutoConnect = value;
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>Installa wireguard-tools col gestore pacchetti (password con pkexec); poi, con un profilo pronto, accende la VPN.</summary>
+    public async Task InstallWireGuardAsync()
+    {
+        if (Busy || !ToolsMissing)
+            return;
+        Busy = true;
+        Installing = true;
+        try
+        {
+            var progress = new Progress<string>(m => InstallMessage = m);
+            var r = await _installer.InstallAsync(progress);
+            InstallMessage = r.Message;
+            ToolsMissing = !_installer.ToolsPresent;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException
+                                       or OperationCanceledException or System.ComponentModel.Win32Exception)
+        {
+            InstallMessage = "Installazione di WireGuard non riuscita: " + ex.Message;
+        }
+        finally
+        {
+            Installing = false;
+            Busy = false;
+        }
+        if (!ToolsMissing && VpnProvisioning.ShouldAutoConnect(_profile) && !IsConnected)
+        {
+            InstallMessage += " Collego la VPN…";
+            await ToggleAsync();
+        }
+    }
 
     public VpnViewModel(LinuxWireGuard tunnel, SyncService? sync, IShellUi ui, IDialogService dialogs, string? profilePath = null,
-        string? dataFolder = null)
+        string? dataFolder = null, LinuxWireGuardInstaller? installer = null)
     {
+        _installer = installer ?? new LinuxWireGuardInstaller();
+        _toolsMissing = !_installer.ToolsPresent;
+        InstallCommand = new RelayCommand(() => _ = InstallWireGuardAsync(), () => !Busy && ToolsMissing);
         _dataFolder = dataFolder;
         _tunnel = tunnel;
         _sync = sync;
@@ -130,6 +204,7 @@ public sealed class VpnViewModel : ViewModelBase
             ToggleCommand.RaiseCanExecuteChanged();
             ProvisionCommand.RaiseCanExecuteChanged();
             ImportConfigCommand.RaiseCanExecuteChanged();
+            InstallCommand.RaiseCanExecuteChanged();
         }
     }
 

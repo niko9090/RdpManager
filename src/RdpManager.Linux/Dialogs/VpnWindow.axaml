@@ -10,6 +10,14 @@
   </Window.Styles>
   <ScrollViewer>
     <StackPanel Margin="20" Spacing="6">
+      <Border IsVisible="{Binding ToolsMissing}" BorderThickness="1" BorderBrush="Orange" CornerRadius="4" Padding="10" Margin="0,0,0,6">
+        <StackPanel Spacing="6">
+          <TextBlock TextWrapping="Wrap" FontWeight="SemiBold" Text="{Binding InstallNotice}" />
+          <Button Classes="accent" Content="Installa WireGuard" Command="{Binding InstallCommand}" HorizontalAlignment="Left" Padding="16,8"
+                  ToolTip.Tip="Usa il gestore pacchetti della distribuzione (apt, dnf, zypper o pacman) e chiede la password di amministratore" />
+        </StackPanel>
+      </Border>
+      <TextBlock IsVisible="{Binding HasInstallMessage}" TextWrapping="Wrap" Text="{Binding InstallMessage}" />
       <TextBlock TextWrapping="Wrap" Text="{Binding ImportExplanation}" />
       <Button Classes="accent" Content="Carica file di configurazione…" Command="{Binding ImportConfigCommand}"
               HorizontalAlignment="Left" Padding="16,10" FontWeight="SemiBold" Margin="0,6,0,6" />
@@ -18,6 +26,7 @@
       <TextBlock Text="{Binding Status}" FontWeight="SemiBold" />
       <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
       <Button Classes="accent" Content="{Binding ToggleText}" Command="{Binding ToggleCommand}" HorizontalAlignment="Left" />
+      <CheckBox IsChecked="{Binding AutoConnect}" Content="Collega da sola all'avvio e se cade" Margin="0,6,0,0" />
 
       <Expander Header="Avanzate" Margin="0,12,0,0">
         <StackPanel Spacing="6">

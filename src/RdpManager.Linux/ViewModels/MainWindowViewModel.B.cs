@@ -91,8 +91,39 @@ public sealed partial class MainWindowViewModel
                     Notice("Sincronizzazione o VPN non riuscite all'avvio: " + ex.Message);
                 }
             });
+        _vpnAuto = new LinuxVpnAutoConnector(VpnFactory(), () => VpnProfile.Load(VpnProfilePath));
+        _ = AutoConnectVpnAsync();
+        _vpnWatch = new Timer(_ => _ = AutoConnectVpnAsync(), null, TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60));
         _syncPoll = new Timer(_ => _ = RunSyncAsync(manual: false), null, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
         _ = CheckUpdatesAsync(manual: false);
+    }
+
+    private LinuxVpnAutoConnector? _vpnAuto;
+    private Timer? _vpnWatch;
+    private int _vpnAutoRunning;
+
+    /// <summary>Connessione automatica della VPN (avvio e ricollegamento): un giro alla volta, errori nel registro.</summary>
+    internal async Task AutoConnectVpnAsync()
+    {
+        if (_vpnAuto is not { } auto || _shutdown.IsCancellationRequested || Interlocked.Exchange(ref _vpnAutoRunning, 1) == 1)
+            return;
+        try
+        {
+            if (await auto.TickAsync(_shutdown.Token) is { Length: > 0 } line)
+                Notice(line);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException
+                                       or ArgumentException or System.ComponentModel.Win32Exception)
+        {
+            AppLog.Default?.Info("VPN automatica non riuscita: " + ex.Message);
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _vpnAutoRunning, 0);
+        }
     }
 
     /// <summary>Chiusura del programma: ricorda le sessioni aperte, ferma i timer.</summary>
@@ -102,6 +133,7 @@ public sealed partial class MainWindowViewModel
         _shutdown.Cancel();
         _syncDelay?.Dispose();
         _syncPoll?.Dispose();
+        _vpnWatch?.Dispose();
         _sync?.Dispose();
     }
 

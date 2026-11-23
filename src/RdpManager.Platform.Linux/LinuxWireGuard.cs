@@ -134,8 +134,12 @@ public sealed class LinuxWireGuard
         }
     }
 
+    /// <summary>Vero dopo uno spegnimento voluto in questa esecuzione: la ricollegazione automatica non deve riaccenderla.</summary>
+    public bool StoppedByUser { get; private set; }
+
     private async Task<LinuxVpnResult> ConnectCoreAsync(WireGuardConfig config, CancellationToken ct)
     {
+        StoppedByUser = false;
         var errors = config.Validate();
         if (errors.Count > 0)
             return new LinuxVpnResult(false, string.Join(" ", errors));
@@ -177,6 +181,8 @@ public sealed class LinuxWireGuard
             var r = await RunAsync(cmd, ct).ConfigureAwait(false);
             if (!nm)
                 TryDelete(wgPath);
+            if (r.Success)
+                StoppedByUser = true;
             return r.Success ? new LinuxVpnResult(true, "VPN disconnessa.") : Fail("Disconnessione non riuscita", r);
         }
         finally

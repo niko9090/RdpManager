@@ -17,6 +17,9 @@ public sealed class VpnProfile
     public int PersistentKeepalive { get; set; } = VpnDefaults.Keepalive;
     public string PcName { get; set; } = "";
 
+    /// <summary>Connessione automatica: all'avvio del programma e se la VPN cade. Attiva di default (anche per i vpn.json già esistenti, dove il campo manca).</summary>
+    public bool AutoConnect { get; set; } = true;
+
     public static string DefaultPath => Path.Combine(AppPaths.ConfigFolder, "vpn.json");
 
     public bool HasKey => PrivateKeyProtected.Length > 0;
