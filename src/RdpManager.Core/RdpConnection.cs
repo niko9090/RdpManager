@@ -121,6 +121,15 @@ public sealed class RdpConnection
     /// <summary>Usa la risoluzione impostata sulla cartella (se ce n'è una) invece della propria.</summary>
     public bool InheritFolderResolution { get; set; }
 
+    // --- Dalla 1.17.1 ---
+
+    /// <summary>
+    /// Nome del PC della VPN per cui la cartella automatica «marshmelloVPN» ha creato questa connessione
+    /// (vedi <see cref="VpnFolder"/>); null = connessione dell'utente, che la cartella non tocca mai.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? AutoVpnDevice { get; set; }
+
     /// <summary>Vero se il gateway è attivo e ha un host.</summary>
 
     [JsonIgnore]
@@ -148,6 +157,7 @@ public sealed class RdpConnection
     {
         var copy = Clone();
         copy.Id = Guid.NewGuid();
+        copy.AutoVpnDevice = null; // la copia è dell'utente: la cartella automatica non deve gestirla né toglierla
         copy.Name = DisplayName + " (copia)";
         return copy;
     }

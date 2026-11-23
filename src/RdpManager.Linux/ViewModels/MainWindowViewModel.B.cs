@@ -774,6 +774,7 @@ public sealed partial class MainWindowViewModel
         SyncOutcome outcome;
         try
         {
+            await SyncService.RefreshVpnFolderAsync(new SyncAccess(this), _shutdown.Token);
             outcome = await SyncService.SyncAsync(new SyncAccess(this), _shutdown.Token);
         }
         catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException or OperationCanceledException or IOException)

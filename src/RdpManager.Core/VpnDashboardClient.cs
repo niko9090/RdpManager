@@ -144,7 +144,7 @@ public static class VpnDashboardModel
 
     private static VpnDashboardView Fail(VpnDashboardStatus status, string message) => new(status, message, []);
 
-    private static string StripMask(string address)
+    internal static string StripMask(string address)
     {
         var slash = address.IndexOf('/');
         return (slash < 0 ? address : address[..slash]).Trim();
