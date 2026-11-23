@@ -142,6 +142,8 @@ public sealed class AvaloniaShellUi : IShellUi
         return view;
     }
 
+    public Task ShowUpdateMessageAsync(string title, string message) => TextDialog.MessageAsync(RequireOwner(), title, message);
+
     public async Task<bool> OfferUpdateAsync(ReleaseInfo release, string currentVersion, bool canInstall = false)
     {
         var open = new Button { Content = canInstall ? "Installa ora" : "Apri la pagina della release", IsDefault = true, MinWidth = 200 };

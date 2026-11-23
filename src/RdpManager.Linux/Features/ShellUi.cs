@@ -33,6 +33,9 @@ public interface IShellUi
     /// <summary>Finestra di avanzamento dello scaricamento; si chiude con Dispose. «Annulla» scatta <see cref="IUpdateProgressView.Cancelled"/>.</summary>
     IUpdateProgressView ShowUpdateProgress(ReleaseInfo release);
 
+    /// <summary>Messaggio con «OK» sull'esito dell'aggiornamento (riuscito o non riuscito); finisce quando l'utente preme OK.</summary>
+    Task ShowUpdateMessageAsync(string title, string message);
+
     /// <summary>Selettore di file; null se annullato.</summary>
     Task<string?> PickFileAsync(string title, string filterName, params string[] patterns);
 
@@ -60,6 +63,9 @@ public interface IUpdateProgressView : IDisposable
     void Report(double fraction);
 
     void SetText(string text);
+
+    /// <summary>Barra senza percentuale (installazione in corso, durata non nota).</summary>
+    void SetIndeterminate(bool on);
 }
 
 /// <summary>Avanzamento senza finestra (prove).</summary>
@@ -68,9 +74,16 @@ public sealed class NullUpdateProgress : IUpdateProgressView
     public CancellationToken Cancelled { get; set; }
     public double Last { get; private set; }
     public string Text { get; private set; } = "";
+    public List<string> Texts { get; } = [];
+    public bool Indeterminate { get; private set; }
     public bool Disposed { get; private set; }
     public void Report(double fraction) => Last = fraction;
-    public void SetText(string text) => Text = text;
+    public void SetText(string text)
+    {
+        Text = text;
+        Texts.Add(text);
+    }
+    public void SetIndeterminate(bool on) => Indeterminate = on;
     public void Dispose() => Disposed = true;
 }
 
@@ -123,6 +136,14 @@ public class NullShellUi : IShellUi
         var p = new NullUpdateProgress();
         Progresses.Add(p);
         return p;
+    }
+
+    public List<(string Title, string Message)> UpdateMessages { get; } = [];
+
+    public virtual Task ShowUpdateMessageAsync(string title, string message)
+    {
+        UpdateMessages.Add((title, message));
+        return Task.CompletedTask;
     }
 
     public virtual Task<string?> PickFileAsync(string title, string filterName, params string[] patterns) => Task.FromResult(FileAnswer);

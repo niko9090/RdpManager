@@ -92,7 +92,7 @@ public sealed partial class MainWindowViewModel
                 }
             });
         _syncPoll = new Timer(_ => _ = RunSyncAsync(manual: false), null, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
-        _ = CheckUpdatesAsync(manual: false);
+        _ = CheckUpdatesAtStartupAsync();
     }
 
     /// <summary>Chiusura del programma: ricorda le sessioni aperte, ferma i timer.</summary>
@@ -749,10 +749,14 @@ public sealed partial class MainWindowViewModel
                 return;
         }
         var release = result.Release!;
-        var line = $"È disponibile la versione {release.Version.ToString(3)}: {release.PageUrl}";
+        var line = $"È disponibile la versione {release.Version.ToString(3)} (tu hai la {AppInfo.VersionText}): {release.PageUrl}";
         Notice(line);
         if (!manual && mode != UpdateMode.AutomaticWithConfirmation)
-            return; // «Solo avviso»: resta la riga nella barra di stato
+        {
+            // «Solo avviso»: resta la riga nella barra di stato, con l'indicazione di come aggiornare.
+            Notice($"È disponibile la versione {release.Version.ToString(3)}. Per installarla: Aiuto, Controlla aggiornamenti.");
+            return;
+        }
         var updater = Updater;
         var install = await updater.DetectAsync(_shutdown.Token);
         var asset = LinuxUpdater.PickAsset(release, install.Kind);
@@ -773,41 +777,83 @@ public sealed partial class MainWindowViewModel
     /// </summary>
     private async Task InstallUpdateAsync(LinuxUpdater updater, LinuxInstallInfo install, ReleaseInfo release, ReleaseAsset asset)
     {
+        var version = release.Version.ToString(3);
+        Notice($"Scarico la nuova versione {version}…");
         UpdateDownloadResult download;
+        LinuxInstallResult? result = null;
+        bool cancelled;
+        // La finestra di avanzamento resta aperta anche durante l'installazione (può chiedere la password e durare un po').
         using (var progress = Ui.ShowUpdateProgress(release))
         {
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(_shutdown.Token, progress.Cancelled);
-            download = await UpdateDownload(release, asset, new Progress<double>(progress.Report), linked.Token);
-            if (!download.IsVerified && progress.Cancelled.IsCancellationRequested)
-                download = download with { Message = "Aggiornamento annullato." };
-        }
-        if (!download.IsVerified || download.InstallerPath is null)
-        {
-            UpdateFallback(release, download.Message);
-            return;
+            download = await UpdateDownload(release, asset, new Progress<double>(f =>
+            {
+                progress.Report(f);
+                progress.SetText($"Scarico RdpManager {version}… {Math.Clamp(f, 0, 1):P0}");
+            }), linked.Token);
+            cancelled = !download.IsVerified && progress.Cancelled.IsCancellationRequested;
+            if (download.IsVerified && download.InstallerPath is not null)
+            {
+                progress.Report(1);
+                progress.SetIndeterminate(true);
+                progress.SetText(install.Kind == LinuxInstallKind.AppImage
+                    ? $"Scaricato e verificato. Sostituisco il file di RdpManager con la versione {version}…"
+                    : $"Scaricato e verificato. Installo la versione {version}: se compare la richiesta di password di sistema, inseriscila per continuare…");
+                Notice($"Installo la versione {version}…");
+                result = await updater.InstallAsync(install, download.InstallerPath, _shutdown.Token);
+            }
         }
 
-        var result = await updater.InstallAsync(install, download.InstallerPath, _shutdown.Token);
+        if (cancelled)
+        {
+            Notice("Aggiornamento annullato: resta la versione " + AppInfo.VersionText + ".");
+            return;
+        }
+        if (result is null)
+        {
+            await UpdateFallbackAsync(release, $"Non sono riuscito a scaricare la versione {version}: {download.Message}");
+            return;
+        }
         if (!result.IsInstalled)
         {
             var text = result.Status switch
             {
                 LinuxInstallStatus.Cancelled => "Aggiornamento non installato: non hai autorizzato l'operazione.",
                 LinuxInstallStatus.NoPrivilegeTool => "Aggiornamento non installato: " + result.Message + " Installa il file a mano dalla pagina della release.",
-                _ => result.Message,
+                _ => "Aggiornamento non installato. " + result.Message,
             };
-            UpdateFallback(release, text);
+            await UpdateFallbackAsync(release, text);
             return;
         }
-        Notice($"RdpManager {release.Version.ToString(3)} installato: riavvio.");
+        Notice($"RdpManager {version} installato: riavvio.");
+        await Ui.ShowUpdateMessageAsync("Aggiornamento riuscito",
+            $"RdpManager {version} è stato installato.\nPremi OK: il programma si chiude e si riapre da solo con la nuova versione (le sessioni aperte si chiudono).");
         updater.Relaunch(install);
         ExitCommand.Execute(null);
     }
 
-    private void UpdateFallback(ReleaseInfo release, string message)
+    private async Task UpdateFallbackAsync(ReleaseInfo release, string message)
     {
-        Notice(message + " Si apre la pagina della release.");
+        Notice(message);
+        await Ui.ShowUpdateMessageAsync("Aggiornamento non riuscito", message + "\n\nPremi OK per aprire la pagina della release e scaricare il file a mano.");
         Ui.OpenUrl(release.PageUrl);
+    }
+
+    /// <summary>Controllo automatico all'avvio: un errore imprevisto non si perde in silenzio, finisce nel registro e in un avviso.</summary>
+    private async Task CheckUpdatesAtStartupAsync()
+    {
+        try
+        {
+            await CheckUpdatesAsync(manual: false);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            AppLog.Default?.Info("Aggiornamento automatico non riuscito: " + ex);
+            Notice("Aggiornamento automatico non riuscito: " + ex.Message);
+        }
     }
 
     // --- Elenco rapido per l'area di notifica ---
