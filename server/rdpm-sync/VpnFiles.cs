@@ -69,7 +69,7 @@ public sealed partial class VpnEndpoints
             var name = ctx.Request.Headers[DeviceHeader].ToString().Trim();
             if (name.Length == 0 || store.FindDevice(t.AccountId, name) is not { } d)
                 return SyncApp.Err(400, "device_unknown",
-                    "Questo PC non è registrato nella VPN del tuo account (manca o è sbagliata l'intestazione X-Device-Name).");
+                    "Questo PC non è registrato in marshmelloVPN con il tuo account (manca o è sbagliata l'intestazione X-Device-Name).");
             me = d;
             return null;
         }

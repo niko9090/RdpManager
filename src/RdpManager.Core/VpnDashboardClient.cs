@@ -113,7 +113,7 @@ public static class VpnDashboardModel
     public const int RefreshSeconds = 30;
 
     public static VpnDashboardView NotSignedIn() => new(VpnDashboardStatus.NotSignedIn,
-        "Per vedere i PC della VPN serve l'accesso all'account: apri «Account e sincronizzazione» dal menu Strumenti.", []);
+        "Per vedere i PC di marshmelloVPN serve l'accesso all'account: apri «Account e sincronizzazione» dal menu Strumenti.", []);
 
     public static VpnDashboardView FromDevices(IEnumerable<VpnDashboardDevice> devices, DateTimeOffset now)
     {
@@ -124,7 +124,7 @@ public static class VpnDashboardModel
                 d.Connected ? "Collegato" : "Non collegato", LastContactText(d.LastContact, now)))
             .ToList();
         return rows.Count == 0
-            ? new VpnDashboardView(VpnDashboardStatus.Empty, "Nessun PC registrato nella VPN.", rows)
+            ? new VpnDashboardView(VpnDashboardStatus.Empty, "Nessun PC registrato in marshmelloVPN.", rows)
             : new VpnDashboardView(VpnDashboardStatus.Ok, "", rows);
     }
 
@@ -139,7 +139,7 @@ public static class VpnDashboardModel
         SyncServerException { Code: "vpn_disabled" } => Fail(VpnDashboardStatus.Disabled,
             "La VPN automatica non è attiva su questo server."),
         SyncServerException s => Fail(VpnDashboardStatus.Error, "Il server ha risposto con un errore: " + s.Message),
-        _ => Fail(VpnDashboardStatus.Error, "Non riesco a leggere i PC della VPN: " + ex.Message),
+        _ => Fail(VpnDashboardStatus.Error, "Non riesco a leggere i PC di marshmelloVPN: " + ex.Message),
     };
 
     private static VpnDashboardView Fail(VpnDashboardStatus status, string message) => new(status, message, []);

@@ -154,7 +154,7 @@ Scambio di file fra i PC dello stesso account (stesso token della plancia, intes
 `POST /v1/vpn/files/{id}/accept` (scarica e cancella), `POST /v1/vpn/files/{id}/reject` (cancella).
 | `RDPM_SYNC_WEB_ADMINS` | vuoto | utenti (separati da virgola) che dalla plancia web `/vpn` possono revocare i dispositivi |
 
-Plancia web: `https://<server>/vpn` (accesso con gli account esistenti, senza accesso rimanda a `/vpn/accesso`).
+Plancia web di marshmelloVPN: `https://<server>/vpn` (accesso con gli account esistenti, senza accesso rimanda a `/vpn/accesso`).
 Mostra dispositivi, IP VPN, connesso sì/no (ultimo handshake da `wg show`, altrimenti ultimo contatto registrato) e dati
 del server; mai chiavi. Usarla solo dietro HTTPS (la password viaggia nel modulo; il cookie è HttpOnly e Secure).
 

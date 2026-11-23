@@ -75,6 +75,18 @@ public class VpnWebTests
     }
 
     [Fact]
+    public async Task La_pagina_di_accesso_si_chiama_marshmelloVPN()
+    {
+        await using var s = Server(new FakeWireGuard());
+        var r = await Get(Browser(s), "/vpn/accesso");
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        var html = await r.Content.ReadAsStringAsync();
+        // la «·» esce codificata (&#183;) perché il titolo passa da HtmlEncode
+        Assert.Contains("<h1>Plancia marshmelloVPN &#183; Accesso</h1>", html);
+        Assert.Contains("<title>marshmelloVPN &#183; Accesso", html);
+    }
+
+    [Fact]
     public async Task Password_sbagliata_non_entra()
     {
         await using var s = Server(new FakeWireGuard());
@@ -102,6 +114,10 @@ public class VpnWebTests
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
         var html = await r.Content.ReadAsStringAsync();
         Assert.Contains("Ufficio", html);
+        // Nome del prodotto (k-144): «marshmelloVPN», tutto minuscolo tranne VPN, nel titolo e nelle intestazioni.
+        Assert.Contains("<h1>Plancia marshmelloVPN</h1>", html);
+        Assert.Contains("<title>marshmelloVPN · RdpManager</title>", html);
+        Assert.Contains("Server marshmelloVPN", html);
         Assert.Contains("10.66.0.2", html);
         Assert.Contains("10.66.0.0/24", html);
         Assert.Contains("vpn.example.com:51820", html);

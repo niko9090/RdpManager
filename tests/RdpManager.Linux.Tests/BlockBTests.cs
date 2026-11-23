@@ -565,7 +565,7 @@ public class AccountAndVpnTests
             await vpn.ToggleAsync();
             Assert.Contains(runner.Calls, c => c.StartsWith("pkexec wg-quick up"));
             Assert.True(vpn.IsConnected);
-            Assert.Equal("Spegni la VPN", vpn.ToggleText);
+            Assert.Equal("Spegni marshmelloVPN", vpn.ToggleText);
             await vpn.ToggleAsync();
             Assert.Contains(runner.Calls, c => c.StartsWith("pkexec wg-quick down"));
             Assert.False(vpn.IsConnected);

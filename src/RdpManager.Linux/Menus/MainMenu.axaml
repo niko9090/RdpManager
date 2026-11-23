@@ -103,8 +103,8 @@
       <!-- ===== Zona mista: Strumenti (PC in rete: A; VPN e account: B) ===== -->
       <MenuItem Header="S_trumenti">
         <MenuItem Header="Cerca _PC in rete…" Command="{Binding NetworkScanCommand}" />
-        <MenuItem Header="_VPN (WireGuard)…" Command="{Binding VpnCommand}" />
-        <MenuItem Header="Pl_ancia VPN…" Command="{Binding VpnDashboardCommand}" />
+        <MenuItem Header="_marshmelloVPN (WireGuard)…" Command="{Binding VpnCommand}" />
+        <MenuItem Header="Pl_ancia marshmelloVPN…" Command="{Binding VpnDashboardCommand}" />
         <MenuItem Header="Account e _sincronizzazione…" Command="{Binding SyncAccountCommand}" />
         <MenuItem Header="_Carica file di configurazione…" Command="{Binding LoadConfigFileCommand}" />
       </MenuItem>

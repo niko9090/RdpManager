@@ -502,9 +502,9 @@ acceso; per la scheda Tailscale serve Tailscale installato e connesso (e, per il
   Remote Desktop Gateway vero, testi rapidi digitati in un PC remoto, aggiornamento con un clic da una
   release vera (la verifica SHA256 è provata con un server finto).
 
-## Installer del client VPN per un PC cliente
+## Installer di marshmelloVPN (client VPN) per un PC cliente
 
-**RdpManager VPN** è la parte VPN da installare sul PC che deve ricevere il desktop remoto (servizio Windows con il tunnel
+**marshmelloVPN** è la parte VPN da installare sul PC che deve ricevere il desktop remoto (servizio Windows con il tunnel
 WireGuard più icona nell'area di notifica). Funziona anche dove RdpManager non è installato. L'installer è **uno solo,
 uguale per tutti i PC e senza segreti dentro**: `dist\RdpManagerVPN-Setup.exe`. Si configura con il file `.rdpmconfig`
 preparato da chi gestisce il server (vedi «File di configurazione unico»).
@@ -539,7 +539,7 @@ né lo cancella, cancellalo tu dopo l'uso.
 
 Installa in `Program Files\RdpManager VPN`, mette l'icona nell'avvio automatico di Windows (voce `RdpManagerVPN` in
 HKCU\...\Run) e la avvia. Dal menu dell'icona si disattivano l'avvio con Windows e la riconnessione automatica.
-**Associazione `.rdpmconfig`:** RdpManager VPN la prende solo se nessun altro programma l'ha già (se c'è RdpManager, resta a
+**Associazione `.rdpmconfig`:** marshmelloVPN la prende solo se nessun altro programma l'ha già (se c'è RdpManager, resta a
 lui). **Disinstallazione** da *App installate*: ferma e rimuove servizio, avvio automatico, file, profilo e
 `%ProgramData%\RdpManagerVPN`.
 
@@ -741,9 +741,9 @@ Per la VPN non c'è niente da compilare: chi gestisce il server prepara **un fil
 
 - **Windows**: doppio clic sul file (l'installer associa l'estensione, per utente, senza amministratore), oppure
   `RdpManager.exe percorso\file.rdpmconfig`, oppure **Strumenti → Carica file di configurazione…**, oppure il pulsante
-  **Carica file di configurazione…** in cima alla finestra **VPN** (i campi a mano sono nella sezione «Avanzate»).
+  **Carica file di configurazione…** in cima alla finestra **marshmelloVPN** (i campi a mano sono nella sezione «Avanzate»).
 - **Linux**: `rdpmanager file.rdpmconfig` (i pacchetti .deb/.rpm/AppImage dichiarano il tipo `application/x-rdpmconfig`, quindi
-  il gestore di file lo apre con RdpManager), **Strumenti → Carica file di configurazione…**, oppure il pulsante nella finestra VPN.
+  il gestore di file lo apre con RdpManager), **Strumenti → Carica file di configurazione…**, oppure il pulsante nella finestra marshmelloVPN.
 
 Il programma salva indirizzo del server e codice di registrazione, scrive il profilo VPN, **crea da solo la chiave privata del PC**
 (al server va solo la pubblica), registra il PC sul server, accende la VPN con i meccanismi di sempre (servizio/inbox su Windows,
@@ -1038,7 +1038,7 @@ Ognuno compila la propria configurazione.
    Se lo scrivi a mano, parti da `server/rdpm-sync/.env.example` (una volta copiato in `.env` è escluso dal repository).
 3. Nell'app l'indirizzo del server non ha un valore predefinito: in **Strumenti › Account e sincronizzazione…** si scrive
    l'indirizzo del proprio server (per esempio `https://vpn.example.com:8443`); finché è vuoto l'app lo chiede.
-   L'endpoint VPN arriva dal server nel profilo automatico, oppure lo scrivi nella finestra della VPN.
+   L'endpoint VPN arriva dal server nel profilo automatico, oppure lo scrivi nella finestra marshmelloVPN.
 
 I valori `vpn.example.com` e `192.0.2.x` negli esempi sono segnaposto (domini e reti riservati alla documentazione).
 

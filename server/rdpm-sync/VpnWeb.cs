@@ -116,7 +116,7 @@ public sealed class VpnWeb(SyncOptions options, Store store, VpnEndpoints vpn, T
             sb.Append("<p class=err>Dispositivo non trovato.</p>");
 
         var ov = await vpn.OverviewAsync();
-        sb.Append("<h2>Server VPN</h2><dl>")
+        sb.Append("<h2>Server marshmelloVPN</h2><dl>")
           .Append("<dt>Rete</dt><dd>").Append(H(ov.Network)).Append("</dd>")
           .Append("<dt>Indirizzo pubblico (endpoint)</dt><dd>").Append(H(ov.Endpoint.Length > 0 ? ov.Endpoint : "non impostato")).Append("</dd>");
         if (ov.Dns.Length > 0)
@@ -132,7 +132,7 @@ public sealed class VpnWeb(SyncOptions options, Store store, VpnEndpoints vpn, T
             bool connected = d.LastContact is { } lc && now - lc <= ConnectedWindow;
             sb.Append("<div class=card><div class=row><b>").Append(H(d.Name)).Append("</b><span class=\"")
               .Append(connected ? "on" : "off").Append("\">").Append(connected ? "Connesso" : "Non connesso").Append("</span></div>")
-              .Append("<div>IP VPN: ").Append(H(d.Address)).Append("</div>");
+              .Append("<div>IP marshmelloVPN:").Append(H(d.Address)).Append("</div>");
             if (admin)
                 sb.Append("<div>Account: ").Append(H(d.Owner)).Append("</div>");
             sb.Append("<div>Ultimo contatto: ").Append(d.LastContact is { } l ? H(Format(l)) + (d.FromHandshake ? " (handshake)" : " (registrazione)") : "mai")
@@ -173,8 +173,8 @@ public sealed class VpnWeb(SyncOptions options, Store store, VpnEndpoints vpn, T
         ctx.Response.Headers["X-Frame-Options"] = "DENY";
         ctx.Response.Headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'";
         var html = "<!doctype html><html lang=it><head><meta charset=utf-8><meta name=viewport content=\"width=device-width,initial-scale=1\">" +
-            "<meta name=robots content=noindex><title>" + H(title) + " · RdpManager</title><style>" + Css + "</style></head><body><main><h1>" +
-            H(title == "VPN" ? "Plancia VPN" : "Plancia VPN · " + title) + "</h1>" + body + "</main></body></html>";
+            "<meta name=robots content=noindex><title>" + H(title == "VPN" ? "marshmelloVPN" : "marshmelloVPN · " + title) + " · RdpManager</title><style>" + Css + "</style></head><body><main><h1>" +
+            H(title == "VPN" ? "Plancia marshmelloVPN" : "Plancia marshmelloVPN · " + title) + "</h1>" + body + "</main></body></html>";
         return Results.Content(html, "text/html; charset=utf-8", Encoding.UTF8, status);
     }
 

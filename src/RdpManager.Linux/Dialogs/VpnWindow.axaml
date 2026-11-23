@@ -3,7 +3,7 @@
         xmlns:f="using:RdpManager.Linux.Features"
         x:Class="RdpManager.Linux.Dialogs.VpnWindow"
         x:DataType="f:VpnViewModel"
-        Title="VPN (WireGuard)" Width="560" Height="720" MinWidth="440" MinHeight="420"
+        Title="marshmelloVPN (WireGuard)" Width="560" Height="720" MinWidth="440" MinHeight="420"
         WindowStartupLocation="CenterOwner">
   <Window.Styles>
     <StyleInclude Source="avares://RdpManager.Linux/Dialogs/DialogStyles.axaml" />

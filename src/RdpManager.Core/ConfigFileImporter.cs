@@ -166,7 +166,7 @@ public static class ConfigFileImporter
                     lines.Add("Non sono riuscito a creare le chiavi: " + ex.Message);
                 }
                 complete = false;
-                lines.Add("Il file non chiede la chiave al server: l'amministratore deve aggiungere questo PC al server (il frammento è nella finestra VPN, «Avanzate»).");
+                lines.Add("Il file non chiede la chiave al server: l'amministratore deve aggiungere questo PC al server (il frammento è nella finestra marshmelloVPN, «Avanzate»).");
             }
         }
 
@@ -194,7 +194,7 @@ public static class ConfigFileImporter
             }
         }
         else if (profile is not null && connect is null)
-            lines.Add("VPN configurata: accendila dalla finestra VPN.");
+            lines.Add("VPN configurata: accendila dalla finestra marshmelloVPN.");
 
         return new ConfigImportReport(complete, lines, connected, false, null);
     }

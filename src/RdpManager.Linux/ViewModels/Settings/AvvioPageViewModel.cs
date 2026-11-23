@@ -50,7 +50,7 @@ public sealed class AvvioPageViewModel : SettingsPageViewModel
 
     public IReadOnlyList<string> RoleChoices { get; } = Enum.GetValues<AppRole>().Select(AppRoleStore.Describe).ToList();
 
-    public string RoleNote => "Con «Gestore VPN» all'avvio si apre la Plancia VPN; la finestra con le schede resta raggiungibile. Vale dal prossimo avvio.";
+    public string RoleNote => "Con «Gestore marshmelloVPN» all'avvio si apre la Plancia marshmelloVPN; la finestra con le schede resta raggiungibile. Vale dal prossimo avvio.";
 
     public RelayCommand OpenLogFolderCommand { get; }
 

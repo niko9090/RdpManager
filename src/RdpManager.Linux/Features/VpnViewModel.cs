@@ -127,8 +127,8 @@ public sealed class VpnViewModel : ViewModelBase
     public RelayCommand ImportConfigCommand { get; }
 
     public string ImportExplanation =>
-        "Per usare la VPN basta caricare il file di configurazione che ti ha dato chi gestisce il server: "
-        + "il programma registra questo PC e accende la VPN. Niente da compilare.";
+        "Per usare marshmelloVPN basta caricare il file di configurazione che ti ha dato chi gestisce il server: "
+        + "il programma registra questo PC e accende marshmelloVPN. Niente da compilare.";
 
     private async Task PickAndImportAsync()
     {
@@ -191,7 +191,7 @@ public sealed class VpnViewModel : ViewModelBase
 
     public bool IsConnected { get => _connected; private set { if (Set(ref _connected, value)) OnPropertyChanged(nameof(ToggleText)); } }
 
-    public string ToggleText => IsConnected ? "Spegni la VPN" : "Accendi la VPN";
+    public string ToggleText => IsConnected ? "Spegni marshmelloVPN" : "Accendi marshmelloVPN";
 
     public bool Busy
     {
@@ -225,7 +225,7 @@ public sealed class VpnViewModel : ViewModelBase
 
     public async Task GenerateKeysAsync()
     {
-        if (_profile.HasKey && !await _dialogs.ConfirmAsync("VPN",
+        if (_profile.HasKey && !await _dialogs.ConfirmAsync("marshmelloVPN",
                 "Esiste già una chiave. Crearne una nuova scollega questo PC dal server finché non aggiungi il nuovo frammento. Continuare?"))
             return;
         _profile.GenerateKeys();

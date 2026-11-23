@@ -19,7 +19,7 @@ public class AppRoleViewModelTests
     public async Task Al_primo_avvio_chiede_il_ruolo_e_lo_salva()
     {
         using var data = new TempData();
-        var vm = Make(data, new ScriptedDialogs { Choice = "Gestore VPN" });
+        var vm = Make(data, new ScriptedDialogs { Choice = "Gestore marshmelloVPN" });
 
         Assert.Equal(AppRole.VpnManager, await vm.ResolveStartupRoleAsync());
         Assert.Equal(AppRole.VpnManager, AppRoleStore.Load(RoleFile(data)));
@@ -40,7 +40,7 @@ public class AppRoleViewModelTests
     {
         using var data = new TempData();
         AppRoleStore.Save(AppRole.VpnManager, RoleFile(data));
-        var dialogs = new ScriptedDialogs { Choice = "Desktop remoto + VPN" }; // se chiedesse, il ruolo cambierebbe
+        var dialogs = new ScriptedDialogs { Choice = "Desktop remoto + marshmelloVPN" }; // se chiedesse, il ruolo cambierebbe
         var vm = Make(data, dialogs);
 
         Assert.Equal(AppRole.VpnManager, await vm.ResolveStartupRoleAsync());
@@ -52,7 +52,7 @@ public class AppRoleViewModelTests
     {
         using var data = new TempData();
         File.WriteAllText(RoleFile(data), "{ rotto");
-        var vm = Make(data, new ScriptedDialogs { Choice = "Desktop remoto + VPN" });
+        var vm = Make(data, new ScriptedDialogs { Choice = "Desktop remoto + marshmelloVPN" });
 
         Assert.Equal(AppRole.DesktopAndVpn, await vm.ResolveStartupRoleAsync());
         Assert.True(AppRoleStore.IsChosen(RoleFile(data)));
@@ -67,7 +67,7 @@ public class AppRoleViewModelTests
         var vm = new SettingsViewModel(settings, data.FilePath, rolePath: path);
         var startup = vm.Sections.OfType<RdpManager.Linux.ViewModels.Settings.AvvioPageViewModel>().Single();
 
-        Assert.Equal(["Desktop remoto + VPN", "Gestore VPN"], startup.RoleChoices);
+        Assert.Equal(["Desktop remoto + marshmelloVPN", "Gestore marshmelloVPN"], startup.RoleChoices);
         Assert.Equal(0, startup.RoleIndex);
         vm.Apply();
         Assert.False(File.Exists(path)); // invariato: niente scrittura

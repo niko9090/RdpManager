@@ -25,7 +25,7 @@ public static class AppRoleStore
     public static string DefaultPath => Path.Combine(AppPaths.ConfigFolder, FileName);
 
     /// <summary>Titolo mostrato all'utente.</summary>
-    public static string Describe(AppRole role) => role == AppRole.VpnManager ? "Gestore VPN" : "Desktop remoto + VPN";
+    public static string Describe(AppRole role) => role == AppRole.VpnManager ? "Gestore marshmelloVPN" : "Desktop remoto + marshmelloVPN";
 
     /// <summary>Vero se il file esiste e contiene un ruolo valido (a Linux serve a sapere se chiedere la scelta).</summary>
     public static bool IsChosen(string? path = null) => TryRead(path ?? DefaultPath, out _);

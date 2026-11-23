@@ -20,7 +20,7 @@ internal sealed class VpnDashboardWindow : ToolWindow
 {
     private const string Columns = "24,200,130,130,*";
 
-    public VpnDashboardWindow(VpnDashboardViewModel vm) : base(vm, "Plancia VPN", 820, 480)
+    public VpnDashboardWindow(VpnDashboardViewModel vm) : base(vm, "Plancia marshmelloVPN", 820, 480)
     {
         var error = DialogKit.Error(nameof(vm.ErrorText));
         error.Margin = new Thickness(14, 8, 14, 0);
@@ -32,7 +32,7 @@ internal sealed class VpnDashboardWindow : ToolWindow
         sendError.Margin = new Thickness(14, 8, 14, 0);
         var top = new StackPanel { Children = { error, info, sendInfo, sendError } };
 
-        var header = Row("Nome", "IP nella VPN", "Stato", "Ultimo contatto", null, bold: true);
+        var header = Row("Nome", "IP nella marshmelloVPN", "Stato", "Ultimo contatto", null, bold: true);
         var list = new ListBox { ItemsSource = vm.Rows, Background = Brushes.Transparent }
             .Bind(SelectingItemsControl.SelectedItemProperty, nameof(vm.Selected), BindingMode.TwoWay);
         list.ItemTemplate = new Avalonia.Controls.Templates.FuncDataTemplate<VpnDashboardItem>((item, _) =>

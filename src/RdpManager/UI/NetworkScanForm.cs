@@ -64,11 +64,11 @@ internal sealed class NetworkScanForm : TouchForm
             "Nessuna rete locale attiva trovata: scrivi un intervallo a mano.");
         Overview = NetworkOverview.Build(adapters, SafeInactive());
         // Nella scheda VPN la VPN nostra viene per prima, così è la rete proposta quando è collegata.
-        VpnTab = new ScanTab(this, NetworkOverview.VpnLabel, adapters.Where(a => a.IsVpn).OrderBy(a => a.Kind == NetworkKind.WireGuard ? 0 : 1).ToList(),
-            "Reti VPN attive su questo PC: la VPN nostra per prima, poi le altre (ZeroTier, OpenVPN, Tailscale…). Si cerca nella " +
+        VpnTab = new ScanTab(this, "VPN",adapters.Where(a => a.IsVpn).OrderBy(a => a.Kind == NetworkKind.WireGuard ? 0 : 1).ToList(),
+            "Reti VPN attive su questo PC: marshmelloVPN per prima, poi le altre (ZeroTier, OpenVPN, Tailscale…). Si cerca nella " +
             "rete della VPN scelta; se è più grande di una /22 si propone la /24 del tuo indirizzo. Per Tailscale è " +
             "meglio la scheda «Tailscale», che conosce già i nomi dei dispositivi.",
-            Overview.VpnConnected ? "Nessun'altra VPN attiva." : "VPN non collegata: collega la VPN, oppure scrivi l'intervallo a mano.");
+            Overview.VpnConnected ? "Nessun'altra VPN attiva." : "marshmelloVPN non collegata: collega marshmelloVPN, oppure scrivi l'intervallo a mano.");
         _tabs.TabPages.Add(LocalTab.Page);
         _tabs.TabPages.Add(BuildTailscalePage());
         _tabs.TabPages.Add(VpnTab.Page);

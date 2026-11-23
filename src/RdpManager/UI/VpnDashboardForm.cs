@@ -37,12 +37,12 @@ internal sealed class VpnDashboardForm : TouchForm
         _open = open;
         _sendFile = sendFile;
         _now = now ?? (() => DateTimeOffset.UtcNow);
-        DialogStyle.Setup(this, "Plancia VPN", resizable: true);
+        DialogStyle.Setup(this, "Plancia marshmelloVPN", resizable: true);
         ShowInTaskbar = true;
         Size = new Size(820, 480);
         MinimumSize = new Size(560, 300);
 
-        foreach (var (text, width) in new[] { ("Nome", 200), ("IP nella VPN", 130), ("Stato", 110), ("Ultimo contatto", 160) })
+        foreach (var (text, width) in new[] { ("Nome", 200), ("IP nella marshmelloVPN", 130), ("Stato", 110), ("Ultimo contatto", 160) })
             _list.Columns.Add(text, width);
         _openRdp.Enabled = false;
         _sendFileButton.Enabled = false;

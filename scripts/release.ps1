@@ -35,7 +35,7 @@ function Get-ReleaseNotes([string]$ver) {
            "**Installazione:** scarica ed esegui RdpManager-Setup-$ver.exe (per utente, non servono diritti di amministratore; si installa sopra la versione precedente).`n" +
            "RdpManager-$ver-win-x64.exe è la versione portatile, senza installazione.`n" +
            "**Linux (x86_64):** rdpmanager_${ver}_amd64.deb (Ubuntu, Debian, Mint), rdpmanager-$ver-1.x86_64.rpm (Fedora, openSUSE) oppure RdpManager-$ver-x86_64.AppImage (chmod +x e avvio, senza installazione). Serve FreeRDP.`n" +
-           "RdpManagerVPN-Setup.exe — da installare sui PC da raggiungere: mettigli accanto il file .rdpmconfig e fai doppio clic.`n" +
+           "RdpManagerVPN-Setup.exe (marshmelloVPN) — da installare sui PC da raggiungere: mettigli accanto il file .rdpmconfig e fai doppio clic.`n" +
            "Le connessioni salvate in %APPDATA%\RdpManager restano anche aggiornando o disinstallando."
 }
 

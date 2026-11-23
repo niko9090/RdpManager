@@ -867,7 +867,7 @@ public class NetworkToolsTests
         Assert.True(vm.VpnConnected);
         Assert.Contains("COLLEGATA", vm.VpnHeadline);
         Assert.Contains("10.66.0.0/24", vm.VpnHeadline);
-        Assert.StartsWith("● collegata - RdpManager - VPN", vm.CardLines[0]);
+        Assert.StartsWith("● collegata - RdpManager - marshmelloVPN", vm.CardLines[0]);
         Assert.Same(vm.VpnTab, vm.SelectedTab);
         Assert.Equal("10.66.0.1-10.66.0.254", vm.VpnTab.Range);
     }
