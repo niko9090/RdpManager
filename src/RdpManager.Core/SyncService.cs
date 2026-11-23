@@ -212,7 +212,15 @@ public sealed class SyncService : IDisposable
         {
             return false;
         }
-        return access.Apply(doc => VpnFolder.Apply(doc, devices));
+        try
+        {
+            return access.Apply(doc => VpnFolder.Apply(doc, devices));
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or ObjectDisposedException)
+        {
+            // Finestra in chiusura o salvataggio non riuscito: la cartella è un di più, ci si riprova al giro dopo.
+            return false;
+        }
     }
 
     /// <summary>Nome di questo PC nella VPN (lo stesso con cui si registra: <see cref="VpnProvisioning.SafeName"/>).</summary>
