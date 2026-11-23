@@ -10,6 +10,9 @@ public sealed class NetworkScanSources
 {
     public Func<IReadOnlyList<AdapterInfo>> Adapters { get; init; } = NetworkAdapters.ReadActive;
 
+    /// <summary>Schede della VPN nostra presenti ma spente (per dire «VPN non collegata»).</summary>
+    public Func<IReadOnlyList<AdapterCard>> InactiveVpn { get; init; } = NetworkAdapters.ReadInactiveVpn;
+
     public Func<CancellationToken, Task<TailscaleLookup>> Tailscale { get; init; } = Services.LinuxTailscale.GetStatusAsync;
 
     public NetworkScanner Scanner { get; init; } = new();
@@ -396,19 +399,50 @@ public sealed class NetworkScanViewModel : ViewModelBase
             "usala solo su reti tue o che hai il permesso di controllare (nelle reti aziendali chiedi prima all'amministratore).",
             "Nessuna rete locale attiva trovata: scrivi un intervallo a mano.");
         TailscaleTab = new TailscaleTabViewModel(this);
-        VpnTab = new RangeScanTabViewModel(this, "Altre VPN", adapters.Where(a => a.IsVpn).ToList(),
-            "Reti VPN attive riconosciute su questo computer (ZeroTier, WireGuard, OpenVPN, Tailscale e altre). Si cerca nella " +
-            "sottorete della VPN scelta; se è più grande di una /22 si propone la /24 del tuo indirizzo. Per Tailscale è " +
+        Overview = NetworkOverview.Build(adapters, SafeInactive());
+        // Nella scheda VPN la VPN nostra viene per prima, così è la rete proposta quando è collegata.
+        VpnTab = new RangeScanTabViewModel(this, NetworkOverview.VpnLabel, adapters.Where(a => a.IsVpn).OrderBy(a => a.Kind == NetworkKind.WireGuard ? 0 : 1).ToList(),
+            "Reti VPN attive su questo computer: la VPN nostra per prima, poi le altre (ZeroTier, OpenVPN, Tailscale…). Si cerca nella " +
+            "rete della VPN scelta; se è più grande di una /22 si propone la /24 del tuo indirizzo. Per Tailscale è " +
             "meglio la scheda «Tailscale», che conosce già i nomi dei dispositivi.",
-            "Nessuna VPN attiva riconosciuta (ZeroTier, WireGuard, OpenVPN o altre). Se la tua VPN usa un'altra rete, scrivi l'intervallo a mano.");
+            Overview.VpnConnected ? "Nessun'altra VPN attiva." : "VPN non collegata: collega la VPN, oppure scrivi l'intervallo a mano.");
         Tabs = [LocalTab, TailscaleTab, VpnTab];
-        _selectedTab = LocalTab;
+        _selectedTab = Overview.VpnConnected ? VpnTab : LocalTab; // VPN collegata: si propone la sua rete
         Folders = [.. doc.AllGroups().Prepend(DiscoveryImport.DefaultFolder).Distinct(StringComparer.CurrentCultureIgnoreCase)];
         AddCommand = new RelayCommand(() => AddSelected());
         CheckAllCommand = new RelayCommand(CheckAll);
     }
 
     public string WindowTitle => "Cerca PC in rete";
+
+    /// <summary>Schede di rete con la VPN nostra in cima e il suo stato.</summary>
+    public NetworkOverview Overview { get; }
+
+    public bool VpnConnected => Overview.VpnConnected;
+
+    public string VpnHeadline => Overview.Headline;
+
+    /// <summary>Colori del riquadro dello stato VPN: verde se collegata, rosso se no.</summary>
+    public string VpnBackground => VpnConnected ? "#D6F0DC" : "#F8DAD6";
+
+    public string VpnForeground => VpnConnected ? "#105A24" : "#8A1C14";
+
+    /// <summary>Una riga per scheda: «collegata - nome - tipo - IP - rete».</summary>
+    public IReadOnlyList<string> CardLines => [.. Overview.Cards.Select(c =>
+        $"{(c.Connected ? "●" : "○")} {c.StateText} - {c.Name} - {(c.IsOurVpn ? NetworkOverview.VpnLabel : c.IsVpn ? "Altra VPN" : "Rete locale")}" +
+        (c.Address is null ? "" : $" - IP {c.AddressText} - rete {c.NetworkText}"))];
+
+    private IReadOnlyList<AdapterCard> SafeInactive()
+    {
+        try
+        {
+            return Sources.InactiveVpn();
+        }
+        catch (Exception ex) when (ex is System.Net.NetworkInformation.NetworkInformationException or InvalidOperationException)
+        {
+            return [];
+        }
+    }
 
     internal ConnectionsDocument Document { get; }
 

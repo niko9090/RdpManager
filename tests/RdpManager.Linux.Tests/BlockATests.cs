@@ -858,6 +858,35 @@ public class NetworkToolsTests
     }
 
     [Fact]
+    public void Cerca_pc_in_rete_mette_la_vpn_collegata_in_cima_e_la_propone()
+    {
+        var wg = new AdapterInfo("RdpManager", "RdpManager", System.Net.NetworkInformation.NetworkInterfaceType.Unknown, System.Net.IPAddress.Parse("10.66.0.12"), 24, NetworkKind.WireGuard);
+        var lan = new AdapterInfo("eth0", "eth0", System.Net.NetworkInformation.NetworkInterfaceType.Ethernet, System.Net.IPAddress.Parse("192.168.1.20"), 24, NetworkKind.Local);
+        var sources = new NetworkScanSources { Adapters = () => [lan, wg], InactiveVpn = () => [] };
+        var vm = new NetworkScanViewModel(new ConnectionsDocument(), (_, _) => new DiscoveryImportResult([], 0), _ => Task.FromResult(true), sources);
+        Assert.True(vm.VpnConnected);
+        Assert.Contains("COLLEGATA", vm.VpnHeadline);
+        Assert.Contains("10.66.0.0/24", vm.VpnHeadline);
+        Assert.StartsWith("● collegata - RdpManager - VPN", vm.CardLines[0]);
+        Assert.Same(vm.VpnTab, vm.SelectedTab);
+        Assert.Equal("10.66.0.1-10.66.0.254", vm.VpnTab.Range);
+    }
+
+    [Fact]
+    public void Cerca_pc_in_rete_dice_che_la_vpn_non_e_collegata()
+    {
+        var lan = new AdapterInfo("eth0", "eth0", System.Net.NetworkInformation.NetworkInterfaceType.Ethernet, System.Net.IPAddress.Parse("192.168.1.20"), 24, NetworkKind.Local);
+        var off = new AdapterCard("RdpManager", "RdpManager", NetworkKind.WireGuard, false, null, 0);
+        var sources = new NetworkScanSources { Adapters = () => [lan], InactiveVpn = () => [off] };
+        var vm = new NetworkScanViewModel(new ConnectionsDocument(), (_, _) => new DiscoveryImportResult([], 0), _ => Task.FromResult(true), sources);
+        Assert.False(vm.VpnConnected);
+        Assert.Contains("NON COLLEGATA", vm.VpnHeadline);
+        Assert.StartsWith("○ non collegata - RdpManager", vm.CardLines[0]);
+        Assert.Same(vm.LocalTab, vm.SelectedTab);
+        Assert.NotNull(vm.VpnTab.EmptyNote);
+    }
+
+    [Fact]
     public async Task Scheda_tailscale_elenca_i_dispositivi_e_controlla_il_desktop_remoto()
     {
         var doc = new ConnectionsDocument();

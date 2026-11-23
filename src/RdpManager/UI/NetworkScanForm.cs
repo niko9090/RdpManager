@@ -7,6 +7,8 @@ namespace RdpManager.UI;
 internal sealed class NetworkScanSources
 {
     public Func<IReadOnlyList<AdapterInfo>> Adapters { get; init; } = NetworkAdapters.ReadActive;
+    /// <summary>Schede della VPN nostra presenti ma spente (per dire «VPN non collegata»).</summary>
+    public Func<IReadOnlyList<AdapterCard>> InactiveVpn { get; init; } = NetworkAdapters.ReadInactiveVpn;
     public Func<CancellationToken, Task<TailscaleLookup>> Tailscale { get; init; } = ct => TailscaleCli.GetStatusAsync(cancellationToken: ct);
     public NetworkScanner Scanner { get; init; } = new();
 
@@ -60,14 +62,18 @@ internal sealed class NetworkScanForm : TouchForm
             "(es. 192.168.1.0/24 oppure 192.168.1.10-192.168.1.50). La ricerca parte solo quando premi «Avvia ricerca»: " +
             "usala solo su reti tue o che hai il permesso di controllare (nelle reti aziendali chiedi prima all'amministratore).",
             "Nessuna rete locale attiva trovata: scrivi un intervallo a mano.");
-        VpnTab = new ScanTab(this, "Altre VPN", adapters.Where(a => a.IsVpn).ToList(),
-            "Reti VPN attive riconosciute su questo PC (ZeroTier, WireGuard, OpenVPN, Tailscale e altre). Si cerca nella " +
-            "sottorete della VPN scelta; se è più grande di una /22 si propone la /24 del tuo indirizzo. Per Tailscale è " +
+        Overview = NetworkOverview.Build(adapters, SafeInactive());
+        // Nella scheda VPN la VPN nostra viene per prima, così è la rete proposta quando è collegata.
+        VpnTab = new ScanTab(this, NetworkOverview.VpnLabel, adapters.Where(a => a.IsVpn).OrderBy(a => a.Kind == NetworkKind.WireGuard ? 0 : 1).ToList(),
+            "Reti VPN attive su questo PC: la VPN nostra per prima, poi le altre (ZeroTier, OpenVPN, Tailscale…). Si cerca nella " +
+            "rete della VPN scelta; se è più grande di una /22 si propone la /24 del tuo indirizzo. Per Tailscale è " +
             "meglio la scheda «Tailscale», che conosce già i nomi dei dispositivi.",
-            "Nessuna VPN attiva riconosciuta (ZeroTier, WireGuard, OpenVPN o altre). Se la tua VPN usa un'altra rete, scrivi l'intervallo a mano.");
+            Overview.VpnConnected ? "Nessun'altra VPN attiva." : "VPN non collegata: collega la VPN, oppure scrivi l'intervallo a mano.");
         _tabs.TabPages.Add(LocalTab.Page);
         _tabs.TabPages.Add(BuildTailscalePage());
         _tabs.TabPages.Add(VpnTab.Page);
+        if (Overview.VpnConnected)
+            _tabs.SelectedTab = VpnTab.Page; // VPN collegata: si propone la sua rete
 
         _folder.Items.AddRange(_doc.AllGroups().Prepend(DiscoveryImport.DefaultFolder).Distinct(StringComparer.CurrentCultureIgnoreCase).ToArray<object>());
         _folder.Text = DiscoveryImport.DefaultFolder;
@@ -83,6 +89,7 @@ internal sealed class NetworkScanForm : TouchForm
         bottom.Controls.Add(_summary);
         var closeRow = DialogStyle.Buttons(_close);
         Controls.Add(_tabs);
+        Controls.Add(BuildVpnBanner());
         Controls.Add(bottom);
         Controls.Add(closeRow);
         CancelButton = _close;
@@ -93,6 +100,46 @@ internal sealed class NetworkScanForm : TouchForm
             _tsCts?.Cancel();
         };
         ThemeManager.Apply(this);
+    }
+
+    internal NetworkOverview Overview { get; }
+    internal Label VpnStatusLabel { get; } = new() { AutoSize = false, Dock = DockStyle.Top, Height = 34, Font = new Font(SystemFonts.MessageBoxFont ?? SystemFonts.DefaultFont, FontStyle.Bold), TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(8, 0, 8, 0) };
+    internal ListView CardsList { get; } = new() { Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true, HideSelection = false, GridLines = false, HeaderStyle = ColumnHeaderStyle.Nonclickable };
+
+    /// <summary>Riquadro in alto: stato della VPN (verde/rosso) e l'elenco delle schede di rete, la VPN per prima.</summary>
+    private Panel BuildVpnBanner()
+    {
+        var o = Overview;
+        VpnStatusLabel.Text = o.Headline;
+        VpnStatusLabel.BackColor = o.VpnConnected ? Color.FromArgb(0xD6, 0xF0, 0xDC) : Color.FromArgb(0xF8, 0xDA, 0xD6);
+        VpnStatusLabel.ForeColor = o.VpnConnected ? Color.FromArgb(0x10, 0x5A, 0x24) : Color.FromArgb(0x8A, 0x1C, 0x14);
+        foreach (var (text, width) in new[] { ("Stato", 100), ("Scheda", 200), ("Tipo", 100), ("IP del PC", 130), ("Rete", 140) })
+            CardsList.Columns.Add(text, width);
+        foreach (var c in o.Cards)
+        {
+            var item = new ListViewItem([c.StateText, c.Name, c.IsOurVpn ? NetworkOverview.VpnLabel : c.IsVpn ? "Altra VPN" : "Rete locale", c.AddressText, c.NetworkText]);
+            if (c.IsOurVpn)
+                item.Font = new Font(CardsList.Font, FontStyle.Bold);
+            if (!c.Connected)
+                item.ForeColor = Color.Firebrick;
+            CardsList.Items.Add(item);
+        }
+        var panel = new Panel { Dock = DockStyle.Top, Height = 34 + Math.Clamp(CardsList.Items.Count, 1, 5) * 20 + 28, Padding = new Padding(0, 0, 0, 6) };
+        panel.Controls.Add(CardsList);
+        panel.Controls.Add(VpnStatusLabel);
+        return panel;
+    }
+
+    private IReadOnlyList<AdapterCard> SafeInactive()
+    {
+        try
+        {
+            return _sources.InactiveVpn();
+        }
+        catch (Exception ex) when (ex is System.Net.NetworkInformation.NetworkInformationException or InvalidOperationException)
+        {
+            return [];
+        }
     }
 
     internal ScanTab LocalTab { get; }
