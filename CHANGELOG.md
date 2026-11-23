@@ -1,5 +1,19 @@
 # Novità di RdpManager
 
+## 1.17.0 (2026-11-23)
+
+**Linux più completo e plancia di gestione della VPN: marshmelloVPN**
+- Linux: l'aggiornamento automatico ora si vede, con l'avanzamento e l'esito in una finestra; gli errori non restano più muti.
+- Linux: i cerchi di stato diventano verdi quando la connessione è attiva.
+- Linux: grafica e colori uguali alla versione Windows (anche i colori di stato e le icone delle risorse condivise).
+- Linux: quando si ridimensiona la finestra, la sessione remota segue la scheda con più calma e riprova se serve.
+- WireGuard si installa direttamente dal programma (Linux), e la VPN si collega da sola all'avvio e al ricollegamento. Su Windows, se rifiuti la richiesta di amministratore all'avvio, il programma non la ripropone finché non colleghi la VPN a mano.
+- Nuova plancia di gestione della VPN, sia come pagina web con accesso sia dentro RdpManager (Windows e Linux): mostra i PC della rete e si aggiorna da sola ogni 30 secondi.
+- Scambio di file fra i PC: su Windows e Linux c'è «Invia file…». Il programma controlla i file in arrivo e chiede se accettarli o rifiutarli, e in quale cartella salvarli.
+- All'installazione si sceglie se usare RdpManager come client RDP o come gestore della VPN (la scelta si cambia anche dalle Impostazioni).
+- La ricerca delle reti funziona anche attraverso la VPN: in alto mostra se la VPN è collegata, con IP e rete, e propone la rete della VPN.
+- Nei testi visibili la VPN si chiama «marshmelloVPN». Aggiornando l'installer della VPN, la vecchia voce «RdpManager VPN» sparisce dal menu Start.
+
 ## 1.16.2 (2026-11-18)
 
 **Sincronizzazione fra PC: niente più connessioni sovrascritte**
