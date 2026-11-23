@@ -119,6 +119,13 @@
       <CornerRadius x:Key="AppRadius">2</CornerRadius>
       <Thickness x:Key="AppPagePadding">20</Thickness>
 
+      <!-- Colori delle icone dell'albero, uguali nei due temi (MainForm.BuildImages di Windows). -->
+      <SolidColorBrush x:Key="IconFolderFillBrush" Color="#F0C450" />
+      <SolidColorBrush x:Key="IconFolderEdgeBrush" Color="#BE8C28" />
+      <SolidColorBrush x:Key="IconStarBrush" Color="#F5B41E" />
+      <SolidColorBrush x:Key="IconComputerBodyBrush" Color="#3C3C46" />
+      <SolidColorBrush x:Key="IconStatusRingBackBrush" Color="#FFFFFF" />
+
       <!-- Icone vettoriali (niente dipendenza da font di simboli). -->
       <StreamGeometry x:Key="IconFolder">M2,5 L2,17 L18,17 L18,7 L9,7 L7,5 Z</StreamGeometry>
       <StreamGeometry x:Key="IconComputer">M2,3 L18,3 L18,13 L2,13 Z M7,15 L13,15 L13,17 L7,17 Z</StreamGeometry>
