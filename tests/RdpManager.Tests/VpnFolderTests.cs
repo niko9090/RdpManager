@@ -170,9 +170,60 @@ public class VpnFolderTests
     public void Due_pc_con_stesso_nome_o_senza_ip_non_rompono_gli_id()
     {
         var doc = new ConnectionsDocument();
-        VpnFolder.Apply(doc, [Dev("PC-A", "10.8.0.2"), Dev("pc-a", "10.8.0.3"), Dev("PC-C", "")]);
-        Assert.Single(Auto(doc));
+        VpnFolder.Apply(doc, [Dev("PC-A", "10.8.0.2"), Dev("pc-a", "10.8.0.3"), Dev("PC-B", "10.8.0.4"), Dev("PC-C", "")]);
+        Assert.Equal("PC-B", Auto(doc).Single().Name);
         Assert.False(doc.RepairConnectionIds());
+    }
+
+    [Fact]
+    public void Nome_ripetuto_non_crea_ne_sposta_la_connessione_e_non_copia_accessi()
+    {
+        var doc = new ConnectionsDocument();
+        doc.Connections.Add(Saved("10.8.0.2", "mario"));
+        VpnFolder.Apply(doc, [Dev("PC-A", "10.8.0.2")]);
+        Assert.Equal("10.8.0.2", Auto(doc).Single().Host);
+
+        // Compare un secondo PC con lo stesso nome: l'ordine dell'elenco non deve far saltare l'IP né i diritti.
+        Assert.False(VpnFolder.Apply(doc, [Dev("pc-a", "10.8.0.9"), Dev("PC-A", "10.8.0.2")]));
+        Assert.Equal("10.8.0.2", Auto(doc).Single().Host);
+        Assert.False(VpnFolder.Apply(doc, [Dev("PC-A", "10.8.0.2"), Dev("pc-a", "10.8.0.9")]));
+        Assert.Equal("10.8.0.2", Auto(doc).Single().Host);
+    }
+
+    [Fact]
+    public void Connessione_che_punta_all_ip_di_un_pc_con_nome_ripetuto_e_ambigua()
+    {
+        var doc = new ConnectionsDocument();
+        doc.Connections.Add(Saved("10.8.0.3", "mario", name: "pc-b"));
+        VpnFolder.Apply(doc, [Dev("PC-B", "10.8.0.2"), Dev("PC-A", "10.8.0.3"), Dev("pc-a", "10.8.0.4")]);
+        Assert.Equal("", Auto(doc).Single().Username);
+    }
+
+    [Fact]
+    public void Connessione_dietro_un_gateway_non_e_lo_stesso_pc()
+    {
+        var doc = new ConnectionsDocument();
+        var viaGateway = Saved("10.8.0.2", "mario");
+        viaGateway.UseGateway = true;
+        viaGateway.GatewayHost = "gw.example.com";
+        doc.Connections.Add(viaGateway);
+        VpnFolder.Apply(doc, [Dev("PC-A", "10.8.0.2")]);
+        Assert.Equal("", Auto(doc).Single().Username);
+    }
+
+    [Fact]
+    public void Fra_due_gemelle_resta_quella_con_gli_accessi_dell_utente()
+    {
+        var doc = new ConnectionsDocument();
+        VpnFolder.Apply(doc, [Dev("PC-A", "10.8.0.2")]);
+        var stable = Auto(doc).Single();
+        var twin = stable.Clone();
+        twin.Id = Guid.NewGuid();
+        twin.Username = "mio";
+        doc.Connections.Insert(doc.Connections.IndexOf(stable) + 1, twin);
+
+        VpnFolder.Apply(doc, [Dev("PC-A", "10.8.0.2")]);
+        Assert.Same(twin, Auto(doc).Single());
     }
 
     [Fact]

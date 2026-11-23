@@ -29,25 +29,45 @@ public static class VpnFolder
     /// </summary>
     public static bool Apply(ConnectionsDocument doc, IReadOnlyList<VpnDashboardDevice> devices)
     {
-        // Un PC per nome (senza distinguere maiuscole): con due nomi uguali l'Id stabile coinciderebbe.
-        var list = new List<(string Name, string Address)>();
-        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        // Tutti i PC con un nome, anche ripetuto: servono a riconoscere gli abbinamenti ambigui.
+        var all = new List<(string Name, string Address)>();
         foreach (var d in devices)
         {
-            var name = (d.Name ?? "").Trim();
-            if (name.Length > 0 && names.Add(name))
-                list.Add((name, VpnDashboardModel.StripMask(d.Address ?? "")));
+            var n = (d.Name ?? "").Trim();
+            if (n.Length > 0)
+                all.Add((n, VpnDashboardModel.StripMask(d.Address ?? "")));
         }
-        if (list.Count == 0)
+        if (all.Count == 0)
             return false;
 
-        bool changed = false;
-        var nameSet = list.Select(d => d.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        // Il nome è la sola identità del PC (la plancia non dà un Id): se due PC hanno lo stesso nome (senza distinguere
+        // maiuscole) non si sa quale sia quale, e l'ordine dell'elenco può cambiare a ogni giro. Per quel nome non si crea
+        // né si aggiorna niente (si lascia com'è quello che c'è già) e non si copiano accessi.
+        var list = all.GroupBy(d => d.Name, StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Count() == 1).Select(g => g.First()).ToList();
 
-        // Connessioni automatiche di PC tolti dalla rete (e doppioni dello stesso PC nati da una sincronizzazione).
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        changed |= doc.Connections.RemoveAll(c => c.AutoVpnDevice is { } dev
-            && (!nameSet.Contains(dev.Trim()) || !seen.Add(dev.Trim()))) > 0;
+        bool changed = false;
+        var nameSet = all.Select(d => d.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        // Connessioni automatiche di PC tolti dalla rete (e doppioni dello stesso PC nati da una sincronizzazione: di due
+        // gemelle resta quella con gli accessi dell'utente, poi quella con l'Id stabile, poi la prima).
+        var drop = new HashSet<RdpConnection>();
+        foreach (var group in doc.Connections.Where(c => c.AutoVpnDevice is not null)
+            .GroupBy(c => c.AutoVpnDevice!.Trim(), StringComparer.OrdinalIgnoreCase))
+        {
+            if (!nameSet.Contains(group.Key))
+            {
+                drop.UnionWith(group);
+                continue;
+            }
+            var stable = StableId(group.Key);
+            drop.UnionWith(group.OrderByDescending(HasCredentials).ThenByDescending(c => c.Id == stable).Skip(1));
+        }
+        if (drop.Count > 0)
+        {
+            doc.Connections.RemoveAll(drop.Contains);
+            changed = true;
+        }
 
         var originals = doc.Connections.Where(c => c.AutoVpnDevice is null).ToList();
         foreach (var (name, address) in list)
@@ -76,7 +96,7 @@ public static class VpnFolder
             }
 
             // Gli accessi si riprendono solo se la connessione automatica non ne ha di suoi (niente viene sovrascritto).
-            if (!HasCredentials(existing) && FindSource(originals, list, name, address) is { } source)
+            if (!HasCredentials(existing) && FindSource(originals, all, name, address) is { } source)
             {
                 CopyFrom(existing, source);
                 changed = true;
@@ -110,7 +130,7 @@ public static class VpnFolder
         var candidates = originals
             .Where(c => Matches(c, name, address) && !devices.Any(d =>
                 !d.Name.Equals(name, StringComparison.OrdinalIgnoreCase) && Matches(c, d.Name, d.Address)))
-            .Where(HasCredentials)
+            .Where(c => !c.HasGateway && HasCredentials(c)) // dietro un gateway lo stesso indirizzo è un altro PC
             .ToList();
         if (candidates.Count == 0)
             return null;
