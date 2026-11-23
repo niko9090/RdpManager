@@ -8,6 +8,17 @@ public sealed partial class MainForm
     private VpnDashboardForm? _vpnDashboard;
     private readonly Dictionary<string, RdpConnection> _vpnDashboardConnections = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Ruolo «Gestore VPN» (impostato da Program): appena la finestra è visibile si apre la plancia, in primo piano.</summary>
+    internal bool OpenVpnDashboardOnStart { get; set; }
+
+    private void RunRoleStartup()
+    {
+        if (!OpenVpnDashboardOnStart)
+            return;
+        OpenVpnDashboardOnStart = false;
+        ShowVpnDashboard();
+    }
+
     internal void ShowVpnDashboard()
     {
         if (_vpnDashboard is { IsDisposed: false } open)

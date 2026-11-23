@@ -35,6 +35,14 @@
     </StackPanel>
 
     <StackPanel Classes="group">
+      <TextBlock Classes="groupTitle" Text="Ruolo di questa installazione" />
+      <StackPanel Classes="groupBody">
+        <ComboBox Width="260" ItemsSource="{Binding Startup.RoleChoices}" SelectedIndex="{Binding Startup.RoleIndex}" />
+        <TextBlock Classes="note" Text="{Binding Startup.RoleNote}" />
+      </StackPanel>
+    </StackPanel>
+
+    <StackPanel Classes="group">
       <TextBlock Classes="groupTitle" Text="Avvio" />
       <StackPanel Classes="groupBody">
         <CheckBox Content="Riapri all'avvio le sessioni lasciate aperte" IsChecked="{Binding Startup.ReopenSessionsOnStartup}" />

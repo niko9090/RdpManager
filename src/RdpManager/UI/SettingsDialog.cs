@@ -27,6 +27,8 @@ public sealed class SettingsDialog : TouchForm
     private readonly Label _pinState = new() { AutoSize = true, Margin = new Padding(3, 7, 10, 3) };
     private readonly NumericUpDown _lockAfter = new() { Minimum = 0, Maximum = 24 * 60, Width = 70 };
     private PinHash? _pin;
+    private readonly ComboBox _role = new() { Width = 260, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly AppRole _initialRole;
     private readonly ComboBox _barPosition = new() { Width = 200, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly ComboBox _barMode = new() { Width = 260, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly NumericUpDown _barWidth = new() { Minimum = FullScreenBarSettings.MinWidth, Maximum = FullScreenBarSettings.MaxWidth, Increment = 10, Width = 70 };
@@ -101,6 +103,12 @@ public sealed class SettingsDialog : TouchForm
 
         _manualOrder.Checked = settings.ConnectionOrder == ConnectionOrder.Manual;
         general.Controls.Add(Group("Elenco delle connessioni", _manualOrder));
+
+        _role.Items.AddRange(Enum.GetValues<AppRole>().Select(r => (object)AppRoleStore.Describe(r)).ToArray());
+        _initialRole = AppRoleStore.Load();
+        _role.SelectedIndex = (int)_initialRole;
+        general.Controls.Add(Group("Ruolo di questa installazione", _role,
+            Note("Con «Gestore VPN» all'avvio si apre la Plancia VPN; la finestra con le schede resta raggiungibile. Vale dal prossimo avvio.")));
 
         _sessionTouch.Items.AddRange(Enum.GetValues<SessionTouchMode>().Select(m => (object)SessionTouchModes.Describe(m)).ToArray());
         _sessionTouch.SelectedIndex = (int)settings.SessionTouch;
@@ -448,6 +456,8 @@ public sealed class SettingsDialog : TouchForm
             DialogResult = DialogResult.None;
             return;
         }
+        if (_role.SelectedIndex >= 0 && (AppRole)_role.SelectedIndex != _initialRole)
+            AppRoleStore.Save((AppRole)_role.SelectedIndex);
         _settings.SetShortcuts(map);
         _settings.PreferredMonitor = _monitor.SelectedIndex <= 0 ? null : MonitorLayout.Ordered(_screens)[_monitor.SelectedIndex - 1].DeviceName;
         _settings.SidebarMode = _pinned.Checked ? SidebarMode.Pinned : SidebarMode.AutoHide;

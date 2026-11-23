@@ -111,6 +111,7 @@ public sealed partial class MainForm : Form
         Shown += (_, _) => ReopenSessions();
         Shown += (_, _) => ShowUpdateFailure();
         Shown += (_, _) => RunPendingConfigFile();
+        Shown += (_, _) => RunRoleStartup();
         if (_backgroundChecks)
         {
             Shown += async (_, _) => await CheckReachabilityAsync(_doc.Connections.ToList());
