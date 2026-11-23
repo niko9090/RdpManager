@@ -42,6 +42,9 @@ public sealed partial class MainForm
         _syncPoll.Start();
         Shown += async (_, _) =>
         {
+            if (_autoSync && !_shutdownCts.IsCancellationRequested
+                && await AutoConnectVpnAsync() is { Length: > 0 } autoLine && !IsDisposed)
+                ShowNotice(autoLine);
             if (_autoSync && _sync.SignedIn && !_shutdownCts.IsCancellationRequested)
             {
                 await RunSyncAsync(manual: false);

@@ -39,6 +39,9 @@ public static class VpnProvisioning
         => !p.HasKey || p.PublicKey is null || p.ServerPublicKey.Length == 0 || p.Endpoint.Length == 0
            || !WireGuardConfig.TryParseCidr(p.Address, out _, out _);
 
+    /// <summary>Vero se il profilo è completo e la connessione automatica è attiva: allora il programma accende la VPN da solo.</summary>
+    public static bool ShouldAutoConnect(VpnProfile p) => p.AutoConnect && !NeedsProvisioning(p);
+
     /// <summary>Riporta nel profilo i dati assegnati dal server (la chiave privata non si tocca).</summary>
     public static void Apply(VpnProfile profile, VpnGrant grant)
     {
