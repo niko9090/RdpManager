@@ -249,6 +249,7 @@ public sealed partial class MainForm : Form
         var tools = new ToolStripMenuItem("S&trumenti");
         tools.DropDownItems.Add(Item("Cerca &PC in rete…", Keys.None, (_, _) => ShowNetworkScan()));
         tools.DropDownItems.Add(Item("&VPN (WireGuard)…", Keys.None, (_, _) => ShowVpn()));
+        tools.DropDownItems.Add(Item("Pl&ancia VPN…", Keys.None, (_, _) => ShowVpnDashboard()));
         tools.DropDownItems.Add(Item("Account e &sincronizzazione…", Keys.None, (_, _) => ShowSyncAccount()));
         tools.DropDownItems.Add(Item("&Carica file di configurazione…", Keys.None,
             async (_, _) => { if (PickConfigFile(this) is { } file) await ImportConfigFileAsync(file, this); }));

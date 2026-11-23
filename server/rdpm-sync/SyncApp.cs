@@ -50,7 +50,7 @@ public static class SyncApp
             if (File.Exists(pubFile))
                 serverKey = File.ReadAllText(pubFile).Trim();
         }
-        var vpn = new VpnEndpoints(options, store, wireGuard, serverKey, log);
+        var vpn = new VpnEndpoints(options, store, wireGuard, serverKey, log, time);
         if (vpn.Enabled)
             app.Lifetime.ApplicationStarted.Register(() => _ = Task.Run(async () =>
             {

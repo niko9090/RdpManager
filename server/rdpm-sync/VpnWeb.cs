@@ -11,7 +11,7 @@ namespace RdpmSync;
 public sealed class VpnWeb(SyncOptions options, Store store, VpnEndpoints vpn, TimeProvider time)
 {
     private const string Cookie = "rdpm_web";
-    private static readonly TimeSpan ConnectedWindow = TimeSpan.FromMinutes(3);
+    private static readonly TimeSpan ConnectedWindow = VpnEndpoints.ConnectedWindow;
 
     private readonly HashSet<string> _admins = options.WebAdmins
         .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
