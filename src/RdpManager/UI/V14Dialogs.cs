@@ -172,7 +172,7 @@ internal sealed class CsvImportDialog : TouchForm
 
         _folder.Text = folder;
         _folder.TextChanged += (_, _) => Refill();
-        var top = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, WrapContents = false };
+        var top = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, WrapContents = true }; // a capo se la finestra è stretta
         top.Controls.AddRange([new Label { Text = $"Separatore «{table.Separator}» · cartella per le righe senza cartella", AutoSize = true, Margin = new Padding(3, 7, 6, 3) }, _folder, _summary]);
         var head = DialogStyle.Note("Scegli per ogni colonna il campo della connessione (riconosciuti in automatico dall'intestazione). Le righe senza host, con porta o MAC non validi e i doppioni non vengono importati.", 900);
         head.Dock = DockStyle.Top;

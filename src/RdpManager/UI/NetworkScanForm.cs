@@ -55,6 +55,8 @@ internal sealed class NetworkScanForm : TouchForm
         ShowInTaskbar = true;
         Size = new Size(900, 600);
         MinimumSize = new Size(720, 460);
+        // In un'area di lavoro piccola la finestra si riduce ma il contenuto tiene la sua misura: scorre invece di sovrapporsi.
+        AutoScrollMinSize = new Size(700, 440);
 
         var adapters = SafeAdapters();
         LocalTab = new ScanTab(this, "Rete locale", adapters.Where(a => !a.IsVpn).ToList(),
