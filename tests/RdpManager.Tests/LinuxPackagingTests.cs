@@ -101,4 +101,13 @@ public class LinuxPackagingTests
         Assert.Contains("RdpManagerVPN-Setup.exe", release);
         Assert.Contains("build-vpn-client.ps1", release);
     }
+
+    [Fact]
+    public void ReleaseScriptExtractsChangelogSectionWithDateAndCrlfOrFails()
+    {
+        var release = Read("scripts", "release.ps1");
+        // intestazione con « (data)» facoltativa e CR finale; sezione senza note = errore, non note vuote
+        Assert.Contains(@"(?:[ \t]+\([^\r\n]*\))?[ \t]*\r?$", release);
+        Assert.Contains("manca la sezione", release);
+    }
 }

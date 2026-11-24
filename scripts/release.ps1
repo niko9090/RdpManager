@@ -23,14 +23,15 @@ $csprojPath = Join-Path $root 'src\Directory.Build.props'
 
 # Note della release: la sezione «## X.Y.Z» di CHANGELOG.md (se c'è) seguita dalle istruzioni di installazione.
 function Get-ReleaseNotes([string]$ver) {
-    $section = ''
     $changelog = Join-Path $root 'CHANGELOG.md'
-    if (Test-Path $changelog) {
-        $text = [IO.File]::ReadAllText($changelog, [Text.Encoding]::UTF8)
-        $m = [regex]::Match($text, '(?ms)^## ' + [regex]::Escape($ver) + '\s*$(.*?)(?=^## |\z)')
-        if ($m.Success) { $section = $m.Groups[1].Value.Trim() + "`n`n" }
+    if (-not (Test-Path $changelog)) { throw "CHANGELOG.md non trovato: impossibile ricavare le note della versione $ver (oppure passare -Notes)." }
+    $text = [IO.File]::ReadAllText($changelog, [Text.Encoding]::UTF8)
+    # Intestazione «## X.Y.Z» con o senza « (data)», fine riga LF o CRLF; la sezione arriva fino al prossimo «## ».
+    $m = [regex]::Match($text, '(?ms)^## ' + [regex]::Escape($ver) + '(?:[ \t]+\([^\r\n]*\))?[ \t]*\r?$(.*?)(?=^## |\z)')
+    if (-not $m.Success -or -not $m.Groups[1].Value.Trim()) {
+        throw "Nel CHANGELOG.md manca la sezione «## $ver» (o è vuota): aggiungerla prima del rilascio (oppure passare -Notes)."
     }
-    if (-not $section) { $section = "RdpManager $ver.`n`n" }
+    $section = $m.Groups[1].Value.Trim() + "`n`n"
     return $section +
            "**Installazione:** scarica ed esegui RdpManager-Setup-$ver.exe (per utente, non servono diritti di amministratore; si installa sopra la versione precedente).`n" +
            "RdpManager-$ver-win-x64.exe è la versione portatile, senza installazione.`n" +
