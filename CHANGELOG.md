@@ -1,5 +1,15 @@
 # Novità di RdpManager
 
+## 1.18.0 (2026-11-24)
+
+**Linux a schermo intero, cartella automatica della VPN e chiusura con la X**
+- Linux: la sessione a schermo intero riempie davvero lo schermo; il ricollegamento riparte con la dimensione attuale della finestra.
+- Nuova cartella automatica «marshmelloVPN»: una connessione per ogni PC della rete VPN, con gli accessi ripresi dalle connessioni salvate se è lo stesso PC.
+- Cartella «marshmelloVPN», correzioni: i nomi ripetuti non creano più ambiguità, le connessioni gemelle tengono gli accessi inseriti dall'utente, non si prendono più accessi da connessioni che passano da un gateway, e gli errori durante l'aggiornamento della cartella sono gestiti.
+- Chiusura con la X: su Windows e su Linux il programma resta in esecuzione nell'area di notifica (o ridotto a icona se l'area non c'è), con un avviso la prima volta. La VPN integrata si spegne quando si esce davvero dal programma.
+- Nota tecnica: le prove dell'interfaccia ora hanno un limite di tempo.
+- Nota tecnica: le compilazioni con un RID esplicito (`-r linux-x64`) ripristinano i pacchetti in `obj/rid-<RID>/`, così non si scontrano più con `dotnet test` lanciato insieme (errore NuGet «Impossibile creare un file, se il file esiste già»).
+
 ## 1.17.0 (2026-11-23)
 
 **Linux più completo e plancia di gestione della VPN: marshmelloVPN**

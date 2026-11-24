@@ -20,6 +20,13 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <!-- Corsia propria (vedi Directory.Build.props): i progetti referenziati si compilano in obj/linuxtests e bin/linuxtests. -->
+  <ItemDefinitionGroup>
+    <ProjectReference>
+      <AdditionalProperties>RdpLane=$(RdpLane)</AdditionalProperties>
+    </ProjectReference>
+  </ItemDefinitionGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\src\RdpManager.Linux\RdpManager.Linux.csproj" />
   </ItemGroup>
