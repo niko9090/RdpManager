@@ -740,6 +740,7 @@ public sealed class RdpSessionView : UserControl
         Try(() => ocx.AdvancedSettings8.AudioCaptureRedirectionMode = c.RedirectMicrophone);
         if (c.HasGateway)
             ConfigureGateway(ocx, c);
+        ConfigureMonitors(_rdp!.Ocx, c);
         var prompt = CredentialPromptPolicy.For(!string.IsNullOrEmpty(c.Password), AllowCredentialPrompt);
         if (!prompt.Strict)
         {
@@ -761,6 +762,53 @@ public sealed class RdpSessionView : UserControl
             if (ns5.get_AllowPromptingForCredentials())
                 throw new InvalidOperationException("la richiesta di credenziali risulta ancora permessa");
             PromptForCredentialsDisabledVerified = true;
+        }
+    }
+
+    /// <summary>
+    /// Esito dell'ultima configurazione multi-schermo del controllo (null = sessione a uno schermo o tutto applicato).
+    /// Valorizzato quando il controllo non ha accettato <c>UseMultimon</c> o la scelta di un sottoinsieme.
+    /// </summary>
+    internal string? MonitorFallbackNote { get; private set; }
+
+    /// <summary>
+    /// Fa usare davvero più schermi alla sessione a schermo intero: <c>UseMultimon</c> di IMsRdpClientNonScriptable5 e,
+    /// per un sottoinsieme di schermi, la proprietà estesa «SelectedMonitors» (indici come in mstsc). Ogni passo è
+    /// verificato a runtime. Ripiego se il controllo li rifiuta: la sessione resta a uno schermo (UseMultimon) oppure,
+    /// per il sottoinsieme, copre gli schermi sotto la finestra a schermo intero (che
+    /// <see cref="Screens.FullScreenBounds"/> dimensiona sull'insieme scelto); per l'esattezza resta «Apri con mstsc»,
+    /// che passa «use multimon» e «selectedmonitors» dal .rdp.
+    /// </summary>
+    private void ConfigureMonitors(object ocx, RdpConnection c)
+    {
+        MonitorFallbackNote = null;
+        var resolution = Screens.Resolve(c);
+        if (!resolution.UseMultimon)
+            return;
+        bool multimon = false;
+        try
+        {
+            if (ocx is IMsRdpClientNonScriptable5 ns5)
+            {
+                ns5.put_UseMultimon(true);
+                multimon = ns5.get_UseMultimon();
+            }
+        }
+        catch (Exception) { }
+        if (!multimon)
+        {
+            MonitorFallbackNote = "Il controllo di Desktop remoto non supporta più schermi: la sessione usa uno schermo solo. Per più schermi usa «Apri con mstsc».";
+            return;
+        }
+        if (resolution.Indexes.Count >= Screens.All().Count)
+            return;
+        try
+        {
+            ((dynamic)ocx).SetExtendedProperty("SelectedMonitors", string.Join(",", resolution.Indexes));
+        }
+        catch (Exception)
+        {
+            MonitorFallbackNote = "Il controllo non permette di scegliere gli schermi: la sessione copre quelli sotto la finestra a schermo intero. Per la scelta esatta usa «Apri con mstsc».";
         }
     }
 

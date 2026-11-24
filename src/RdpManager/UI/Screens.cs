@@ -9,6 +9,23 @@ internal static class Screens
         Screen.AllScreens.Select(s => new ScreenInfo(s.DeviceName, s.Bounds, s.WorkingArea, s.Primary,
             NativeMethods.DpiAt(new Point(s.Bounds.X + s.Bounds.Width / 2, s.Bounds.Y + s.Bounds.Height / 2)))).ToList();
 
+    /// <summary>Gli schermi che la connessione usa, rispetto a quelli collegati adesso (<see cref="MonitorSelection"/>).</summary>
+    public static MonitorResolution Resolve(RdpConnection connection) => MonitorSelection.Resolve(All(), connection);
+
+    /// <summary>Rettangolo dello schermo intero per la connessione: l'insieme degli schermi usati se sono più d'uno.</summary>
+    public static Rectangle FullScreenBounds(IReadOnlyList<ScreenInfo> all, RdpConnection? connection, string? preferredMonitor)
+    {
+        if (connection is not null && all.Count > 1)
+        {
+            var resolution = MonitorSelection.Resolve(all, connection);
+            if (resolution.UseMultimon)
+                return MonitorLayout.VirtualBounds(resolution.Screens);
+            if (connection.MonitorMode != MonitorMode.Single && resolution.Screens.Count == 1)
+                return resolution.Screens[0].Bounds; // un solo schermo scelto: quello
+        }
+        return (MonitorLayout.ChooseScreen(all, preferredMonitor) ?? all[0]).Bounds;
+    }
+
     /// <summary>"1 · 2560×1440 (principale, 150%)": numero in ordine da sinistra, risoluzione e scala.</summary>
     public static string Describe(ScreenInfo s, IReadOnlyList<ScreenInfo> all)
     {
