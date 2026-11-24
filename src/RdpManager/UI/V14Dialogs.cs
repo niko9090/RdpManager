@@ -178,14 +178,50 @@ internal sealed class CsvImportDialog : TouchForm
         head.Dock = DockStyle.Top;
 
         var cancel = DialogStyle.Button("Annulla", DialogResult.Cancel);
+        // Nota, colonne e riga sopra l'anteprima stanno in un pannello che scorre: con poca altezza non si sovrappongono, scorrono.
+        head.Dock = DockStyle.None;
+        _columns.Dock = DockStyle.None;
+        top.Dock = DockStyle.None;
+        _stack = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoSize = true, Location = Point.Empty };
+        _stack.Controls.AddRange([head, _columns, top]);
+        _head = head;
+        _top = top;
+        _header = new Panel { Dock = DockStyle.Top, AutoScroll = true, Height = 100 };
+        _header.Controls.Add(_stack);
+        _buttons = DialogStyle.Buttons(cancel, _ok);
         Controls.Add(_preview);
-        Controls.Add(top);
-        Controls.Add(_columns);
-        Controls.Add(head);
-        Controls.Add(DialogStyle.Buttons(cancel, _ok));
+        Controls.Add(_header);
+        Controls.Add(_buttons);
         CancelButton = cancel;
         Refill();
         ThemeManager.Apply(this);
+        SizeChanged += (_, _) => FitHeader();
+        FitHeader();
+    }
+
+    private readonly FlowLayoutPanel _stack;
+    private readonly Panel _header;
+    private readonly Control _head;
+    private readonly Control _top;
+    private readonly Control _buttons;
+
+    /// <summary>Adatta la larghezza del contenuto alla finestra e limita l'altezza del pannello in alto, lasciando posto all'anteprima.</summary>
+    private void FitHeader()
+    {
+        int w = Math.Max(200, ClientSize.Width - SystemInformation.VerticalScrollBarWidth - 8);
+        var max = new Size(w, 0);
+        if (_head.MaximumSize != max || _columns.MaximumSize != max || _top.MaximumSize != max)
+        {
+            _head.MaximumSize = max;
+            _columns.MaximumSize = max;
+            _top.MaximumSize = max;
+            _stack.PerformLayout();
+        }
+        int want = _stack.PreferredSize.Height + 4;
+        int cap = Math.Max(60, ClientSize.Height - _buttons.Height - 110);
+        int height = Math.Min(want, cap);
+        if (_header.Height != height)
+            _header.Height = height;
     }
 
     public IReadOnlyList<CsvRow> Rows => _rows;
