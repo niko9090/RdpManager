@@ -134,6 +134,8 @@ public sealed class DialogLayoutTests
         yield return full;
         yield return new Rectangle(full.X, full.Y, full.Width * 3 / 4, full.Height * 3 / 4);
         yield return new Rectangle(full.X, full.Y, full.Width / 2, full.Height / 2);
+        // Area piccola fissa (schermo 1370x698 dimezzato): il difetto si vede su qualsiasi PC, anche con lo schermo grande.
+        yield return new Rectangle(full.X, full.Y, 685, 325);
     }
 
     private static bool Overlap(Rectangle a, Rectangle b)
