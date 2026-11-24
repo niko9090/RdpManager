@@ -23,6 +23,9 @@ public sealed class VpnForm : TouchForm
     private readonly FlowLayoutPanel _advanced = new() { FlowDirection = FlowDirection.TopDown, AutoSize = true, Visible = false };
 
     /// <param name="importFile">Importa un file di configurazione (MainForm lo collega; senza, il pulsante non c'è).</param>
+    /// <summary>Dà il modo di registrare la chiave sul server (null, o risultato null, se non si è nell'account).</summary>
+    internal Func<VpnRegistrar?>? Registrar { get; set; }
+
     internal VpnForm(IWireGuardTunnel tunnel, string? profilePath = null, Func<IWin32Window, string, Task>? importFile = null)
     {
         _importFile = importFile;
@@ -151,14 +154,65 @@ public sealed class VpnForm : TouchForm
         RefreshKeys();
     }
 
-    private void GenerateKeys()
+    /// <summary>Per le prove: sostituisce la domanda di conferma (vero = continua).</summary>
+    internal Func<string, bool>? ConfirmOverride { get; set; }
+
+    /// <summary>Per le prove: sostituisce il messaggio all'utente.</summary>
+    internal Action<string>? NotifyOverride { get; set; }
+
+    private void Notify(string text)
     {
-        if (_profile.HasKey && MessageBox.Show(this,
-                "Esiste già una chiave. Crearne una nuova scollega questo PC dal server finché non aggiungi il nuovo frammento. Continuare?",
-                "marshmelloVPN", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+        if (NotifyOverride is { } n)
+            n(text);
+        else
+            MessageBox.Show(this, text, "marshmelloVPN", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+    }
+
+    private async void GenerateKeys() => await GenerateKeysAsync();
+
+    internal async Task GenerateKeysAsync()
+    {
+        var register = Registrar?.Invoke();
+        if (_profile.HasKey)
+        {
+            var question = register is not null && VpnKeySync.IsRegistered(_profile)
+                ? "Esiste già una chiave. Ne creo una nuova e la registro sul server: se il server non risponde resta quella attuale. Continuare?"
+                : "Esiste già una chiave. Crearne una nuova scollega questo PC dal server finché non aggiungi il nuovo frammento. Continuare?";
+            var yes = ConfirmOverride is { } c
+                ? c(question)
+                : MessageBox.Show(this, question, "marshmelloVPN", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes;
+            if (!yes)
+                return;
+        }
+        VpnKeyResult result;
+        try
+        {
+            UseWaitCursor = true;
+            result = await VpnKeySync.RotateAsync(_profile, _profilePath, register);
+        }
+        catch (IOException ex)
+        {
+            result = new VpnKeyResult(false, "Impossibile salvare le chiavi: " + ex.Message);
+        }
+        finally
+        {
+            if (!IsDisposed)
+                UseWaitCursor = false;
+        }
+        if (IsDisposed)
             return;
-        _profile.GenerateKeys();
-        Persist();
+        if (result.Ok)
+        {
+            _pcName.Text = _profile.PcName;
+            _address.Text = _profile.Address;
+            _endpoint.Text = _profile.Endpoint;
+            _serverKey.Text = _profile.ServerPublicKey;
+            Persist();
+        }
+        else
+            RefreshKeys();
+        if (!result.Ok || result.RegisteredOnServer)
+            Notify(result.Message);
     }
 
     private void RefreshKeys()

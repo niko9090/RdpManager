@@ -15,7 +15,10 @@ public sealed partial class MainForm
             open.Activate();
             return;
         }
-        _vpn = new VpnForm(CreateTunnel(), importFile: (owner, path) => ImportConfigFileAsync(path, owner));
+        _vpn = new VpnForm(CreateTunnel(), importFile: (owner, path) => ImportConfigFileAsync(path, owner))
+        {
+            Registrar = () => _sync.SignedIn ? _sync.RequestVpnAsync : null,
+        };
         _vpn.FormClosed += (_, _) => _vpn = null;
         _vpn.Show(this);
     }
@@ -128,6 +131,31 @@ public sealed partial class MainForm
         {
             AppLog.Default?.Info("Connessione automatica della VPN non riuscita: " + ex.Message);
             return "VPN non collegata: " + ex.Message;
+        }
+    }
+
+    private readonly VpnKeyWatchdog _keyWatchdog = new();
+
+    /// <summary>
+    /// Tunnel acceso ma senza handshake: una volta sola (finché il programma resta aperto) si rimanda al server la chiave
+    /// pubblica attuale, nel caso il server abbia una chiave vecchia. Nessuna chiave nuova, nessun segreto nel log.
+    /// </summary>
+    internal async Task RecoverVpnKeyAsync()
+    {
+        try
+        {
+            if (IsDisposed || !_sync.SignedIn || _shutdownCts.IsCancellationRequested)
+                return;
+            var unreachable = CreateTunnel().Dettagli is { } d
+                && d.ServerUnreachable(DateTime.UtcNow, TimeSpan.FromMinutes(2), TimeSpan.FromMinutes(5));
+            if (!unreachable || !_keyWatchdog.TryBegin(true))
+                return;
+            var profile = VpnProfile.Load();
+            var result = await VpnKeySync.ReRegisterAsync(profile, _sync.RequestVpnAsync, _shutdownCts.Token);
+            AppLog.Default?.Info("VPN senza handshake: " + result.Message);
+        }
+        catch (OperationCanceledException)
+        {
         }
     }
 

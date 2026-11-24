@@ -38,7 +38,12 @@ public sealed partial class MainForm
             _syncDelay.Stop();
             await RunSyncAsync(manual: false);
         };
-        _syncPoll.Tick += async (_, _) => await RunSyncAsync(manual: false);
+        _syncPoll.Tick += async (_, _) =>
+        {
+            await RunSyncAsync(manual: false);
+            if (_autoSync)
+                await RecoverVpnKeyAsync();
+        };
         _syncPoll.Start();
         Shown += async (_, _) =>
         {
