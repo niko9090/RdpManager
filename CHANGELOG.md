@@ -1,5 +1,16 @@
 # Novità di RdpManager
 
+## 1.19.1 (2026-11-24)
+
+**VPN: ora si vedono i PC delle altre reti**
+- Nella cartella «marshmelloVPN» compaiono i PC delle altre reti: lo stesso PC registrato due volte non viene più scartato, compaiono anche i PC aggiunti a mano sul Synology, e il PC stesso non si propone da solo.
+- Le copie doppie o triple delle voci «marshmelloVPN» create dalle versioni vecchie vengono unite in una sola per PC, tenendo gli accessi scritti dall'utente.
+- La cartella si aggiorna subito dopo l'accensione della VPN; se fallisce riprova presto e scrive il motivo nel registro. La VPN si riaccende da sola se cade.
+- La ricerca dei PC in rete propone tutta la rete della VPN.
+- «Crea chiavi» con la VPN accesa la riavvia con la chiave nuova; durante la riparazione della chiave non compaiono più PC fantasma. Lo stato del tunnel è più affidabile.
+- La finestra di importazione da CSV non si sovrappone più sugli schermi bassi.
+- Nota tecnica: il servizio rdpm-sync sul server passa alla 1.2.1 e va ridistribuito sul Synology. Il client marshmelloVPN passa alla 1.8.2.
+
 ## 1.19.0 (2026-11-24)
 
 **Più schermi per ogni connessione**
