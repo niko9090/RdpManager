@@ -59,6 +59,11 @@ public static class VpnFolder
         bool changed = false;
         var nameSet = list.Select(d => d.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+        // Voci della cartella senza il segno AutoVpnDevice (perso da una versione che non lo conosceva): si riconoscono
+        // come proprie e si uniscono in una sola per PC.
+        if (AdoptLegacy(doc, list))
+            changed = true;
+
         // Connessioni automatiche di PC tolti dalla rete (e doppioni dello stesso PC nati da una sincronizzazione: di due
         // gemelle resta quella con gli accessi dell'utente, poi quella con l'Id stabile, poi la prima).
         var drop = new HashSet<RdpConnection>();
@@ -114,6 +119,80 @@ public static class VpnFolder
         }
         return changed;
     }
+
+    /// <summary>
+    /// Riconosce le voci «vecchie» (nella cartella, senza AutoVpnDevice) di un PC della rete: host uguale al suo IP VPN
+    /// o, in mancanza, nome uguale al suo. Ne resta una per PC (quella già automatica, altrimenti la più completa e poi
+    /// la usata più di recente), con AutoVpnDevice rimesso; gli accessi mancanti si riprendono dalle altre copie, il
+    /// preferito resta se lo era una qualunque. Le voci che non corrispondono a un solo PC non si toccano.
+    /// </summary>
+    private static bool AdoptLegacy(ConnectionsDocument doc, List<(string Name, string Address)> list)
+    {
+        var byDevice = new Dictionary<string, List<RdpConnection>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var c in doc.Connections)
+        {
+            if (c.AutoVpnDevice is not null
+                || !RdpConnection.NormalizeGroup(c.Group).Equals(FolderName, StringComparison.OrdinalIgnoreCase))
+                continue;
+            var host = c.Host.Trim();
+            var hit = list.Where(d => d.Address.Length > 0 && host.Equals(d.Address, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (hit.Count == 0)
+            {
+                var cname = c.Name.Trim();
+                hit = list.Where(d => cname.Length > 0 && d.Name.Equals(cname, StringComparison.OrdinalIgnoreCase)).ToList();
+            }
+            if (hit.Count != 1)
+                continue; // nessuno o ambiguo: resta dell'utente
+            if (!byDevice.TryGetValue(hit[0].Name, out var copies))
+                byDevice[hit[0].Name] = copies = [];
+            copies.Add(c);
+        }
+
+        bool changed = false;
+        foreach (var (device, copies) in byDevice)
+        {
+            var stable = StableId(device);
+            var ranked = copies.OrderByDescending(Completeness).ThenByDescending(c => c.LastConnectedUtc ?? DateTime.MinValue)
+                .ThenByDescending(c => c.Id == stable).ToList();
+            var auto = doc.Connections.FirstOrDefault(c => c.AutoVpnDevice is { } dev
+                && dev.Trim().Equals(device, StringComparison.OrdinalIgnoreCase));
+            var survivor = auto ?? ranked[0];
+            var donors = ranked.Where(c => c != survivor).ToList();
+            survivor.AutoVpnDevice = device;
+
+            if (!HasCredentials(survivor) && donors.FirstOrDefault(HasCredentials) is { } source)
+            {
+                if (auto is not null)
+                    CopyFrom(survivor, source);
+                else
+                {
+                    survivor.Username = source.Username;
+                    survivor.Domain = source.Domain;
+                    survivor.Password = source.Password;
+                    survivor.ProtectedPassword = source.ProtectedPassword;
+                    survivor.CredentialProfileId = source.CredentialProfileId;
+                }
+            }
+            if (donors.Any(d => d.IsFavorite))
+                survivor.IsFavorite = true;
+            if (survivor.Color is null && donors.Select(d => d.Color).FirstOrDefault(x => x is not null) is { } color)
+                survivor.Color = color;
+            if (survivor.Label.Length == 0 && donors.Select(d => d.Label).FirstOrDefault(x => x.Length > 0) is { } label)
+                survivor.Label = label;
+            if (survivor.MacAddress.Length == 0 && donors.Select(d => d.MacAddress).FirstOrDefault(x => x.Length > 0) is { } mac)
+                survivor.MacAddress = mac;
+
+            doc.Connections.RemoveAll(c => donors.Contains(c));
+            changed = true;
+        }
+        return changed;
+    }
+
+    /// <summary>Quanti accessi e personalizzazioni dell'utente ha la connessione: serve a scegliere la copia da tenere.</summary>
+    private static int Completeness(RdpConnection c) =>
+        (c.Username.Trim().Length > 0 ? 1 : 0) + (c.Domain.Trim().Length > 0 ? 1 : 0) + (c.HasPassword ? 1 : 0)
+        + (c.CredentialProfileId is not null ? 1 : 0) + (c.IsFavorite ? 1 : 0) + (c.Color is not null ? 1 : 0)
+        + (c.Label.Length > 0 ? 1 : 0) + (c.MacAddress.Length > 0 ? 1 : 0);
 
     private sealed record Entry(string Name, string Address, VpnDashboardDevice Device);
 

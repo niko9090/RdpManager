@@ -354,4 +354,133 @@ public class VpnFolderTests
         VpnFolder.Apply(doc, [Dev("PC-A", "10.8.0.2")]);
         Assert.Null(Auto(doc).Single().Duplicate().AutoVpnDevice);
     }
+
+    // --- Voci vecchie senza AutoVpnDevice (campo perso da una versione che non lo conosceva) ---
+
+    private static readonly string[] Pcs = ["alfa", "bravo", "charlie", "delta", "echo", "foxtrot"];
+
+    private static List<VpnDashboardDevice> SixDevices() =>
+        Pcs.Select((n, i) => Dev(n, $"10.66.0.{i + 2}")).ToList();
+
+    /// <summary>JSON nella forma del file reale (dati finti): 3 copie per PC nella cartella, nessuna con autoVpnDevice.</summary>
+    private static string LegacyJson()
+    {
+        var items = new List<string>();
+        for (int i = 0; i < Pcs.Length; i++)
+            for (int copy = 0; copy < 3; copy++)
+            {
+                // Le copie 0 hanno host IP, le 1 solo il nome della connessione, le 2 l'IP; credenziali solo su alcune.
+                var host = copy == 1 ? Pcs[i] + ".lan" : $"10.66.0.{i + 2}";
+                var user = (i + copy) % 2 == 0 ? $"\"username\": \"utente{i}\", \"protectedPassword\": \"cGFzcw{i}\"," : "";
+                var fav = i == 0 && copy == 2 ? "\"isFavorite\": true," : "";
+                var color = i == 1 && copy == 1 ? "\"color\": \"#112233\"," : "";
+                var last = $"\"lastConnectedUtc\": \"2026-01-0{copy + 1}T10:00:00Z\",";
+                items.Add($"{{ \"id\": \"{Guid.NewGuid()}\", \"name\": \"{Pcs[i]}\", \"host\": \"{host}\", {user} {fav} {color} {last} \"group\": \"marshmelloVPN\" }}");
+            }
+        return "{ \"groups\": [\"marshmelloVPN\"], \"connections\": [" + string.Join(",", items) + "] }";
+    }
+
+    private static ConnectionsDocument Load(string json) => System.Text.Json.JsonSerializer.Deserialize<ConnectionsDocument>(json,
+        new System.Text.Json.JsonSerializerOptions
+        {
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+            Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() },
+        })!;
+
+    [Fact]
+    public void Diciotto_voci_vecchie_diventano_sei_con_il_segno_e_gli_accessi_conservati()
+    {
+        var doc = Load(LegacyJson());
+        Assert.Equal(18, doc.Connections.Count);
+        Assert.All(doc.Connections, c => Assert.Null(c.AutoVpnDevice));
+
+        Assert.True(VpnFolder.Apply(doc, SixDevices(), selfName: "altro-pc"));
+
+        Assert.Equal(6, doc.Connections.Count);
+        foreach (var (pc, i) in Pcs.Select((p, i) => (p, i)))
+        {
+            var c = doc.Connections.Single(x => x.AutoVpnDevice == pc);
+            Assert.Equal($"10.66.0.{i + 2}", c.Host);
+            Assert.Equal("marshmelloVPN", c.Group);
+            Assert.Equal($"utente{i}", c.Username);
+            Assert.Equal($"cGFzcw{i}", c.ProtectedPassword);
+        }
+        Assert.True(doc.Connections.Single(x => x.AutoVpnDevice == "alfa").IsFavorite);
+        Assert.Equal("#112233", doc.Connections.Single(x => x.AutoVpnDevice == "bravo").Color);
+
+        // Rilanciato non cambia più niente.
+        Assert.False(VpnFolder.Apply(doc, SixDevices(), selfName: "altro-pc"));
+        Assert.Equal(6, doc.Connections.Count);
+    }
+
+    [Fact]
+    public void Fra_copie_con_accessi_diversi_resta_quella_piu_completa_poi_la_piu_recente()
+    {
+        var doc = new ConnectionsDocument { Groups = [VpnFolder.FolderName] };
+        doc.Connections.Add(new RdpConnection { Name = "alfa", Host = "10.66.0.2", Group = "marshmelloVPN", Username = "vecchio", LastConnectedUtc = new DateTime(2026, 3, 1) });
+        doc.Connections.Add(new RdpConnection { Name = "alfa", Host = "10.66.0.2", Group = "marshmelloVPN", Username = "nuovo", Domain = "D", LastConnectedUtc = new DateTime(2026, 1, 1) });
+        doc.Connections.Add(new RdpConnection { Name = "alfa", Host = "10.66.0.2", Group = "marshmelloVPN", Username = "piuRecente", LastConnectedUtc = new DateTime(2026, 5, 1) });
+
+        VpnFolder.Apply(doc, [Dev("alfa", "10.66.0.2")], selfName: "altro-pc");
+
+        var c = Assert.Single(doc.Connections);
+        Assert.Equal("nuovo", c.Username); // la più completa
+        Assert.Equal("alfa", c.AutoVpnDevice);
+    }
+
+    [Fact]
+    public void Le_voci_vecchie_senza_pc_corrispondente_restano_dell_utente()
+    {
+        var doc = new ConnectionsDocument { Groups = [VpnFolder.FolderName] };
+        var orphan = new RdpConnection { Name = "server-ufficio", Host = "192.168.1.5", Group = "marshmelloVPN", Username = "me" };
+        var ambiguous = new RdpConnection { Name = "boh", Host = "10.66.0.99", Group = "marshmelloVPN", Username = "me" };
+        doc.Connections.Add(orphan);
+        doc.Connections.Add(ambiguous);
+
+        VpnFolder.Apply(doc, SixDevices(), selfName: "altro-pc");
+
+        Assert.Contains(orphan, doc.Connections);
+        Assert.Contains(ambiguous, doc.Connections);
+        Assert.Null(orphan.AutoVpnDevice);
+        Assert.Null(ambiguous.AutoVpnDevice);
+        Assert.Equal("marshmelloVPN", orphan.Group);
+    }
+
+    [Fact]
+    public void Le_connessioni_spostate_fuori_dalla_cartella_o_create_a_mano_non_si_toccano()
+    {
+        var doc = new ConnectionsDocument { Groups = [VpnFolder.FolderName, "Clienti"] };
+        var moved = new RdpConnection { Name = "alfa", Host = "10.66.0.2", Group = "Clienti", Username = "mario" };
+        var root = new RdpConnection { Name = "bravo", Host = "10.66.0.3", Group = "", Username = "mario" };
+        var sub = new RdpConnection { Name = "charlie", Host = "10.66.0.4", Group = "marshmelloVPN/Extra", Username = "mario" };
+        doc.Connections.AddRange([moved, root, sub]);
+
+        VpnFolder.Apply(doc, SixDevices(), selfName: "altro-pc");
+
+        foreach (var c in new[] { moved, root, sub })
+        {
+            Assert.Contains(c, doc.Connections);
+            Assert.Null(c.AutoVpnDevice);
+            Assert.Equal("mario", c.Username);
+        }
+        Assert.Equal("Clienti", moved.Group);
+        Assert.Equal("", root.Group);
+        Assert.Equal("marshmelloVPN/Extra", sub.Group);
+    }
+
+    [Fact]
+    public void Le_copie_tolte_dalla_pulizia_non_ricompaiono_dopo_la_sincronizzazione()
+    {
+        var json = LegacyJson();
+        var local = Load(json);
+        var remote = Load(json);
+        var fp = new SyncFingerprints(new byte[32]);
+        var baseHashes = fp.Of(local);
+
+        VpnFolder.Apply(local, SixDevices(), selfName: "altro-pc");
+        SyncMerge.MergeInto(local, remote, baseHashes, fp);
+
+        Assert.Equal(6, local.Connections.Count);
+        Assert.All(local.Connections, c => Assert.NotNull(c.AutoVpnDevice));
+    }
 }
