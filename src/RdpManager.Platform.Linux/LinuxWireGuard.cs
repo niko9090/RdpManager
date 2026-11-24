@@ -33,6 +33,28 @@ public static class LinuxWireGuardCommands
     public static LinuxCommand WgQuickDown(string confPath) => new("pkexec", ["wg-quick", "down", confPath]);
     public static LinuxCommand LinkStatus(string tunnel = VpnDefaults.TunnelName) => new("ip", ["-o", "link", "show", "dev", tunnel]);
 
+    /// <summary>Ultimo handshake per peer (senza privilegi spesso non leggibile: allora l'esito è «sconosciuto»).</summary>
+    public static LinuxCommand LatestHandshakes(string tunnel = VpnDefaults.TunnelName) => new("wg", ["show", tunnel, "latest-handshakes"]);
+
+    /// <summary>
+    /// Dall'output di «wg show &lt;if&gt; latest-handshakes» (righe «chiave&lt;TAB&gt;secondi-unix», 0 = mai) ricava il più recente;
+    /// 0 se nessun peer ha mai fatto handshake, null se l'output non è leggibile. La chiave non viene mai restituita.
+    /// </summary>
+    public static long? ParseLatestHandshake(string output)
+    {
+        long best = 0;
+        var any = false;
+        foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var parts = line.Split(['\t', ' '], StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 2 || !long.TryParse(parts[^1], out var ts) || ts < 0)
+                return null;
+            any = true;
+            best = Math.Max(best, ts);
+        }
+        return any ? best : null;
+    }
+
     /// <summary>True se l'elenco di «nmcli -t -f NAME,TYPE,DEVICE connection show --active» contiene il tunnel WireGuard.</summary>
     public static bool IsActiveInNmcli(string output, string tunnel = VpnDefaults.TunnelName)
     {
@@ -199,6 +221,13 @@ public sealed class LinuxWireGuard
             return r.Success && LinuxWireGuardCommands.IsActiveInNmcli(r.StdOut);
         }
         return (await RunAsync(LinuxWireGuardCommands.LinkStatus(), ct).ConfigureAwait(false)).Success;
+    }
+
+    /// <summary>Secondi Unix dell'ultimo handshake (0 = mai); null se non si riesce a leggerlo (niente permessi, «wg» assente).</summary>
+    public async Task<long?> LatestHandshakeAsync(CancellationToken ct = default)
+    {
+        var r = await RunAsync(LinuxWireGuardCommands.LatestHandshakes(), ct).ConfigureAwait(false);
+        return r.Success ? LinuxWireGuardCommands.ParseLatestHandshake(r.StdOut) : null;
     }
 
     /// <summary>Dove sta il .conf per wg-quick: in $XDG_RUNTIME_DIR (in memoria, solo dell'utente) se c'è, altrimenti il percorso predefinito.</summary>
