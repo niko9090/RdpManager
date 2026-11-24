@@ -66,8 +66,20 @@ public static class RdpFile
             c.RedirectPrinters = printers != 0;
         if (TryInt(settings, "audiocapturemode", out var mic))
             c.RedirectMicrophone = mic != 0;
-        if (TryInt(settings, "use multimon", out var multimon))
-            c.UseAllMonitors = multimon != 0;
+        if (TryInt(settings, "use multimon", out var multimon) && multimon != 0)
+        {
+            // multimon:1 con selectedmonitors = schermi scelti; senza (o con elenco vuoto/illeggibile) = tutti.
+            var selected = settings.TryGetValue("selectedmonitors", out var sel) ? MonitorSelection.ParseIndexes(sel) : [];
+            if (selected.Length > 0)
+            {
+                c.MonitorMode = MonitorMode.Selected;
+                c.SelectedMonitors = selected;
+            }
+            else
+            {
+                c.MonitorMode = MonitorMode.All;
+            }
+        }
 
         if (settings.TryGetValue("password 51", out var pwd))
             c.Password = PasswordProtector.TryUnprotectFromRdpFile(pwd);
@@ -112,7 +124,10 @@ public static class RdpFile
             Line("domain", 's', c.Domain);
 
         Line("screen mode id", 'i', 1);
-        Line("use multimon", 'i', c.UseAllMonitors ? 1 : 0);
+        bool selectedMonitors = c.MonitorMode == MonitorMode.Selected && c.SelectedMonitors.Length > 0;
+        Line("use multimon", 'i', c.MonitorMode == MonitorMode.All || selectedMonitors ? 1 : 0);
+        if (selectedMonitors)
+            Line("selectedmonitors", 's', string.Join(",", c.SelectedMonitors));
         if (c.ResolutionMode == ResolutionMode.Fixed)
         {
             Line("desktopwidth", 'i', c.DesktopWidth);
