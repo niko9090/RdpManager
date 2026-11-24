@@ -447,6 +447,19 @@ public sealed class V16CoreTests : IDisposable
         Assert.Equal(ScanCheck.Ok, ScanPolicy.Check(zt.SuggestedRange));
     }
 
+    [Fact]
+    public void Adapter_WireGuardWithPrefix32_SuggestsTheVpnNetwork()
+    {
+        var wg = new AdapterInfo("RdpManager", "WireGuard Tunnel", NetworkInterfaceType.Unknown, IPAddress.Parse("10.66.0.5"), 32, NetworkKind.WireGuard);
+        Assert.Equal("10.66.0.1 - 10.66.0.254", wg.SuggestedRange.ToString());
+        var custom = wg with { Address = IPAddress.Parse("10.77.1.9") };
+        Assert.Equal("10.77.1.9", custom.SuggestedRange.ToString()); // fuori dalla rete predefinita: nessun cambio
+        var withProfile = custom with { VpnNetwork = "10.77.1.0/24" };
+        Assert.Equal("10.77.1.1 - 10.77.1.254", withProfile.SuggestedRange.ToString());
+        var other = new AdapterInfo("Tailscale", "x", NetworkInterfaceType.Ethernet, IPAddress.Parse("100.64.0.5"), 32, NetworkKind.Tailscale);
+        Assert.Equal("100.64.0.5", other.SuggestedRange.ToString());
+    }
+
     // ---------- PC trovati e doppioni ----------
 
     [Fact]

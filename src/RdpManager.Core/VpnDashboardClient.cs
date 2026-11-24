@@ -5,7 +5,10 @@ using System.Text.Json;
 namespace RdpManager.Core;
 
 /// <summary>Un PC della VPN come lo vede la plancia: gli stessi dati della pagina web <c>/vpn</c> del server.</summary>
-public sealed record VpnDashboardDevice(string Name, string Address, bool Connected, DateTimeOffset? LastContact);
+/// <param name="DeviceId">Id stabile del dispositivo dato dal server (null con un server vecchio).</param>
+/// <param name="Owner">Account proprietario (null con un server vecchio o per un peer messo a mano).</param>
+public sealed record VpnDashboardDevice(string Name, string Address, bool Connected, DateTimeOffset? LastContact,
+    string? DeviceId = null, string? Owner = null);
 
 /// <summary>
 /// Plancia VPN: legge l'elenco dei PC da <c>GET v1/vpn/overview</c> di rdpm-sync con il token dell'account.
@@ -82,7 +85,9 @@ public sealed class VpnDashboardClient : IDisposable
                     d.GetProperty("name").GetString() ?? "",
                     d.GetProperty("address").GetString() ?? "",
                     d.TryGetProperty("connected", out var c) && c.ValueKind == JsonValueKind.True,
-                    last));
+                    last,
+                    OptionalString(d, "deviceId"),
+                    OptionalString(d, "owner")));
             }
             return list;
         }
@@ -91,6 +96,9 @@ public sealed class VpnDashboardClient : IDisposable
             throw new SyncServerException(status, "invalid_response", "Risposta del server non valida.");
         }
     }
+
+    private static string? OptionalString(JsonElement d, string name) =>
+        d.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String && v.GetString() is { Length: > 0 } s ? s : null;
 
     public void Dispose() => _http.Dispose();
 }

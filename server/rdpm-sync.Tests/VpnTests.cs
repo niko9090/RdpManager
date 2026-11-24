@@ -16,6 +16,9 @@ public sealed class FakeWireGuard : IWireGuardPeers
     public bool Denied { get; set; }
     public string[] Reserved { get; set; } = [];
     public Dictionary<string, DateTimeOffset> Handshakes { get; } = [];
+    public List<WgManualPeer> Manual { get; } = [];
+
+    public IReadOnlyList<WgManualPeer> ManualPeers() => Manual;
 
     public Task<IReadOnlyDictionary<string, DateTimeOffset>> HandshakesAsync(CancellationToken ct = default) =>
         Task.FromResult<IReadOnlyDictionary<string, DateTimeOffset>>(Handshakes);
@@ -230,6 +233,43 @@ public class VpnTests
         Assert.False(uff.GetProperty("connected").GetBoolean());
     }
 
+    [Fact]
+    public async Task Overview_da_id_stabile_e_proprietario_a_ogni_pc()
+    {
+        var wg = new FakeWireGuard();
+        await using var s = Server(wg);
+        var mario = await UserAsync(s, "mario");
+        var luisa = await UserAsync(s, "luisa");
+        await Request(s, mario, "Casa", NewKey());
+        await Request(s, luisa, "Casa", NewKey()); // stesso nome, altro account
+
+        var first = (await Json(await s.SendAsync(mario, HttpMethod.Get, "/v1/vpn/overview"))).GetProperty("devices").EnumerateArray().ToList();
+        var second = (await Json(await s.SendAsync(mario, HttpMethod.Get, "/v1/vpn/overview"))).GetProperty("devices").EnumerateArray().ToList();
+        Assert.Equal(2, first.Count);
+        Assert.NotEqual(first[0].GetProperty("deviceId").GetString(), first[1].GetProperty("deviceId").GetString());
+        Assert.Equal(first.Select(d => d.GetProperty("deviceId").GetString()), second.Select(d => d.GetProperty("deviceId").GetString()));
+        Assert.Equal(["luisa", "mario"], first.Select(d => d.GetProperty("owner").GetString()!).Order().ToArray());
+    }
+
+    [Fact]
+    public async Task Overview_include_i_peer_messi_a_mano_con_handshake_dalla_loro_chiave()
+    {
+        var wg = new FakeWireGuard();
+        var key = NewKey();
+        wg.Manual.Add(new WgManualPeer(key, "10.66.0.7", "Server-NAS"));
+        wg.Manual.Add(new WgManualPeer(NewKey(), "10.66.0.8", "10.66.0.8"));
+        await using var s = Server(wg);
+        var mario = await UserAsync(s, "mario");
+        wg.Handshakes[key] = s.Time.GetUtcNow().AddSeconds(-20);
+
+        var devices = (await Json(await s.SendAsync(mario, HttpMethod.Get, "/v1/vpn/overview"))).GetProperty("devices").EnumerateArray().ToList();
+        Assert.Equal(2, devices.Count);
+        var nas = devices.Single(d => d.GetProperty("name").GetString() == "Server-NAS");
+        Assert.Equal("10.66.0.7", nas.GetProperty("address").GetString());
+        Assert.True(nas.GetProperty("connected").GetBoolean());
+        Assert.False(devices.Single(d => d.GetProperty("address").GetString() == "10.66.0.8").GetProperty("connected").GetBoolean());
+    }
+
     [Theory]
     [InlineData("A", "non-e-una-chiave")]
     [InlineData("A", "")]
@@ -378,6 +418,53 @@ public class WgConfFileTests
     {
         var conf = WgConfFile.Rewrite(Base, [P1]);
         Assert.Equal(["10.66.0.7"], WgConfFile.UnmanagedAddresses(conf));
+    }
+
+    [Fact]
+    public void I_peer_a_mano_si_leggono_con_nome_dal_commento_o_dall_ip()
+    {
+        var conf = WgConfFile.Rewrite(Base + """
+
+
+            [Peer]
+            PublicKey = ddddddddddddddddddddddddddddddddddddddddddd=
+            AllowedIPs = 10.66.0.9/32
+            """, [P1]);
+        var manual = WgConfFile.UnmanagedPeers(conf);
+        Assert.Equal(2, manual.Count);
+        Assert.Equal(new WgManualPeer("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa=", "10.66.0.7", "manuale"), manual[0]);
+        Assert.Equal(new WgManualPeer("ddddddddddddddddddddddddddddddddddddddddddd=", "10.66.0.9", "10.66.0.9"), manual[1]);
+    }
+
+    [Fact]
+    public async Task Handshakes_con_wg_che_non_risponde_torna_vuoto_entro_il_tempo_massimo()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "rdpm-wg-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            string wg;
+            if (OperatingSystem.IsWindows())
+            {
+                wg = Path.Combine(dir, "wg.cmd");
+                File.WriteAllText(wg, "@echo off\r\nping -n 30 127.0.0.1 >nul\r\n");
+            }
+            else
+            {
+                wg = Path.Combine(dir, "wg.sh");
+                File.WriteAllText(wg, "#!/bin/sh\nsleep 30\n");
+                File.SetUnixFileMode(wg, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            }
+            var peers = new WgCliPeers(Path.Combine(dir, "wg0.conf"), "wg0", wg, TimeSpan.FromMilliseconds(500));
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var result = await peers.HandshakesAsync();
+            Assert.Empty(result);
+            Assert.True(sw.Elapsed < TimeSpan.FromSeconds(10));
+        }
+        finally
+        {
+            try { Directory.Delete(dir, true); } catch (IOException) { }
+        }
     }
 
     [Fact]

@@ -134,10 +134,10 @@ public sealed class VpnWeb(SyncOptions options, Store store, VpnEndpoints vpn, T
               .Append(connected ? "on" : "off").Append("\">").Append(connected ? "Connesso" : "Non connesso").Append("</span></div>")
               .Append("<div>IP marshmelloVPN:").Append(H(d.Address)).Append("</div>");
             if (admin)
-                sb.Append("<div>Account: ").Append(H(d.Owner)).Append("</div>");
+                sb.Append("<div>Account: ").Append(d.Id == 0 ? "(peer messo a mano nel server)" : H(d.Owner)).Append("</div>");
             sb.Append("<div>Ultimo contatto: ").Append(d.LastContact is { } l ? H(Format(l)) + (d.FromHandshake ? " (handshake)" : " (registrazione)") : "mai")
               .Append("</div>");
-            if (admin)
+            if (admin && d.Id != 0) // i peer messi a mano non hanno una registrazione da revocare
                 sb.Append("<form method=post action=\"/vpn/revoca\" onsubmit=\"return confirm('Revocare questo dispositivo?')\">")
                   .Append("<input type=hidden name=csrf value=\"").Append(csrf).Append("\"><input type=hidden name=id value=\"").Append(d.Id)
                   .Append("\"><button class=del>Revoca</button></form>");

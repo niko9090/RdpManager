@@ -32,7 +32,32 @@ public sealed record AdapterInfo(
     /// Intervallo proposto per la scansione: la sottorete se non supera una /22; altrimenti la /24 attorno al
     /// proprio indirizzo (la rete intera resta scrivibile a mano, con conferma).
     /// </summary>
-    public IpRange SuggestedRange => Prefix >= ScanPolicy.MaxPrefixWithoutConfirmation ? Subnet : IpRange.FromPrefix(Address, 24);
+    public IpRange SuggestedRange => Kind == NetworkKind.WireGuard && VpnRange() is { } vpn ? vpn
+        : Prefix >= ScanPolicy.MaxPrefixWithoutConfirmation ? Subnet : IpRange.FromPrefix(Address, 24);
+
+    /// <summary>
+    /// Rete della VPN (dagli AllowedIPs del profilo, es. «10.66.0.0/24»); se vuota vale <see cref="VpnDefaults.Network"/>.
+    /// Serve perché il tunnel prende l'indirizzo come /32 e la sua «sottorete» sarebbe il solo PC.
+    /// </summary>
+    public string? VpnNetwork { get; init; }
+
+    /// <summary>La rete VPN da proporre quando la scheda ha un prefisso più stretto di quello della rete VPN (null: nessun cambio).</summary>
+    private IpRange? VpnRange()
+    {
+        foreach (var text in new[] { VpnNetwork ?? "", VpnDefaults.Network })
+        {
+            foreach (var part in text.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (!IpRange.TryParse(part, out var range, out _) || !part.Contains('/'))
+                    continue;
+                var net = range.CoveringPrefix;
+                if (Prefix <= net || !range.Contains(Address) || net < ScanPolicy.MaxPrefixWithoutConfirmation)
+                    continue;
+                return range;
+            }
+        }
+        return null;
+    }
 
     public override string ToString() => $"{Name} ({KindName}) - {Address}/{Prefix}";
 }
