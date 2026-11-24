@@ -197,29 +197,45 @@ public sealed class SyncService : IDisposable
     /// senza VPN o con il server non raggiungibile non fa niente e non segnala errori. Vero se l'elenco è cambiato
     /// (l'interfaccia lo salva dentro <see cref="ISyncDocumentAccess.Apply"/>).
     /// </summary>
-    public async Task<bool> RefreshVpnFolderAsync(ISyncDocumentAccess access, CancellationToken ct = default)
+    public async Task<bool> RefreshVpnFolderAsync(ISyncDocumentAccess access, CancellationToken ct = default) =>
+        (await TryRefreshVpnFolderAsync(access, ct)).Changed;
+
+    /// <summary>
+    /// Come <see cref="RefreshVpnFolderAsync"/> ma dice anche perché non è riuscito (<see cref="VpnFolderRefresh.Failure"/>):
+    /// chi chiama lo scrive nel registro e ritenta presto (<see cref="VpnFolderRetry"/>). Una risposta vuota o un errore
+    /// non cancellano mai connessioni (<see cref="VpnFolder.Apply"/> con elenco vuoto non fa niente).
+    /// </summary>
+    public async Task<VpnFolderRefresh> TryRefreshVpnFolderAsync(ISyncDocumentAccess access, CancellationToken ct = default)
     {
         if (!SignedIn)
-            return false;
+            return new VpnFolderRefresh(false, null);
         IReadOnlyList<VpnDashboardDevice> devices;
         try
         {
             devices = await GetVpnDevicesAsync(ct);
         }
-        catch (Exception ex) when (ex is SyncUnreachableException or SyncServerException or InvalidOperationException
+        catch (SyncServerException ex)
+        {
+            return new VpnFolderRefresh(false, $"il server ha risposto {(int)ex.Status} ({ex.Code}): {ex.Message}");
+        }
+        catch (SyncUnreachableException ex)
+        {
+            return new VpnFolderRefresh(false, "server non raggiungibile: " + ex.Message);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException
             or ObjectDisposedException or OperationCanceledException or IOException or HttpRequestException
             or ArgumentException or CryptographicException)
         {
-            return false;
+            return new VpnFolderRefresh(false, ex.Message);
         }
         try
         {
-            return access.Apply(doc => VpnFolder.Apply(doc, devices));
+            return new VpnFolderRefresh(access.Apply(doc => VpnFolder.Apply(doc, devices)), null);
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or ObjectDisposedException)
         {
             // Finestra in chiusura o salvataggio non riuscito: la cartella è un di più, ci si riprova al giro dopo.
-            return false;
+            return new VpnFolderRefresh(false, "elenco non aggiornato: " + ex.Message);
         }
     }
 

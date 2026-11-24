@@ -10,6 +10,7 @@ public sealed partial class MainForm
 
     internal void ShowVpn()
     {
+        ResetVpnAutoReconnect();
         if (_vpn is { IsDisposed: false } open)
         {
             open.Activate();
@@ -123,6 +124,11 @@ public sealed partial class MainForm
             var profile = VpnProfile.Load();
             if (!VpnProvisioning.ShouldAutoConnect(profile))
                 return "";
+            if (VpnClientGuard.IsManagedByClient(new ScControl(), msg => AppLog.Default?.Info(msg)))
+            {
+                AppLog.Default?.Info(VpnClientGuard.SkipMessage);
+                return "";
+            }
             if (!Vpn.WireGuardNative.DllPresent)
                 return "VPN non collegata: manca wireguard.dll accanto al programma.";
             return await Task.Run(() => VpnAutoStart.Run(profile, CreateTunnel(), new ScControl(), p => p.Save()));
@@ -132,6 +138,12 @@ public sealed partial class MainForm
             AppLog.Default?.Info("Connessione automatica della VPN non riuscita: " + ex.Message);
             return "VPN non collegata: " + ex.Message;
         }
+    }
+
+    private async Task AfterVpnUpAsync()
+    {
+        await WaitForVpnHandshakeAsync();
+        await RefreshVpnFolderAsync();
     }
 
     private readonly VpnKeyWatchdog _keyWatchdog = new();
@@ -169,6 +181,11 @@ public sealed partial class MainForm
         {
             if (IsDisposed || !_sync.SignedIn || _shutdownCts.IsCancellationRequested || !VpnProvisioning.NeedsProvisioning(VpnProfile.Load()))
                 return "";
+            if (VpnClientGuard.IsManagedByClient(new ScControl(), msg => AppLog.Default?.Info(msg)))
+            {
+                AppLog.Default?.Info(VpnClientGuard.SkipMessage);
+                return "";
+            }
             var profile = await VpnProvisioning.EnsureAsync(_sync, ct: _shutdownCts.Token);
             if (profile is null)
                 return "";
@@ -177,6 +194,8 @@ public sealed partial class MainForm
                 return "VPN configurata. Manca wireguard.dll accanto al programma: la VPN non si può accendere.";
             var config = profile.ToConfig();
             await Task.Run(() => CreateTunnel().Accendi(config));
+            // Registrata e accesa: la cartella si rifà subito, senza aspettare il giro dei 5 minuti.
+            _ = AfterVpnUpAsync();
             return "VPN configurata e accesa (indirizzo " + profile.Address + ").";
         }
         catch (SyncServerException ex) when (ex.Code == "vpn_disabled")
