@@ -88,6 +88,19 @@ public class VpnTests
     }
 
     [Fact]
+    public async Task Il_profilo_porta_l_endpoint_LAN_solo_se_configurato()
+    {
+        await using var without = Server(new FakeWireGuard());
+        var j0 = await Json(await Request(without, await UserAsync(without, "mario"), "Ufficio", NewKey()));
+        Assert.Equal("", j0.GetProperty("lanEndpoint").GetString());
+
+        await using var with = Server(new FakeWireGuard(), o => o.VpnLanEndpoint = "192.168.1.117:51820");
+        var j1 = await Json(await Request(with, await UserAsync(with, "mario"), "Ufficio", NewKey()));
+        Assert.Equal("192.168.1.117:51820", j1.GetProperty("lanEndpoint").GetString());
+        Assert.Equal("vpn.example.com:51820", j1.GetProperty("endpoint").GetString()); // il nome pubblico resta
+    }
+
+    [Fact]
     public async Task Gli_indirizzi_sono_progressivi_e_saltano_quelli_riservati()
     {
         var wg = new FakeWireGuard { Reserved = ["10.66.0.3"] };

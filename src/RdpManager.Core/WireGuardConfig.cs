@@ -26,6 +26,12 @@ public sealed record WireGuardConfig
     /// <summary>Chiave pubblica del server.</summary>
     public string PeerPublicKey { get; init; } = "";
     public string Endpoint { get; init; } = VpnDefaults.DefaultEndpoint;
+    /// <summary>
+    /// Endpoint del server dentro la sua LAN (IP:porta), facoltativo. Il router di casa di solito non rimanda in dentro il
+    /// traffico UDP verso il proprio IP pubblico (niente hairpin NAT): un PC nella LAN del server col solo nome pubblico non
+    /// fa mai l'handshake. Vedi <see cref="VpnEndpointChoice"/>.
+    /// </summary>
+    public string LanEndpoint { get; init; } = "";
     public string AllowedIPs { get; init; } = VpnDefaults.Network;
     public int PersistentKeepalive { get; init; } = VpnDefaults.Keepalive;
 
@@ -44,6 +50,8 @@ public sealed record WireGuardConfig
             errors.Add("La chiave pubblica del server non è valida (32 byte in base64).");
         if (!TryParseEndpoint(Endpoint, out _, out _))
             errors.Add("L'endpoint deve essere nome-o-IP:porta, per esempio vpn.example.com:51820.");
+        if (LanEndpoint.Length > 0 && !TryParseEndpoint(LanEndpoint, out _, out _))
+            errors.Add("LanEndpoint deve essere nome-o-IP:porta, per esempio 192.168.1.10:51820.");
         var allowed = AllowedIPs.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
         if (allowed.Length == 0 || !allowed.All(a => TryParseCidr(a, out _, out _)))
             errors.Add("AllowedIPs deve contenere reti IPv4 con prefisso (per esempio 10.66.0.0/24).");
@@ -66,6 +74,8 @@ public sealed record WireGuardConfig
         sb.Append("\r\n[Peer]\r\n");
         sb.Append("PublicKey = ").Append(PeerPublicKey).Append("\r\n");
         sb.Append("Endpoint = ").Append(Endpoint).Append("\r\n");
+        if (LanEndpoint.Length > 0)
+            sb.Append("LanEndpoint = ").Append(LanEndpoint).Append("\r\n");
         sb.Append("AllowedIPs = ").Append(AllowedIPs).Append("\r\n");
         sb.Append("PersistentKeepalive = ").Append(PersistentKeepalive.ToString(CultureInfo.InvariantCulture)).Append("\r\n");
         return sb.ToString();
@@ -110,6 +120,7 @@ public sealed record WireGuardConfig
                 ("interface", "dns") => cfg with { Dns = value },
                 ("peer", "publickey") => cfg with { PeerPublicKey = value },
                 ("peer", "endpoint") => cfg with { Endpoint = value },
+                ("peer", "lanendpoint") => cfg with { LanEndpoint = value },
                 ("peer", "allowedips") => cfg with { AllowedIPs = value },
                 ("peer", "persistentkeepalive") when int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var ka)
                     => cfg with { PersistentKeepalive = ka },

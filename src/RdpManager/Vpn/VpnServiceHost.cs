@@ -88,11 +88,27 @@ internal static class VpnServiceHost
             SetStatus(StartPending, 0, 20000);
             VpnInbox.Collect(_programData, _tunnelName, VpnFiles.RestrictToAdministrators); // configurazione lasciata dall'utente senza UAC
             var conf = WireGuardConfig.Parse(File.ReadAllText(VpnPaths.Conf(_programData, _tunnelName)));
-            runner.Start(conf, _tunnelName);
+            // Con un endpoint LAN nel profilo: nella LAN del server si parte da quello (niente hairpin NAT sul router); se non
+            // arriva l'handshake si prova l'altro endpoint e si tiene quello che risponde.
+            bool hasAlternative = conf.LanEndpoint.Length > 0;
+            bool useLan = hasAlternative && VpnEndpointChoice.OnServerLan(conf.LanEndpoint, VpnEndpointChoice.LocalAddresses());
+            runner.Start(VpnEndpointChoice.Apply(conf, useLan), _tunnelName);
+            var started = DateTime.UtcNow;
+            bool answered = false;
             SetStatus(Running, 0, 0);
             do
             {
-                WriteStatus(runner.ReadStatus());
+                var status = runner.ReadStatus();
+                answered |= status?.LastHandshakeUtc is not null;
+                if (hasAlternative && !answered && DateTime.UtcNow - started > VpnEndpointChoice.SwitchTimeout)
+                {
+                    useLan = !useLan;
+                    runner.Stop();
+                    runner.Start(VpnEndpointChoice.Apply(conf, useLan), _tunnelName);
+                    started = DateTime.UtcNow;
+                    status = runner.ReadStatus();
+                }
+                WriteStatus(status is null ? null : status with { StartedUtc = started });
             }
             while (!StopEvent.WaitOne(2000));
         }

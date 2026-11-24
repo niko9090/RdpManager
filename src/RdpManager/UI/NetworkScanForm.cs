@@ -62,7 +62,7 @@ internal sealed class NetworkScanForm : TouchForm
             "(es. 192.168.1.0/24 oppure 192.168.1.10-192.168.1.50). La ricerca parte solo quando premi «Avvia ricerca»: " +
             "usala solo su reti tue o che hai il permesso di controllare (nelle reti aziendali chiedi prima all'amministratore).",
             "Nessuna rete locale attiva trovata: scrivi un intervallo a mano.");
-        Overview = NetworkOverview.Build(adapters, SafeInactive());
+        Overview = NetworkOverview.Build(adapters, SafeInactive(), ServerUnreachable());
         // Nella scheda VPN la VPN nostra viene per prima, così è la rete proposta quando è collegata.
         VpnTab = new ScanTab(this, "VPN",adapters.Where(a => a.IsVpn).OrderBy(a => a.Kind == NetworkKind.WireGuard ? 0 : 1).ToList(),
             "Reti VPN attive su questo PC: marshmelloVPN per prima, poi le altre (ZeroTier, OpenVPN, Tailscale…). Si cerca nella " +
@@ -128,6 +128,20 @@ internal sealed class NetworkScanForm : TouchForm
         panel.Controls.Add(CardsList);
         panel.Controls.Add(VpnStatusLabel);
         return panel;
+    }
+
+    /// <summary>Il servizio VPN gira ma non ha mai fatto l'handshake col server: la scheda è accesa, la VPN no.</summary>
+    private bool ServerUnreachable()
+    {
+        try
+        {
+            return MainForm.CreateTunnel().Dettagli is { } d
+                && d.ServerUnreachable(DateTime.UtcNow, TimeSpan.FromSeconds(30), TimeSpan.FromMinutes(5));
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 
     private IReadOnlyList<AdapterCard> SafeInactive()

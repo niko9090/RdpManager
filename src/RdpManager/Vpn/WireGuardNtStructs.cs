@@ -11,12 +11,23 @@ public sealed record VpnStatus(DateTime? LastHandshakeUtc, ulong TxBytes, ulong 
 {
     private const long MaxFileTime = 2650467743999999999L; // limite di DateTime.FromFileTimeUtc
 
+    /// <summary>Quando il servizio ha acceso questo tunnel (facoltativo: manca nei file scritti da versioni vecchie).</summary>
+    public DateTime? StartedUtc { get; init; }
+
+    /// <summary>
+    /// Tunnel acceso ma il server non ha mai risposto: nessun handshake da più di <paramref name="grace"/> dall'accensione,
+    /// oppure l'ultimo è più vecchio di <paramref name="staleAfter"/>. In questo caso il desktop remoto non può funzionare.
+    /// </summary>
+    public bool ServerUnreachable(DateTime nowUtc, TimeSpan grace, TimeSpan staleAfter)
+        => LastHandshakeUtc is { } hs ? nowUtc - hs > staleAfter : StartedUtc is { } s && nowUtc - s > grace;
+
     /// <summary>Formato del file di stato scritto dal servizio (righe chiave=valore).</summary>
     public string Format() => string.Join("\n",
         "handshake=" + (LastHandshakeUtc?.ToFileTimeUtc() ?? 0),
         "tx=" + TxBytes,
         "rx=" + RxBytes,
-        "aggiornato=" + UpdatedUtc.ToFileTimeUtc()) + "\n";
+        "aggiornato=" + UpdatedUtc.ToFileTimeUtc(),
+        StartedUtc is { } s ? "avviato=" + s.ToFileTimeUtc() : "") .Trim('\n') + "\n";
 
     /// <summary>Legge il file di stato; null se è incompleto o rovinato.</summary>
     public static VpnStatus? Parse(string? text)
@@ -35,7 +46,10 @@ public sealed record VpnStatus(DateTime? LastHandshakeUtc, ulong TxBytes, ulong 
             || !values.TryGetValue("rx", out var rx) || !values.TryGetValue("aggiornato", out var up)
             || up is <= 0 or > MaxFileTime || hs is < 0 or > MaxFileTime)
             return null;
-        return new VpnStatus(hs == 0 ? null : DateTime.FromFileTimeUtc(hs), (ulong)tx, (ulong)rx, DateTime.FromFileTimeUtc(up));
+        return new VpnStatus(hs == 0 ? null : DateTime.FromFileTimeUtc(hs), (ulong)tx, (ulong)rx, DateTime.FromFileTimeUtc(up))
+        {
+            StartedUtc = values.TryGetValue("avviato", out var st) ? FromFileTime(st) : null,
+        };
     }
 
     internal static DateTime? FromFileTime(long ft) => ft > 0 && ft <= MaxFileTime ? DateTime.FromFileTimeUtc(ft) : null;
