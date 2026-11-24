@@ -13,6 +13,25 @@
   </PropertyGroup>
 
   <!--
+    Corsia per progetto di prova: i due progetti di test (RdpManager.Tests e RdpManager.Linux.Tests) compilano gli
+    stessi progetti (Core, Platform.Linux...). Lanciati insieme dal cancello di unione, dopo un cambio di versione
+    (che obbliga a ricompilare tutto) scrivevano lo stesso obj/Debug/net8.0/*.dll: "being used by another process".
+    Ogni progetto di prova ha quindi la sua corsia (RdpLane), passata ai progetti referenziati con
+    AdditionalProperties nei suoi ProjectReference: obj/<corsia>/ e bin/<corsia>/ per tutti. Il restore (obj/
+    project.assets.json) resta condiviso: AdditionalProperties non arriva al restore dei referenziati, e NuGet
+    serializza da solo le scritture dello stesso file. Va impostata qui, prima dell'import dell'SDK. Chi compila un progetto direttamente (publish, installer, build normale) non ha corsia e
+    usa obj/ e bin/ come sempre: i percorsi degli script di pubblicazione non cambiano.
+  -->
+  <PropertyGroup>
+    <RdpLane Condition="'$(RdpLane)' == '' And '$(MSBuildProjectName)' == 'RdpManager.Tests'">tests</RdpLane>
+    <RdpLane Condition="'$(RdpLane)' == '' And '$(MSBuildProjectName)' == 'RdpManager.Linux.Tests'">linuxtests</RdpLane>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(RdpLane)' != ''">
+    <IntermediateOutputPath>$(MSBuildProjectDirectory)\obj\$(RdpLane)\$([MSBuild]::ValueOrDefault('$(Configuration)', 'Debug'))\</IntermediateOutputPath>
+    <BaseOutputPath>$(MSBuildProjectDirectory)\bin\$(RdpLane)\</BaseOutputPath>
+  </PropertyGroup>
+
+  <!--
     Restore separato per le compilazioni con un RID esplicito (-r linux-x64).
     Perché: "dotnet build ... -r linux-x64" e "dotnet test" lanciati insieme nella stessa cartella rifanno il restore
     dello stesso progetto e scrivono lo stesso obj/project.assets.json e obj/*.nuget.*; uno dei due può fallire con
@@ -22,6 +41,9 @@
   -->
   <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
     <BaseIntermediateOutputPath>$(MSBuildProjectDirectory)\obj\rid-$(RuntimeIdentifier)\</BaseIntermediateOutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
     <MSBuildProjectExtensionsPath>$(BaseIntermediateOutputPath)</MSBuildProjectExtensionsPath>
     <!-- L'SDK esclude dai file .cs solo BaseIntermediateOutputPath: senza questo entrerebbero i .cs generati in obj\Debug. -->
     <DefaultItemExcludes>$(DefaultItemExcludes);obj\**</DefaultItemExcludes>
