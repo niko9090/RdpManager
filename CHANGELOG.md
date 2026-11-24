@@ -1,5 +1,13 @@
 # Novità di RdpManager
 
+## 1.18.1 (2026-11-24)
+
+**VPN più affidabile**
+- La finestra della rete ora scrive «VPN non collegata» se il server non ha mai risposto (prima diceva «COLLEGATA» appena l'adattatore era acceso).
+- Se il PC è nella stessa rete del Synology, la VPN prova anche l'indirizzo interno del server.
+- «Crea chiavi» ora registra la chiave nuova sul server mantenendo lo stesso indirizzo VPN; se il server rifiuta, restano le chiavi di prima.
+- Se la VPN resta senza risposta, RdpManager si registra di nuovo da solo, una volta (Windows e Linux; su Linux serve poter leggere `wg show`).
+
 ## 1.18.0 (2026-11-24)
 
 **Linux a schermo intero, cartella automatica della VPN e chiusura con la X**
