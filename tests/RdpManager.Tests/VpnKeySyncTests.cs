@@ -119,6 +119,98 @@ public class VpnKeySyncTests : IDisposable
     }
 
     [Fact]
+    public async Task La_ri_registrazione_salva_il_nome_concesso_dal_server_e_lo_rimanda()
+    {
+        var p = Registered();
+        p.PcName = "";
+        var sent = new List<string>();
+        VpnRegistrar reg = (name, key, _) =>
+        {
+            sent.Add(name);
+            return Task.FromResult(new VpnGrant("Ufficio", "10.66.0.7/32", ServerKey, "vpn.example.com:51820", VpnDefaults.Network, "", 25));
+        };
+
+        var r = await VpnKeySync.ReRegisterAsync(p, reg, default, Path_);
+
+        Assert.True(r.Ok);
+        Assert.False(r.ProfileChanged);
+        Assert.Equal("Ufficio", p.PcName);
+        Assert.Equal("Ufficio", VpnProfile.Load(Path_).PcName);
+        await VpnKeySync.ReRegisterAsync(p, reg, default, Path_);
+        Assert.Equal("Ufficio", sent[1]); // la seconda volta si manda il nome che il server conosce
+    }
+
+    [Fact]
+    public async Task Se_il_server_risponde_con_un_altro_indirizzo_il_profilo_si_aggiorna_e_il_tunnel_va_riavviato()
+    {
+        var p = Registered();
+        VpnRegistrar reg = (name, key, _) =>
+            Task.FromResult(new VpnGrant(name, "10.66.0.9/32", ServerKey, "vpn.example.com:51820", VpnDefaults.Network, "", 25));
+
+        var r = await VpnKeySync.ReRegisterAsync(p, reg, default, Path_);
+
+        Assert.True(r.Ok);
+        Assert.True(r.ProfileChanged);
+        Assert.Equal("10.66.0.9/32", p.Address);
+        Assert.Equal("10.66.0.9/32", VpnProfile.Load(Path_).Address);
+    }
+
+    [Fact]
+    public void L_indirizzo_dei_profili_manuali_e_stabile_e_dipende_dal_nome()
+    {
+        var a = WireGuardConfig.AddressFromName("Ufficio");
+        Assert.Equal(a, WireGuardConfig.AddressFromName("ufficio "));
+        var all = new[] { "Ufficio", "Casa", "PC-1", "PC-2", "Magazzino", "Cassa" }.Select(n => WireGuardConfig.AddressFromName(n)).Distinct().ToList();
+        Assert.True(all.Count > 1);
+        Assert.All(all, x => Assert.True(WireGuardConfig.TryParseCidr(x, out var ip, out _) && ip.StartsWith("10.66.0.")));
+        Assert.NotEqual(a, WireGuardConfig.AddressFromName("Ufficio", [a!]));
+    }
+
+    [Fact]
+    public void Crea_chiavi_con_la_VPN_accesa_riavvia_il_tunnel_con_il_profilo_nuovo()
+    {
+        var p = Registered();
+        var oldPub = p.PublicKey;
+        var server = new FakeServer();
+        var tunnel = new RecordingTunnel { Stato = TunnelState.Acceso };
+        StaTestRunner.Run(() =>
+        {
+            using var form = new VpnForm(tunnel, Path_)
+            {
+                Registrar = () => server.Register,
+                ConfirmOverride = _ => true,
+                NotifyOverride = _ => { },
+            };
+            form.GenerateKeysAsync().GetAwaiter().GetResult();
+        });
+        Assert.Equal(["spegni", "accendi"], tunnel.Log);
+        Assert.NotEqual(oldPub, WireGuardKeys.PublicKeyFromPrivate(tunnel.LastConfig!.PrivateKey));
+        Assert.Equal(VpnProfile.Load(Path_).PublicKey, WireGuardKeys.PublicKeyFromPrivate(tunnel.LastConfig.PrivateKey));
+    }
+
+    [Fact]
+    public void Crea_chiavi_con_la_VPN_spenta_non_accende_niente()
+    {
+        Registered();
+        var tunnel = new RecordingTunnel { Stato = TunnelState.Spento };
+        StaTestRunner.Run(() =>
+        {
+            using var form = new VpnForm(tunnel, Path_) { Registrar = () => new FakeServer().Register, ConfirmOverride = _ => true, NotifyOverride = _ => { } };
+            form.GenerateKeysAsync().GetAwaiter().GetResult();
+        });
+        Assert.Empty(tunnel.Log);
+    }
+
+    private sealed class RecordingTunnel : IWireGuardTunnel
+    {
+        public TunnelState Stato { get; set; }
+        public List<string> Log { get; } = [];
+        public WireGuardConfig? LastConfig { get; private set; }
+        public void Accendi(WireGuardConfig config) { Log.Add("accendi"); LastConfig = config; }
+        public void Spegni() => Log.Add("spegni");
+    }
+
+    [Fact]
     public void Il_controllo_automatico_tenta_una_sola_volta_e_solo_senza_handshake()
     {
         var w = new VpnKeyWatchdog();

@@ -142,6 +142,7 @@ In RdpManager l'indirizzo del server va scritto (nessun valore predefinito); con
 | `RDPM_VPN_SERVER_PUBLIC_KEY` | letta da `server.pub` accanto a `wg0.conf` | chiave pubblica del server WireGuard |
 | `RDPM_VPN_ENDPOINT` | vuota (nessun default) | endpoint scritto nei profili |
 | `RDPM_VPN_DNS` | vuota | DNS scritto nei profili |
+| `RDPM_VPN_LAN_ENDPOINT` | vuota | endpoint del server dentro la LAN (es. `192.168.1.10:51820`), scritto nei profili: i PC in LAN lo usano al posto di quello pubblico (niente hairpin NAT). `docker-compose.yml` lo passa al contenitore; vuota = nessun endpoint LAN |
 | `RDPM_VPN_INTERFACE`, `RDPM_VPN_WG` | `wg0`, `wg` | interfaccia e comando `wg` |
 | `RDPM_VPN_MAX_DEVICES` | `20` | PC per account |
 | `RDPM_SYNC_MAX_FILE_MB` | `100` | dimensione massima di un file scambiato fra i PC (1–2048) |
