@@ -967,9 +967,12 @@ Per chi gestisce il server: `pwsh server/crea-config-client.ps1` legge `config/l
   monitor; viene ricordato e all'avvio la finestra si apre lì. Se il monitor non è più collegato si
   usa il principale. *Sposta la finestra sul monitor successivo* cambia monitor anche a schermo
   intero.
-- **Tutti i monitor**: una connessione con *Usa tutti i monitor* a schermo intero si estende su
-  tutti i monitor come un unico desktop remoto; con *Apri con mstsc* usa la modalità multimonitor di
-  Windows (`use multimon`).
+- **Schermi della connessione** (dalla 1.19): nella modifica della connessione la sezione *Schermi*
+  offre tre scelte: *un solo schermo*, *tutti gli schermi* o *scegli quali* (con l'elenco degli
+  schermi collegati; gli scelti si ritrovano per nome). A schermo intero la sessione si estende
+  sugli schermi scelti come un unico desktop remoto; con *Apri con mstsc* usa la modalità
+  multimonitor di Windows (`use multimon`); su Linux FreeRDP riceve `/monitors`. Le connessioni con
+  il vecchio *Usa tutti i monitor* passano da sole a *tutti gli schermi*.
 - **Dimensione e DPI**: con «Adatta alla finestra» il desktop remoto segue la dimensione della scheda
   e la scala del monitor (100 %, 125 %, 150 %…), anche spostando la finestra su un monitor diverso,
   senza riconnettere, se il PC remoto lo permette (Windows 8.1/Server 2012 R2 e successivi);

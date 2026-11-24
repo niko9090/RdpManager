@@ -1,5 +1,14 @@
 # Novità di RdpManager
 
+## 1.19.0 (2026-11-24)
+
+**Più schermi per ogni connessione**
+- Nuova sezione «Schermi» in ogni connessione, con tre scelte: un solo schermo, tutti gli schermi, oppure scegli quali. C'è anche l'elenco degli schermi collegati (Windows e Linux).
+- Le connessioni che avevano «Usa tutti i monitor» passano da sole a «tutti gli schermi».
+- Windows: la sessione incorporata a schermo intero usa davvero più schermi.
+- Linux: FreeRDP riceve `/monitors`.
+- Gli schermi scelti si ritrovano per nome, anche se cambia l'ordine di collegamento.
+
 ## 1.18.1 (2026-11-24)
 
 **VPN più affidabile**
