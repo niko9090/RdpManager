@@ -92,6 +92,8 @@ public sealed partial class MainWindowViewModel
                 }
             });
         _vpnAuto = new LinuxVpnAutoConnector(VpnFactory(), () => VpnProfile.Load(VpnProfilePath));
+        _vpnRecovery = new LinuxVpnKeyRecovery(VpnFactory(), () => VpnProfile.Load(VpnProfilePath),
+            () => SyncService.SignedIn, (name, key, ct) => SyncService.RequestVpnAsync(name, key, ct));
         _ = AutoConnectVpnAsync();
         _vpnWatch = new Timer(_ => _ = AutoConnectVpnAsync(), null, TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60));
         _syncPoll = new Timer(_ => _ = RunSyncAsync(manual: false), null, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
@@ -125,6 +127,7 @@ public sealed partial class MainWindowViewModel
     }
 
     private LinuxVpnAutoConnector? _vpnAuto;
+    private LinuxVpnKeyRecovery? _vpnRecovery;
     private Timer? _vpnWatch;
     private int _vpnAutoRunning;
 
@@ -137,6 +140,8 @@ public sealed partial class MainWindowViewModel
         {
             if (await auto.TickAsync(_shutdown.Token) is { Length: > 0 } line)
                 Notice(line);
+            if (_vpnRecovery is { } recovery && await recovery.TickAsync(_shutdown.Token) is { Length: > 0 } recovered)
+                AppLog.Default?.Info(recovered);
         }
         catch (OperationCanceledException)
         {
