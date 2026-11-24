@@ -212,7 +212,9 @@ public sealed class VpnForm : TouchForm
         var s = _tunnel.Stato;
         _status.Text = s switch
         {
-            TunnelState.Acceso => "Acceso" + Details(_tunnel.Dettagli),
+            TunnelState.Acceso => _tunnel.Dettagli is { } d && d.ServerUnreachable(DateTime.UtcNow, TimeSpan.FromSeconds(30), TimeSpan.FromMinutes(5))
+                ? "NON COLLEGATA: la scheda è accesa ma il server non risponde, il desktop remoto non funziona" + Details(d)
+                : "Acceso" + Details(_tunnel.Dettagli),
             TunnelState.InAvvio => "In avvio…",
             TunnelState.InArresto => "In arresto…",
             TunnelState.Errore => "Errore",

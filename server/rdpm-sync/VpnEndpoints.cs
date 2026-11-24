@@ -8,7 +8,7 @@ public sealed record VpnDeviceView(long Id, string Name, string Address, string 
     DateTimeOffset CreatedUtc);
 
 public sealed record VpnOverview(bool Enabled, string Network, string Endpoint, string Dns,
-    IReadOnlyList<VpnDeviceView> Devices);
+    IReadOnlyList<VpnDeviceView> Devices, string LanEndpoint = "");
 
 /// <summary>
 /// Dispositivi VPN dell'account: un utente autenticato registra un suo PC (nome + chiave pubblica generata sul PC, la
@@ -56,6 +56,7 @@ public sealed partial class VpnEndpoints(SyncOptions options, Store store, IWire
         address = d.Address + "/32",
         serverPublicKey,
         endpoint = options.VpnEndpoint,
+        lanEndpoint = options.VpnLanEndpoint,
         allowedIPs = Network,
         dns = options.VpnDns,
         persistentKeepalive = Keepalive,
@@ -224,7 +225,7 @@ public sealed partial class VpnEndpoints(SyncOptions options, Store store, IWire
             var last = hs ?? x.Device.LastSeenUtc;
             return new VpnDeviceView(x.Device.Id, x.Device.Name, x.Device.Address, x.Owner, hs is not null, last, x.Device.CreatedUtc);
         }).ToList();
-        return new VpnOverview(Enabled, Network, options.VpnEndpoint, options.VpnDns, devices);
+        return new VpnOverview(Enabled, Network, options.VpnEndpoint, options.VpnDns, devices, options.VpnLanEndpoint);
     }
 
     /// <summary>Revoca un dispositivo qualunque (azione da amministratore). False se non esiste.</summary>

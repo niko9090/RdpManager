@@ -4,7 +4,8 @@ namespace RdpManager.Core;
 
 /// <summary>Risposta del server a <c>POST /v1/vpn/devices</c>: tutto ciò che serve per il profilo (la chiave privata resta sul PC).</summary>
 public sealed record VpnGrant(
-    string Name, string Address, string ServerPublicKey, string Endpoint, string AllowedIPs, string Dns, int PersistentKeepalive)
+    string Name, string Address, string ServerPublicKey, string Endpoint, string AllowedIPs, string Dns, int PersistentKeepalive,
+    string LanEndpoint = "")
 {
     public static VpnGrant Parse(JsonElement json)
     {
@@ -12,7 +13,8 @@ public sealed record VpnGrant(
         var grant = new VpnGrant(
             Str("name"), Str("address"), Str("serverPublicKey"), Str("endpoint"),
             Str("allowedIPs") is { Length: > 0 } a ? a : VpnDefaults.Network, Str("dns"),
-            json.TryGetProperty("persistentKeepalive", out var k) && k.ValueKind == JsonValueKind.Number ? k.GetInt32() : VpnDefaults.Keepalive);
+            json.TryGetProperty("persistentKeepalive", out var k) && k.ValueKind == JsonValueKind.Number ? k.GetInt32() : VpnDefaults.Keepalive,
+            WireGuardConfig.TryParseEndpoint(Str("lanEndpoint"), out _, out _) ? Str("lanEndpoint") : "");
         if (!WireGuardKeys.IsValidKey(grant.ServerPublicKey)
             || !WireGuardConfig.TryParseCidr(grant.Address, out _, out _)
             || grant.Endpoint.Length == 0)
@@ -47,12 +49,36 @@ public static class VpnProvisioning
     {
         profile.Address = grant.Address;
         profile.Endpoint = grant.Endpoint;
+        profile.LanEndpoint = grant.LanEndpoint;
+        profile.LanEndpointAsked = true;
         profile.ServerPublicKey = grant.ServerPublicKey;
         profile.Dns = grant.Dns;
         profile.AllowedIPs = grant.AllowedIPs;
         profile.PersistentKeepalive = grant.PersistentKeepalive;
         if (grant.Name.Length > 0)
             profile.PcName = grant.Name;
+    }
+
+    /// <summary>
+    /// Profili nati prima dell'endpoint LAN: una volta sola si richiede al server (stessa chiave, stesso indirizzo) e, se lo
+    /// pubblica, si salva. Errori di rete: si riprova al prossimo avvio. L'indirizzo e le chiavi non cambiano.
+    /// </summary>
+    private static async Task RefreshLanEndpointAsync(SyncService sync, VpnProfile profile, string? profilePath, CancellationToken ct)
+    {
+        if (profile.LanEndpointAsked || !sync.SignedIn)
+            return;
+        try
+        {
+            var grant = await sync.RequestVpnAsync(profile.PcName.Length > 0 ? profile.PcName : SafeName(Environment.MachineName), profile.PublicKey!, ct);
+            if (grant.Address != profile.Address || grant.ServerPublicKey != profile.ServerPublicKey)
+                return; // il server ha cambiato qualcosa d'altro: non si tocca un profilo che funziona
+            profile.LanEndpoint = grant.LanEndpoint;
+            profile.LanEndpointAsked = true;
+            profile.Save(profilePath);
+        }
+        catch (Exception ex) when (ex is SyncServerException or SyncUnreachableException or FormatException or IOException)
+        {
+        }
     }
 
     /// <summary>
@@ -64,7 +90,10 @@ public static class VpnProvisioning
     {
         var profile = VpnProfile.Load(profilePath);
         if (!NeedsProvisioning(profile))
+        {
+            await RefreshLanEndpointAsync(sync, profile, profilePath, ct);
             return profile;
+        }
         if (!sync.SignedIn)
             return null;
         if (!profile.HasKey || profile.PublicKey is null)

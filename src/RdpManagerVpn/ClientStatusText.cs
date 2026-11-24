@@ -13,7 +13,9 @@ public static class ClientStatusText
         {
             TunnelState.Acceso => details?.LastHandshakeUtc is { } hs
                 ? (nowUtc - hs < ServicePolicy.HandshakeTimeout ? "Connesso" : "Server non raggiungibile")
-                : "Connessione in corso…",
+                : details is not null && details.ServerUnreachable(nowUtc, ServicePolicy.NoContactGrace, ServicePolicy.HandshakeTimeout)
+                    ? "Non collegato: il server non risponde"
+                    : "Connessione in corso…",
             TunnelState.InAvvio => "Connessione in corso…",
             TunnelState.InArresto => "Disconnessione in corso…",
             TunnelState.Errore => "Errore del servizio",

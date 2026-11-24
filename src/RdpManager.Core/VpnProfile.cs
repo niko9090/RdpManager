@@ -11,6 +11,10 @@ public sealed class VpnProfile
     public string PrivateKeyProtected { get; set; } = "";
     public string Address { get; set; } = "";
     public string Endpoint { get; set; } = VpnDefaults.DefaultEndpoint;
+    /// <summary>Endpoint del server nella sua LAN (IP:porta), se il server lo pubblica; vuoto nei vpn.json vecchi.</summary>
+    public string LanEndpoint { get; set; } = "";
+    /// <summary>Segno: si è già chiesto al server l'endpoint LAN (profili nati prima che esistesse), per non richiederlo a ogni avvio.</summary>
+    public bool LanEndpointAsked { get; set; }
     public string ServerPublicKey { get; set; } = "";
     public string Dns { get; set; } = "";
     public string AllowedIPs { get; set; } = VpnDefaults.Network;
@@ -53,6 +57,7 @@ public sealed class VpnProfile
             Dns = Dns,
             PeerPublicKey = ServerPublicKey,
             Endpoint = Endpoint,
+            LanEndpoint = LanEndpoint,
             AllowedIPs = AllowedIPs.Length > 0 ? AllowedIPs : VpnDefaults.Network,
             PersistentKeepalive = PersistentKeepalive,
         };

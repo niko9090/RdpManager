@@ -164,19 +164,23 @@ public sealed class NetworkOverview
 {
     public const string VpnLabel = "marshmelloVPN";
 
-    private NetworkOverview(IReadOnlyList<AdapterCard> cards, AdapterInfo? suggested)
+    private NetworkOverview(IReadOnlyList<AdapterCard> cards, AdapterInfo? suggested, bool serverUnreachable)
     {
         Cards = cards;
         Suggested = suggested;
+        ServerUnreachable = serverUnreachable;
         Vpn = cards.FirstOrDefault(c => c.IsOurVpn && c.Connected) ?? cards.FirstOrDefault(c => c.IsOurVpn);
     }
+
+    /// <summary>La scheda c'è ed è accesa ma il server non risponde (nessun handshake): la VPN non è davvero collegata.</summary>
+    public bool ServerUnreachable { get; }
 
     public IReadOnlyList<AdapterCard> Cards { get; }
 
     /// <summary>La scheda della VPN nostra (collegata se c'è, altrimenti una non collegata); null se non esiste nessuna.</summary>
     public AdapterCard? Vpn { get; }
 
-    public bool VpnConnected => Vpn is { Connected: true };
+    public bool VpnConnected => Vpn is { Connected: true } && !ServerUnreachable;
 
     /// <summary>La scheda collegata della VPN, da proporre per la scansione (null se la VPN non è collegata).</summary>
     public AdapterInfo? Suggested { get; }
@@ -184,12 +188,14 @@ public sealed class NetworkOverview
     /// <summary>Frase di stato ben visibile: collegata con IP e rete, oppure non collegata.</summary>
     public string Headline => Vpn switch
     {
+        { Connected: true } v when ServerUnreachable => $"{VpnLabel} NON COLLEGATA - la scheda «{v.Name}» è accesa ma il server non risponde (nessun contatto): il desktop remoto verso i PC della VPN non funziona.",
         { Connected: true } v => $"{VpnLabel} COLLEGATA - il tuo IP in marshmelloVPN è {v.AddressText}, rete {v.NetworkText} (scheda «{v.Name}»).",
         { } v => $"{VpnLabel} NON COLLEGATA - la scheda «{v.Name}» c'è ma è spenta: collega marshmelloVPN per cercare i PC nella sua rete.",
         null => $"{VpnLabel} NON COLLEGATA - su questo PC non si vede nessuna scheda di marshmelloVPN: collega marshmelloVPN (o configurala) per cercare i PC nella sua rete.",
     };
 
-    public static NetworkOverview Build(IReadOnlyList<AdapterInfo> active, IReadOnlyList<AdapterCard>? inactive = null)
+    public static NetworkOverview Build(IReadOnlyList<AdapterInfo> active, IReadOnlyList<AdapterCard>? inactive = null,
+        bool serverUnreachable = false)
     {
         var all = active.Select(AdapterCard.From)
             .Concat((inactive ?? []).Where(c => !active.Any(a => a.Name == c.Name)))
@@ -203,7 +209,7 @@ public sealed class NetworkOverview
             .Select(x => x.c)
             .ToList();
         var suggested = active.FirstOrDefault(a => a.Kind == NetworkKind.WireGuard);
-        return new NetworkOverview(ordered, suggested);
+        return new NetworkOverview(ordered, suggested, serverUnreachable);
     }
 
     /// <summary>Come <see cref="Build"/>, leggendo anche le schede VPN spente dal sistema.</summary>

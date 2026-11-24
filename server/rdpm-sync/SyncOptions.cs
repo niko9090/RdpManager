@@ -41,6 +41,11 @@ public sealed class SyncOptions
     /// <summary>Endpoint pubblico del server WireGuard (nome:porta) scritto nei profili; senza, la VPN automatica resta spenta.</summary>
     public string VpnEndpoint { get; set; } = "";
     public string VpnDns { get; set; } = "";
+    /// <summary>
+    /// Endpoint del server nella sua LAN (IP:porta, per esempio 192.168.1.117:51820), facoltativo: i PC nella stessa LAN lo usano
+    /// al posto del nome pubblico, perché il router non fa l'hairpin NAT in UDP. Vuoto = nessun endpoint LAN nei profili.
+    /// </summary>
+    public string VpnLanEndpoint { get; set; } = "";
     public int MaxDevicesPerAccount { get; set; } = 20;
 
     /// <summary>Nomi utente (separati da virgola) che nella pagina web /vpn possono revocare i dispositivi. Vuoto = nessuno.</summary>
@@ -82,6 +87,7 @@ public sealed class SyncOptions
         o.VpnServerPublicKey = V("RDPM_VPN_SERVER_PUBLIC_KEY") ?? "";
         o.VpnEndpoint = V("RDPM_VPN_ENDPOINT") ?? o.VpnEndpoint;
         o.VpnDns = V("RDPM_VPN_DNS") ?? "";
+        o.VpnLanEndpoint = V("RDPM_VPN_LAN_ENDPOINT") ?? "";
         o.WebAdmins = V("RDPM_SYNC_WEB_ADMINS") ?? "";
         if (int.TryParse(V("RDPM_VPN_MAX_DEVICES"), out var md) && md is > 0 and <= 250)
             o.MaxDevicesPerAccount = md;
