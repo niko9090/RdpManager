@@ -182,7 +182,9 @@ public static class VpnFolder
         to.RedirectPrinters = from.RedirectPrinters;
         to.RedirectMicrophone = from.RedirectMicrophone;
         to.AudioMode = from.AudioMode;
-        to.UseAllMonitors = from.UseAllMonitors;
+        to.MonitorMode = from.MonitorMode;
+        to.SelectedMonitors = from.SelectedMonitors;
+        to.SelectedMonitorDevices = from.SelectedMonitorDevices;
         to.AutoReconnect = from.AutoReconnect;
         to.AutoReconnectMaxAttempts = from.AutoReconnectMaxAttempts;
         to.Quality = from.Quality;

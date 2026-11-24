@@ -21,6 +21,17 @@ public enum AudioMode
     None = 2,
 }
 
+/// <summary>Quali schermi locali usa la sessione remota.</summary>
+public enum MonitorMode
+{
+    /// <summary>Uno solo (di serie).</summary>
+    Single = 0,
+    /// <summary>Tutti gli schermi ("use multimon:i:1").</summary>
+    All = 1,
+    /// <summary>Solo quelli in <see cref="RdpConnection.SelectedMonitors"/> ("selectedmonitors:s:0,1").</summary>
+    Selected = 2,
+}
+
 /// <summary>Credenziali per il Remote Desktop Gateway.</summary>
 public enum GatewayCredentialsSource
 {
@@ -65,8 +76,41 @@ public sealed class RdpConnection
     public bool RedirectPrinters { get; set; }
     public bool RedirectMicrophone { get; set; }
 
-    /// <summary>La sessione usa tutti i monitor locali (come "use multimon" di mstsc).</summary>
-    public bool UseAllMonitors { get; set; }
+    /// <summary>Quali schermi locali usa la sessione (dalla 1.19). Di serie uno solo.</summary>
+    public MonitorMode MonitorMode { get; set; } = MonitorMode.Single;
+
+    /// <summary>
+    /// Schermi scelti, usati solo con <see cref="MonitorMode.Selected"/>: indici come in "selectedmonitors" di mstsc
+    /// (ordine di mstsc/EnumDisplayMonitors, 0 = primo). Si assegna una copia; non modificare l'array restituito.
+    /// </summary>
+    public int[] SelectedMonitors
+    {
+        get => _selectedMonitors;
+        set => _selectedMonitors = value is null ? [] : value.Where(i => i >= 0).Distinct().Order().ToArray();
+    }
+    private int[] _selectedMonitors = [];
+
+    /// <summary>
+    /// Nomi di dispositivo (es. "\\.\DISPLAY2") degli schermi scelti, parallelo a <see cref="SelectedMonitors"/> quando
+    /// presente: serve a ritrovare lo schermo se gli indici cambiano. Facoltativo; vuoto = solo indici.
+    /// </summary>
+    public string[] SelectedMonitorDevices { get; set; } = [];
+
+    /// <summary>
+    /// Compatibilità con le versioni prima della 1.19 ("use multimon" di mstsc): vero = <see cref="MonitorMode.All"/>.
+    /// Impostare true passa a "tutti"; impostare false toglie solo "tutti" (gli schermi scelti restano scelti).
+    /// </summary>
+    public bool UseAllMonitors
+    {
+        get => MonitorMode == MonitorMode.All;
+        set
+        {
+            if (value)
+                MonitorMode = MonitorMode.All;
+            else if (MonitorMode == MonitorMode.All)
+                MonitorMode = MonitorMode.Single;
+        }
+    }
 
     /// <summary>Riconnessione automatica dopo una disconnessione non voluta, al massimo <see cref="AutoReconnectMaxAttempts"/> volte.</summary>
     public bool AutoReconnect { get; set; }
@@ -150,7 +194,13 @@ public sealed class RdpConnection
         return mine.Equals(theirs, StringComparison.OrdinalIgnoreCase);
     }
 
-    public RdpConnection Clone() => (RdpConnection)MemberwiseClone();
+    public RdpConnection Clone()
+    {
+        var copy = (RdpConnection)MemberwiseClone();
+        copy._selectedMonitors = (int[])_selectedMonitors.Clone();
+        copy.SelectedMonitorDevices = (string[])SelectedMonitorDevices.Clone();
+        return copy;
+    }
 
     /// <summary>Copia con nuovo Id e nome "(copia)", per il comando Duplica.</summary>
     public RdpConnection Duplicate()
