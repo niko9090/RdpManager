@@ -7,6 +7,9 @@ namespace RdpmSync;
 /// <summary>Un PC della VPN: chiave pubblica, indirizzo (10.66.0.N/32) e un'etichetta per il commento in wg0.conf.</summary>
 public sealed record WgPeer(string PublicKey, string Address, string Label);
 
+/// <summary>Un peer messo a mano in wg0.conf fuori dal blocco gestito: nome dal commento «# PC:» (altrimenti l'IP).</summary>
+public sealed record WgManualPeer(string PublicKey, string Address, string Name);
+
 /// <summary>
 /// Come il server comanda WireGuard. Interfaccia astratta: i test usano una copia finta, in produzione
 /// <see cref="WgCliPeers"/> riscrive wg0.conf e applica le modifiche al tunnel in esecuzione con <c>wg set</c> (senza riavvio).
@@ -15,6 +18,9 @@ public interface IWireGuardPeers
 {
     /// <summary>Indirizzi (es. «10.66.0.5») già in uso fuori dal controllo del server (peer aggiunti a mano).</summary>
     IReadOnlyCollection<string> ReservedAddresses();
+
+    /// <summary>Peer aggiunti a mano fuori dal blocco gestito (con chiave, per leggerne l'handshake).</summary>
+    IReadOnlyList<WgManualPeer> ManualPeers() => [];
 
     /// <summary>Porta il tunnel (e il file di configurazione) esattamente allo stato <paramref name="desired"/>.</summary>
     Task ApplyAsync(IReadOnlyCollection<WgPeer> desired, CancellationToken ct = default);
@@ -61,6 +67,57 @@ public static partial class WgConfFile
         return AddressRegex().Matches(before + "\n" + after).Select(m => m.Groups[1].Value).ToList();
     }
 
+    /// <summary>I peer fuori dal blocco gestito, con chiave e indirizzo; il nome viene dal commento «# PC: x» che li precede.</summary>
+    public static List<WgManualPeer> UnmanagedPeers(string conf)
+    {
+        var (before, _, after) = Split(conf);
+        var result = new List<WgManualPeer>();
+        foreach (var part in new[] { before, after })
+        {
+            string label = "", key = "", address = "";
+            bool inPeer = false;
+            void Flush()
+            {
+                if (inPeer && key.Length > 0 && address.Length > 0)
+                    result.Add(new WgManualPeer(key, address, label.Length > 0 ? label : address));
+                inPeer = false; key = ""; address = ""; label = "";
+            }
+            foreach (var raw in part.Split('\n'))
+            {
+                var line = raw.Trim();
+                if (line.StartsWith('#'))
+                {
+                    var m = LabelRegex().Match(line);
+                    if (m.Success)
+                    {
+                        Flush();
+                        label = m.Groups[1].Value.Trim();
+                    }
+                }
+                else if (line.StartsWith('['))
+                {
+                    var wasLabel = inPeer ? "" : label; // il commento vale solo per il [Peer] che segue
+                    Flush();
+                    label = wasLabel;
+                    inPeer = line.StartsWith("[Peer]", StringComparison.OrdinalIgnoreCase);
+                    if (!inPeer)
+                        label = "";
+                }
+                else if (inPeer)
+                {
+                    var k = KeyRegex().Match(line);
+                    if (k.Success)
+                        key = k.Groups[1].Value;
+                    var a = AddressRegex().Match(line);
+                    if (a.Success && address.Length == 0)
+                        address = a.Groups[1].Value;
+                }
+            }
+            Flush();
+        }
+        return result;
+    }
+
     private static (string Before, string Block, string After) Split(string conf)
     {
         conf = conf.Replace("\r\n", "\n");
@@ -80,6 +137,9 @@ public static partial class WgConfFile
         return s.Length == 0 ? "pc" : s;
     }
 
+    [GeneratedRegex(@"^#\s*PC:\s*(.*)$", RegexOptions.IgnoreCase)]
+    private static partial Regex LabelRegex();
+
     [GeneratedRegex(@"^\s*PublicKey\s*=\s*(\S+)\s*$", RegexOptions.Multiline)]
     private static partial Regex KeyRegex();
 
@@ -91,8 +151,13 @@ public static partial class WgConfFile
 /// Implementazione di produzione: scrive il blocco gestito in wg0.conf (così i peer sopravvivono al riavvio del tunnel)
 /// e li applica al tunnel in esecuzione con <c>wg set</c>. Non serve NET_ADMIN: <c>wg</c> parla col socket di wireguard-go.
 /// </summary>
-public sealed class WgCliPeers(string confPath, string iface = "wg0", string wgPath = "wg") : IWireGuardPeers
+public sealed class WgCliPeers(string confPath, string iface = "wg0", string wgPath = "wg", TimeSpan? handshakeTimeout = null) : IWireGuardPeers
 {
+    private readonly TimeSpan _handshakeTimeout = handshakeTimeout ?? TimeSpan.FromSeconds(5);
+
+    public IReadOnlyList<WgManualPeer> ManualPeers() =>
+        File.Exists(confPath) ? WgConfFile.UnmanagedPeers(File.ReadAllText(confPath)) : [];
+
     public IReadOnlyCollection<string> ReservedAddresses() =>
         File.Exists(confPath) ? WgConfFile.UnmanagedAddresses(File.ReadAllText(confPath)) : [];
 
@@ -127,8 +192,23 @@ public sealed class WgCliPeers(string confPath, string iface = "wg0", string wgP
             using var p = Process.Start(psi);
             if (p is null)
                 return result;
-            var output = await p.StandardOutput.ReadToEndAsync(ct);
-            await p.WaitForExitAsync(ct);
+            using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            limit.CancelAfter(_handshakeTimeout);
+            string output;
+            try
+            {
+                // stderr si svuota in parallelo: se si riempie, wg si blocca scrivendo.
+                var errTask = p.StandardError.ReadToEndAsync(limit.Token);
+                output = await p.StandardOutput.ReadToEndAsync(limit.Token);
+                await p.WaitForExitAsync(limit.Token);
+                await errTask;
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                // wg non risponde: si va avanti senza handshake (la pagina usa l'ultimo contatto registrato).
+                try { p.Kill(entireProcessTree: true); } catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { }
+                return result;
+            }
             if (p.ExitCode != 0)
                 return result;
             foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))

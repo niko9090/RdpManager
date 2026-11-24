@@ -166,28 +166,124 @@ public class VpnFolderTests
         Assert.Contains(mine, doc.Connections);
     }
 
+    private static VpnDashboardDevice Dev(string name, string address, bool online, int minutesAgo = 0) =>
+        new(name, address, online, online || minutesAgo > 0 ? Now.AddMinutes(-minutesAgo) : null);
+
+    private static readonly DateTimeOffset Now = new(2026, 11, 24, 12, 0, 0, TimeSpan.Zero);
+
     [Fact]
-    public void Due_pc_con_stesso_nome_o_senza_ip_non_rompono_gli_id()
+    public void Due_pc_con_stesso_nome_e_senza_ip_non_rompono_gli_id()
     {
         var doc = new ConnectionsDocument();
         VpnFolder.Apply(doc, [Dev("PC-A", "10.8.0.2"), Dev("pc-a", "10.8.0.3"), Dev("PC-B", "10.8.0.4"), Dev("PC-C", "")]);
-        Assert.Equal("PC-B", Auto(doc).Single().Name);
+        Assert.Equal(3, Auto(doc).Count);
         Assert.False(doc.RepairConnectionIds());
     }
 
     [Fact]
-    public void Nome_ripetuto_non_crea_ne_sposta_la_connessione_e_non_copia_accessi()
+    public void Stesso_nome_e_stesso_ip_dato_due_volte_tiene_una_connessione_con_l_id_stabile()
+    {
+        var doc = new ConnectionsDocument();
+        VpnFolder.Apply(doc, [Dev("PC-A", "10.8.0.2/32", true), Dev("pc-a", "10.8.0.2", false, 5)]);
+        var only = Auto(doc).Single();
+        Assert.Equal(VpnFolder.StableId("pc-a"), only.Id);
+        Assert.Equal("10.8.0.2", only.Host);
+    }
+
+    [Fact]
+    public void Stesso_nome_e_ip_diversi_con_uno_solo_in_linea_tiene_quello_in_linea()
+    {
+        var doc = new ConnectionsDocument();
+        VpnFolder.Apply(doc, [Dev("PC-A", "10.8.0.2", false, 90), Dev("PC-A", "10.8.0.3", true)]);
+        var only = Auto(doc).Single();
+        Assert.Equal("10.8.0.3", only.Host);
+        Assert.Equal("PC-A", only.Name);
+        Assert.Equal(VpnFolder.StableId("PC-A"), only.Id);
+    }
+
+    [Fact]
+    public void Stesso_nome_e_ip_diversi_nessuno_in_linea_tiene_l_handshake_piu_recente()
+    {
+        var doc = new ConnectionsDocument();
+        VpnFolder.Apply(doc, [Dev("PC-A", "10.8.0.2", false, 600), Dev("PC-A", "10.8.0.3", false, 60)]);
+        Assert.Equal("10.8.0.3", Auto(doc).Single().Host);
+    }
+
+    [Fact]
+    public void Stesso_nome_con_due_pc_in_linea_li_tiene_tutti_e_due_distinguendo_il_nome()
+    {
+        var doc = new ConnectionsDocument();
+        VpnFolder.Apply(doc, [Dev("PC-A", "10.8.0.2", true), Dev("PC-A", "10.8.0.3", true)]);
+        var auto = Auto(doc);
+        Assert.Equal(2, auto.Count);
+        Assert.Equal(["PC-A (10.8.0.2)", "PC-A (10.8.0.3)"], auto.Select(c => c.Name).Order().ToArray());
+        Assert.Equal("10.8.0.3", auto.Single(c => c.Name == "PC-A (10.8.0.3)").Host);
+        Assert.False(doc.RepairConnectionIds());
+
+        // Al giro dopo, con l'elenco in un altro ordine, non cambia niente.
+        Assert.False(VpnFolder.Apply(doc, [Dev("PC-A", "10.8.0.3", true), Dev("PC-A", "10.8.0.2", true)]));
+    }
+
+    [Fact]
+    public void Con_due_pc_in_linea_quello_che_aveva_gia_la_connessione_tiene_il_nome_e_gli_accessi()
+    {
+        var doc = new ConnectionsDocument();
+        VpnFolder.Apply(doc, [Dev("PC-A", "10.8.0.2", true)]);
+        var existing = Auto(doc).Single();
+        existing.Username = "mio";
+
+        VpnFolder.Apply(doc, [Dev("PC-A", "10.8.0.3", true), Dev("PC-A", "10.8.0.2", true)]);
+        Assert.Same(existing, Auto(doc).Single(c => c.Name == "PC-A"));
+        Assert.Equal("mio", existing.Username);
+        Assert.Equal("PC-A (10.8.0.3)", Auto(doc).Single(c => c.Name != "PC-A").Name);
+    }
+
+    [Fact]
+    public void Elenco_vuoto_transitorio_non_cancella_le_connessioni()
+    {
+        var doc = new ConnectionsDocument();
+        VpnFolder.Apply(doc, [Dev("PC-A", "10.8.0.2", true), Dev("PC-A", "10.8.0.3", true)]);
+        Assert.False(VpnFolder.Apply(doc, []));
+        Assert.False(VpnFolder.Apply(doc, [Dev("", "10.8.0.9")]));
+        Assert.Equal(2, Auto(doc).Count);
+    }
+
+    [Fact]
+    public void Il_pc_stesso_non_compare_nella_cartella()
+    {
+        var doc = new ConnectionsDocument();
+        VpnFolder.Apply(doc, [Dev("MIO-PC", "10.8.0.2"), Dev("PC-B", "10.8.0.3")], "mio-pc");
+        Assert.Equal("PC-B", Auto(doc).Single().Name);
+
+        // Anche una connessione automatica che c'era già per sé stesso sparisce.
+        var doc2 = new ConnectionsDocument();
+        VpnFolder.Apply(doc2, [Dev("MIO-PC", "10.8.0.2")], "altro");
+        Assert.Single(Auto(doc2));
+        VpnFolder.Apply(doc2, [Dev("MIO-PC", "10.8.0.2"), Dev("PC-B", "10.8.0.3")], "MIO-PC");
+        Assert.Equal("PC-B", Auto(doc2).Single().Name);
+    }
+
+    [Fact]
+    public void Il_pc_stesso_si_riconosce_anche_dal_proprio_ip_vpn()
+    {
+        var doc = new ConnectionsDocument();
+        VpnFolder.Apply(doc, [Dev("QUALCOSA", "10.8.0.2/32"), Dev("QUALCOSA", "10.8.0.4")], "mio-pc", "10.8.0.2");
+        Assert.Equal("10.8.0.4", Auto(doc).Single().Host);
+    }
+
+    [Fact]
+    public void Nome_ripetuto_con_un_solo_pc_in_linea_non_sposta_la_connessione_esistente()
     {
         var doc = new ConnectionsDocument();
         doc.Connections.Add(Saved("10.8.0.2", "mario"));
-        VpnFolder.Apply(doc, [Dev("PC-A", "10.8.0.2")]);
+        VpnFolder.Apply(doc, [Dev("PC-A", "10.8.0.2", true)]);
         Assert.Equal("10.8.0.2", Auto(doc).Single().Host);
 
-        // Compare un secondo PC con lo stesso nome: l'ordine dell'elenco non deve far saltare l'IP né i diritti.
-        Assert.False(VpnFolder.Apply(doc, [Dev("pc-a", "10.8.0.9"), Dev("PC-A", "10.8.0.2")]));
+        // Compare un secondo PC con lo stesso nome ma spento: l'ordine dell'elenco non deve far saltare l'IP né i diritti.
+        Assert.False(VpnFolder.Apply(doc, [Dev("pc-a", "10.8.0.9", false, 600), Dev("PC-A", "10.8.0.2", true)]));
         Assert.Equal("10.8.0.2", Auto(doc).Single().Host);
-        Assert.False(VpnFolder.Apply(doc, [Dev("PC-A", "10.8.0.2"), Dev("pc-a", "10.8.0.9")]));
-        Assert.Equal("10.8.0.2", Auto(doc).Single().Host);
+        Assert.False(VpnFolder.Apply(doc, [Dev("PC-A", "10.8.0.2", true), Dev("pc-a", "10.8.0.9", false, 600)]));
+        Assert.Equal("mario", Auto(doc).Single().Username);
     }
 
     [Fact]
@@ -196,7 +292,7 @@ public class VpnFolderTests
         var doc = new ConnectionsDocument();
         doc.Connections.Add(Saved("10.8.0.3", "mario", name: "pc-b"));
         VpnFolder.Apply(doc, [Dev("PC-B", "10.8.0.2"), Dev("PC-A", "10.8.0.3"), Dev("pc-a", "10.8.0.4")]);
-        Assert.Equal("", Auto(doc).Single().Username);
+        Assert.All(Auto(doc), c => Assert.Equal("", c.Username));
     }
 
     [Fact]

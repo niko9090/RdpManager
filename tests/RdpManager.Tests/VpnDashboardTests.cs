@@ -51,6 +51,24 @@ public class VpnDashboardTests
     }
 
     [Fact]
+    public async Task Elenco_porta_id_del_dispositivo_e_proprietario_se_il_server_li_da()
+    {
+        var handler = new FakeHandler(_ => Json(HttpStatusCode.OK, """
+            {"devices":[
+              {"name":"Casa","address":"10.66.0.2","connected":true,"lastContact":null,"deviceId":"dev-7","owner":"mario"},
+              {"name":"Vecchio","address":"10.66.0.3","connected":false,"lastContact":null}]}
+            """));
+        using var client = new VpnDashboardClient("https://sync.example.com", handler);
+
+        var devices = await client.GetDevicesAsync("t");
+
+        Assert.Equal("dev-7", devices[0].DeviceId);
+        Assert.Equal("mario", devices[0].Owner);
+        Assert.Null(devices[1].DeviceId); // server vecchio: nessun campo, nessun errore
+        Assert.Null(devices[1].Owner);
+    }
+
+    [Fact]
     public async Task Senza_accesso_401_diventa_unauthorized()
     {
         using var client = new VpnDashboardClient("https://sync.example.com", new FakeHandler(_ =>

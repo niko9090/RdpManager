@@ -27,27 +27,37 @@ public static class VpnFolder
     /// cartella stessa per PC non più in rete. Con l'elenco vuoto non fa niente (meglio un PC in più che perdere tutto per
     /// una risposta vuota). Vero se il documento è cambiato.
     /// </summary>
-    public static bool Apply(ConnectionsDocument doc, IReadOnlyList<VpnDashboardDevice> devices)
+    public static bool Apply(ConnectionsDocument doc, IReadOnlyList<VpnDashboardDevice> devices,
+        string? selfName = null, string? selfAddress = null)
     {
         // Tutti i PC con un nome, anche ripetuto: servono a riconoscere gli abbinamenti ambigui.
-        var all = new List<(string Name, string Address)>();
+        var entries = new List<Entry>();
         foreach (var d in devices)
         {
             var n = (d.Name ?? "").Trim();
             if (n.Length > 0)
-                all.Add((n, VpnDashboardModel.StripMask(d.Address ?? "")));
+                entries.Add(new Entry(n, VpnDashboardModel.StripMask(d.Address ?? ""), d));
         }
-        if (all.Count == 0)
-            return false;
+        if (entries.Count == 0)
+            return false; // elenco vuoto (anche solo transitorio): non si cancella niente
+        var all = entries.Select(e => (e.Name, e.Address)).ToList();
 
-        // Il nome è la sola identità del PC (la plancia non dà un Id): se due PC hanno lo stesso nome (senza distinguere
-        // maiuscole) non si sa quale sia quale, e l'ordine dell'elenco può cambiare a ogni giro. Per quel nome non si crea
-        // né si aggiorna niente (si lascia com'è quello che c'è già) e non si copiano accessi.
-        var list = all.GroupBy(d => d.Name, StringComparer.OrdinalIgnoreCase)
-            .Where(g => g.Count() == 1).Select(g => g.First()).ToList();
+        // Il PC stesso non va in cartella: si riconosce dal nome (e, se lo si conosce, dal proprio IP VPN).
+        selfName = (selfName ?? SyncService.VpnDeviceName).Trim();
+        var selfIp = VpnDashboardModel.StripMask(selfAddress ?? "");
+        bool IsSelf(Entry e) =>
+            (selfIp.Length > 0 && e.Address.Equals(selfIp, StringComparison.OrdinalIgnoreCase))
+            || (e.Name.Equals(selfName, StringComparison.OrdinalIgnoreCase)
+                && (selfIp.Length == 0 || e.Address.Length == 0 || e.Address.Equals(selfIp, StringComparison.OrdinalIgnoreCase)));
+
+        // Lo stesso nome può comparire più volte (stesso PC registrato da due account, o due PC con lo stesso nome):
+        // si tengono i PC distinti, vedi Resolve.
+        var list = new List<(string Name, string Address)>();
+        foreach (var g in entries.Where(e => !IsSelf(e)).GroupBy(e => e.Name, StringComparer.OrdinalIgnoreCase))
+            list.AddRange(Resolve(doc, g.Key, g.ToList()));
 
         bool changed = false;
-        var nameSet = all.Select(d => d.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var nameSet = list.Select(d => d.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         // Connessioni automatiche di PC tolti dalla rete (e doppioni dello stesso PC nati da una sincronizzazione: di due
         // gemelle resta quella con gli accessi dell'utente, poi quella con l'Id stabile, poi la prima).
@@ -105,6 +115,58 @@ public static class VpnFolder
         return changed;
     }
 
+    private sealed record Entry(string Name, string Address, VpnDashboardDevice Device);
+
+    private static DateTimeOffset Recent(Entry e) => e.Device.LastContact ?? DateTimeOffset.MinValue;
+
+    /// <summary>
+    /// I PC dell'elenco che hanno lo stesso nome. Stesso IP: è lo stesso PC, ne resta uno. IP diversi: se uno solo è in linea
+    /// (o ha l'handshake più recente) resta lui con il nome semplice, così l'Id stabile non cambia; se sono più d'uno in linea
+    /// (o non si distinguono) si tengono tutti, con il nome distinto dall'IP: «nome (10.66.0.N)». Il nome semplice va a chi
+    /// aveva già la connessione automatica.
+    /// </summary>
+    private static List<(string Name, string Address)> Resolve(ConnectionsDocument doc, string key, List<Entry> group)
+    {
+        var distinct = group.Where(e => e.Address.Length > 0)
+            .GroupBy(e => e.Address, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.OrderByDescending(e => e.Device.Connected).ThenByDescending(Recent).First())
+            .ToList();
+        if (distinct.Count == 0)
+            return [(group[0].Name, "")]; // senza IP: non si crea niente, ma la connessione che c'è non va tolta
+        if (distinct.Count == 1)
+            return [(distinct[0].Name, distinct[0].Address)];
+
+        var online = distinct.Where(e => e.Device.Connected).ToList();
+        List<Entry> keep;
+        if (online.Count == 1)
+            return [(online[0].Name, online[0].Address)];
+        if (online.Count > 1)
+            keep = online;
+        else
+        {
+            var ranked = distinct.OrderByDescending(Recent).ToList();
+            if (ranked[0].Device.LastContact is not null && Recent(ranked[0]) > Recent(ranked[1]))
+                return [(ranked[0].Name, ranked[0].Address)];
+            keep = distinct; // nessuna differenza: meglio un PC in più che uno sbagliato
+        }
+
+        var existing = doc.Connections.FirstOrDefault(c => c.AutoVpnDevice is { } dev
+            && dev.Trim().Equals(key, StringComparison.OrdinalIgnoreCase));
+        var result = new List<(string Name, string Address)>();
+        bool plainTaken = false;
+        foreach (var e in keep.OrderBy(e => e.Address, StringComparer.Ordinal))
+        {
+            if (!plainTaken && existing is not null && existing.Host.Equals(e.Address, StringComparison.OrdinalIgnoreCase))
+            {
+                plainTaken = true;
+                result.Add((e.Name, e.Address));
+            }
+            else
+                result.Add(($"{e.Name} ({e.Address})", e.Address));
+        }
+        return result;
+    }
+
     private static Guid FreeId(ConnectionsDocument doc, string name)
     {
         for (int attempt = 0; ; attempt++)
@@ -129,7 +191,9 @@ public static class VpnFolder
     {
         var candidates = originals
             .Where(c => Matches(c, name, address) && !devices.Any(d =>
-                !d.Name.Equals(name, StringComparison.OrdinalIgnoreCase) && Matches(c, d.Name, d.Address)))
+                !d.Name.Equals(name, StringComparison.OrdinalIgnoreCase)
+                && !(address.Length > 0 && d.Address.Equals(address, StringComparison.OrdinalIgnoreCase)) // il PC stesso (nome distinto fra gemelli)
+                && Matches(c, d.Name, d.Address)))
             .Where(c => !c.HasGateway && HasCredentials(c)) // dietro un gateway lo stesso indirizzo è un altro PC
             .ToList();
         if (candidates.Count == 0)

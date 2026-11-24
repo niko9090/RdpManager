@@ -5,7 +5,7 @@ namespace RdpmSync;
 public sealed record VpnDeviceRequest(string? Name, string? PublicKey);
 
 public sealed record VpnDeviceView(long Id, string Name, string Address, string Owner, bool FromHandshake, DateTimeOffset? LastContact,
-    DateTimeOffset CreatedUtc);
+    DateTimeOffset CreatedUtc, string DeviceId = "");
 
 public sealed record VpnOverview(bool Enabled, string Network, string Endpoint, string Dns,
     IReadOnlyList<VpnDeviceView> Devices, string LanEndpoint = "");
@@ -112,6 +112,8 @@ public sealed partial class VpnEndpoints(SyncOptions options, Store store, IWire
                     address = d.Address,
                     connected = d.LastContact is { } lc && now - lc <= ConnectedWindow,
                     lastContact = d.LastContact,
+                    deviceId = d.DeviceId,
+                    owner = d.Owner,
                 }),
             });
         });
@@ -223,8 +225,24 @@ public sealed partial class VpnEndpoints(SyncOptions options, Store store, IWire
         {
             DateTimeOffset? hs = handshakes.TryGetValue(x.Device.PublicKey, out var h) ? h : null;
             var last = hs ?? x.Device.LastSeenUtc;
-            return new VpnDeviceView(x.Device.Id, x.Device.Name, x.Device.Address, x.Owner, hs is not null, last, x.Device.CreatedUtc);
+            return new VpnDeviceView(x.Device.Id, x.Device.Name, x.Device.Address, x.Owner, hs is not null, last, x.Device.CreatedUtc,
+                $"dev-{x.Device.Id}");
         }).ToList();
+
+        // Peer messi a mano in wg0.conf: non hanno account né registrazione, ma sono PC della rete e hanno un handshake.
+        IReadOnlyList<WgManualPeer> manual = [];
+        try { manual = wg?.ManualPeers() ?? []; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            log.LogWarning(ex, "VPN: wg0.conf non leggibile, i peer a mano non compaiono nell'elenco");
+        }
+        var known = devices.Select(d => d.Address).ToHashSet();
+        foreach (var m in manual.Where(m => known.Add(m.Address)))
+        {
+            DateTimeOffset? hs = handshakes.TryGetValue(m.PublicKey, out var h) ? h : null;
+            var id = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(m.PublicKey)))[..16].ToLowerInvariant();
+            devices.Add(new VpnDeviceView(0, m.Name, m.Address, "", hs is not null, hs, default, $"wg-{id}"));
+        }
         return new VpnOverview(Enabled, Network, options.VpnEndpoint, options.VpnDns, devices, options.VpnLanEndpoint);
     }
 
