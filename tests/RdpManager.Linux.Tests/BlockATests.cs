@@ -1061,7 +1061,7 @@ public class SettingsAndInfoTests
             AutoReconnect = true,
             AutoReconnectMaxAttempts = "7",
             InheritFolderResolution = true,
-            UseAllMonitors = true,
+            AllScreens = true,
         };
         Assert.Equal("#AABBCC", vm.ColorPreview);
         Assert.True(vm.TryCommit());

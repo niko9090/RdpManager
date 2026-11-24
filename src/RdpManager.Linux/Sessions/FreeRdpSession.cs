@@ -84,7 +84,7 @@ public sealed class FreeRdpSession : ViewModelBase, ISession
     public event EventHandler? TitleChanged;
 
     /// <summary>Il client sa incorporarsi e la connessione non usa tutti i monitor: la vista può offrire una superficie X11.</summary>
-    public bool WantsEmbedding => _client.CanEmbed && !_connection.UseAllMonitors;
+    public bool WantsEmbedding => _client.CanEmbed && _connection.MonitorMode == MonitorMode.Single;
 
     public bool IsRunning
     {
@@ -155,7 +155,7 @@ public sealed class FreeRdpSession : ViewModelBase, ISession
             return;
         IsEmbedded = true;
         SurfaceXid = xid;
-        Launch(new FreeRdpLaunchContext { ParentWindow = xid, AvailableWidth = width, AvailableHeight = height, DrivePath = HomePath() });
+        Launch(new FreeRdpLaunchContext { ParentWindow = xid, AvailableWidth = width, AvailableHeight = height, DrivePath = HomePath(), Screens = ScreenProvider.All() });
     }
 
     /// <summary>Incorporare non è possibile (Wayland, client SDL, più monitor): finestra separata.</summary>
@@ -166,7 +166,7 @@ public sealed class FreeRdpSession : ViewModelBase, ISession
         IsEmbedded = false;
         SurfaceXid = null;
         _detached = true;
-        Launch(new FreeRdpLaunchContext { AvailableWidth = width, AvailableHeight = height, DrivePath = HomePath() });
+        Launch(new FreeRdpLaunchContext { AvailableWidth = width, AvailableHeight = height, DrivePath = HomePath(), Screens = ScreenProvider.All() });
     }
 
     /// <summary>

@@ -1,7 +1,33 @@
 using System.Globalization;
 using RdpManager.Core;
+using RdpManager.Linux.Features;
 
 namespace RdpManager.Linux.ViewModels;
+
+/// <summary>Uno schermo dell'elenco «Scegli quali schermi»: la posizione, il nome del dispositivo e la casella.</summary>
+public sealed class ScreenChoice : ViewModelBase
+{
+    private bool _isChecked;
+
+    public ScreenChoice(int index, string device, string text, bool connected)
+    {
+        Index = index;
+        Device = device;
+        Text = text;
+        Connected = connected;
+    }
+
+    /// <summary>Posizione nell'elenco rilevato (0 = primo), come «selectedmonitors».</summary>
+    public int Index { get; }
+
+    public string Device { get; }
+    public string Text { get; }
+    public bool Connected { get; }
+
+    public bool IsChecked { get => _isChecked; set => Set(ref _isChecked, value); }
+
+    public override string ToString() => Text;
+}
 
 /// <summary>Modulo di modifica di una connessione: lavora su una copia e scrive sull'originale solo con <see cref="TryCommit"/>.</summary>
 public sealed class ConnectionEditViewModel : ViewModelBase
@@ -15,7 +41,8 @@ public sealed class ConnectionEditViewModel : ViewModelBase
     private string _password = "";
     private string? _error;
     private bool _clipboard, _drives, _printers, _microphone, _favorite, _autoReconnect, _useGateway, _keepAlive;
-    private bool _inheritResolution, _allMonitors, _showPassword;
+    private bool _inheritResolution, _showPassword;
+    private MonitorMode _monitorMode;
     private ChoiceItem<ResolutionMode> _resolution;
     private ChoiceItem<AudioMode> _audio;
     private ChoiceItem<QualityProfile> _quality;
@@ -48,7 +75,8 @@ public sealed class ConnectionEditViewModel : ViewModelBase
         _useGateway = connection.UseGateway;
         _keepAlive = connection.KeepAlive;
         _inheritResolution = connection.InheritFolderResolution;
-        _allMonitors = connection.UseAllMonitors;
+        _monitorMode = connection.MonitorMode;
+        Screens = BuildScreens(connection);
         _attempts = Math.Clamp(connection.AutoReconnectMaxAttempts, 1, ReconnectPolicy.MaxAllowedAttempts).ToString(CultureInfo.InvariantCulture);
         _color = connection.Color ?? "";
         _resolution = Choices.Pick(Choices.Resolution, connection.ResolutionMode);
@@ -105,7 +133,82 @@ public sealed class ConnectionEditViewModel : ViewModelBase
     /// <summary>Vale la risoluzione impostata sulla cartella, se c'è.</summary>
     public bool InheritFolderResolution { get => _inheritResolution; set => Set(ref _inheritResolution, value); }
 
-    public bool UseAllMonitors { get => _allMonitors; set => Set(ref _allMonitors, value); }
+    /// <summary>Come si usano gli schermi: uno solo, tutti, o quelli scelti.</summary>
+    public MonitorMode MonitorMode
+    {
+        get => _monitorMode;
+        set
+        {
+            if (!Set(ref _monitorMode, value))
+                return;
+            OnPropertyChanged(nameof(SingleScreen));
+            OnPropertyChanged(nameof(AllScreens));
+            OnPropertyChanged(nameof(ChosenScreens));
+        }
+    }
+
+    /// <summary>Opzione «Un solo schermo».</summary>
+    public bool SingleScreen
+    {
+        get => _monitorMode == MonitorMode.Single;
+        set { if (value) MonitorMode = MonitorMode.Single; }
+    }
+
+    /// <summary>Opzione «Tutti gli schermi».</summary>
+    public bool AllScreens
+    {
+        get => _monitorMode == MonitorMode.All;
+        set { if (value) MonitorMode = MonitorMode.All; }
+    }
+
+    /// <summary>Opzione «Scegli quali schermi»: abilita l'elenco a caselle.</summary>
+    public bool ChosenScreens
+    {
+        get => _monitorMode == MonitorMode.Selected;
+        set { if (value) MonitorMode = MonitorMode.Selected; }
+    }
+
+    /// <summary>Gli schermi rilevati (più quelli salvati ma non più collegati), con la casella di scelta.</summary>
+    public IReadOnlyList<ScreenChoice> Screens { get; }
+
+    /// <summary>Nota sotto l'elenco quando non si vede nessuno schermo, null altrimenti.</summary>
+    public string? ScreensNote => Screens.Count == 0
+        ? "Gli schermi non sono stati rilevati: scegli «Un solo schermo» o «Tutti gli schermi»."
+        : null;
+
+    private List<ScreenChoice> BuildScreens(RdpConnection connection)
+    {
+        var detected = ScreenProvider.All();
+        var saved = connection.SelectedMonitors;
+        var devices = connection.SelectedMonitorDevices;
+        var used = new bool[saved.Length];
+        var list = new List<ScreenChoice>();
+        for (int i = 0; i < detected.Count; i++)
+        {
+            var s = detected[i];
+            bool on = false;
+            for (int k = 0; k < saved.Length; k++)
+            {
+                string? dev = k < devices.Length && !string.IsNullOrWhiteSpace(devices[k]) ? devices[k] : null;
+                if (dev is not null ? dev.Equals(s.DeviceName, StringComparison.OrdinalIgnoreCase) : saved[k] == i)
+                {
+                    on = true;
+                    used[k] = true;
+                }
+            }
+            string size = $"{s.Bounds.Width}×{s.Bounds.Height}";
+            list.Add(new ScreenChoice(i, s.DeviceName, $"Schermo {i + 1}: {s.DeviceName} ({size}{(s.Primary ? ", principale" : "")})", true) { IsChecked = on });
+        }
+        // Schermi scelti e non più collegati: restano nell'elenco (spuntati) finché non si decide di toglierli.
+        for (int k = 0; k < saved.Length; k++)
+        {
+            if (used[k])
+                continue;
+            string? dev = k < devices.Length && !string.IsNullOrWhiteSpace(devices[k]) ? devices[k] : null;
+            list.Add(new ScreenChoice(saved[k], dev ?? "", $"Schermo {saved[k] + 1}{(dev is null ? "" : ": " + dev)} (non collegato)", false) { IsChecked = true });
+        }
+        return list;
+    }
 
     /// <summary>«Mostra» la password mentre la si scrive.</summary>
     public bool ShowPassword { get => _showPassword; set => Set(ref _showPassword, value); }
@@ -234,6 +337,8 @@ public sealed class ConnectionEditViewModel : ViewModelBase
             && (!int.TryParse(DesktopWidth.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out width) || width < 320
                 || !int.TryParse(DesktopHeight.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out height) || height < 200))
             return Fail("Larghezza e altezza devono essere numeri (almeno 320 x 200).");
+        if (MonitorMode == MonitorMode.Selected && !Screens.Any(s => s.IsChecked))
+            return Fail("Spunta almeno uno schermo, oppure scegli «Un solo schermo» o «Tutti gli schermi».");
         var mac = "";
         if (MacAddress.Trim().Length > 0 && !WakeOnLan.TryNormalizeMac(MacAddress, out mac))
             return Fail("L'indirizzo MAC non è valido (esempio: AA:BB:CC:DD:EE:FF).");
@@ -261,7 +366,13 @@ public sealed class ConnectionEditViewModel : ViewModelBase
         _target.AutoReconnect = AutoReconnect;
         _target.KeepAlive = KeepAlive;
         _target.InheritFolderResolution = InheritFolderResolution;
-        _target.UseAllMonitors = UseAllMonitors;
+        _target.MonitorMode = MonitorMode;
+        if (MonitorMode == MonitorMode.Selected)
+        {
+            var chosen = Screens.Where(s => s.IsChecked).OrderBy(s => s.Index).ToList();
+            _target.SelectedMonitors = chosen.Select(s => s.Index).ToArray();
+            _target.SelectedMonitorDevices = chosen.Select(s => s.Device).ToArray();
+        }
         _target.AutoReconnectMaxAttempts = attempts;
         _target.Color = color;
         if (_gatewayTouched)
