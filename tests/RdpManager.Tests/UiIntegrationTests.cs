@@ -40,7 +40,7 @@ public sealed class UiIntegrationTests : IDisposable
     private static void WithMainForm(ConnectionStore store, Action<MainForm> body)
     {
         Exception? failure = null;
-        var thread = new Thread(() =>
+        var thread = StaTestRunner.Create(() =>
         {
             try
             {
@@ -58,7 +58,7 @@ public sealed class UiIntegrationTests : IDisposable
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
-        Assert.True(thread.Join(TimeSpan.FromSeconds(120)), "La prova UI non è terminata entro 120 s");
+        Assert.True(thread.Join(TimeSpan.FromSeconds(StaTestRunner.LimitSeconds)), "La prova UI non è terminata entro 60 s");
         if (failure is not null)
             ExceptionDispatchInfo.Throw(failure);
     }

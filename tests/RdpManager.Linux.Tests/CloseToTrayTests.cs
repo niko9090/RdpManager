@@ -56,7 +56,8 @@ public class CloseToTrayTests
     {
         using var data = new TempData();
         var vm = Make(data, out _);
-        Assert.False(vm.Document.Settings.CloseToTray);
+        Assert.True(new AppSettings().CloseToTray); // valore di serie, uguale a Windows (k-158)
+        vm.Document.Settings.CloseToTray = false; // impostazioni già salvate prima, con l'opzione spenta
         Assert.True(vm.ApplyCloseToTrayDefaultOnce());
         Assert.True(vm.Document.Settings.CloseToTray);
         vm.Document.Settings.CloseToTray = false; // scelta dell'utente: non si riaccende

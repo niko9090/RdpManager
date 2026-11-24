@@ -201,11 +201,11 @@ public sealed class CrashSafetyTests : IDisposable
     private static void Run(Action body)
     {
         Exception? failure = null;
-        var thread = new Thread(() =>
+        var thread = StaTestRunner.Create(() =>
         {
             try
             {
-                Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
+                // modalità eccezioni già impostata da StaTestRunner.Create
                 body();
             }
             catch (Exception ex) { failure = ex; }

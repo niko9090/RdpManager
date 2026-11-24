@@ -19,16 +19,16 @@ public sealed class DialogLayoutTests
     private static void OnSta(Action body)
     {
         Exception? failure = null;
-        var thread = new Thread(() =>
+        var thread = StaTestRunner.Create(() =>
         {
-            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
+            // modalità eccezioni già impostata da StaTestRunner.Create
             try { body(); }
             catch (Exception ex) { failure = ex; }
             finally { TouchUi.WorkAreaForTests = null; }
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
-        Assert.True(thread.Join(TimeSpan.FromSeconds(180)), "La prova UI non è terminata entro 180 s");
+        Assert.True(thread.Join(TimeSpan.FromSeconds(StaTestRunner.LimitSeconds)), "La prova UI non è terminata entro 60 s");
         if (failure is not null)
             ExceptionDispatchInfo.Throw(failure);
     }

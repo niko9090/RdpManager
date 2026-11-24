@@ -61,7 +61,7 @@ public sealed class LiveRdpServerTests
         var sw = new Stopwatch();
         using var watcher = new ModalDialogWatcher(Log, outDir, pressNo: true);
 
-        var thread = new Thread(() =>
+        var thread = StaTestRunner.Create(() =>
         {
             try
             {
@@ -119,7 +119,7 @@ public sealed class LiveRdpServerTests
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
-        bool finished = thread.Join(TimeSpan.FromSeconds(120));
+        bool finished = thread.Join(TimeSpan.FromSeconds(StaTestRunner.LimitSeconds));
         try { Directory.Delete(storeDir, recursive: true); } catch (IOException) { }
         Log($"Finestre modali viste: {watcher.Seen.Count}");
         Assert.True(finished, "Interfaccia bloccata da una finestra modale (vedi live.log). Finestre viste: " +

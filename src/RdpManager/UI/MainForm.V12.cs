@@ -479,7 +479,7 @@ public sealed partial class MainForm
         if (_doc.Settings.ShowTrayIcon && _tray is null)
         {
             _tray = new NotifyIcon { Icon = Icon, Text = "RdpManager", ContextMenuStrip = _trayMenu, Visible = true };
-            _tray.MouseClick += (_, e) => { if (e.Button == MouseButtons.Left) RestoreFromTray(); };
+            _tray.MouseDoubleClick += (_, e) => { if (e.Button == MouseButtons.Left) RestoreFromTray(); };
         }
         else if (!_doc.Settings.ShowTrayIcon && _tray is not null)
         {
@@ -545,7 +545,7 @@ public sealed partial class MainForm
         foreach (var item in _trayMenu.Items.Cast<ToolStripItem>().ToList())
             item.Dispose();
         _trayMenu.Items.Clear();
-        _trayMenu.Items.Add(new ToolStripMenuItem("Mostra RdpManager", null, (_, _) => RestoreFromTray()) { Font = new Font(_trayMenu.Font, FontStyle.Bold) });
+        _trayMenu.Items.Add(new ToolStripMenuItem("Apri RdpManager", null, (_, _) => RestoreFromTray()) { Font = new Font(_trayMenu.Font, FontStyle.Bold) });
         _trayMenu.Items.Add("Ricerca rapida…", null, (_, _) =>
         {
             RestoreFromTray();
@@ -638,24 +638,33 @@ public sealed partial class MainForm
     /// <summary>Con «resta nell'area di notifica» la chiusura nasconde la finestra; vero se l'ha fatto.</summary>
     private bool HideToTrayInsteadOfClosing(FormClosingEventArgs e)
     {
-        if (e.CloseReason != CloseReason.UserClosing || _exitRequested || !_doc.Settings.CloseToTray || _tray is null)
+        if (!ClosePolicy.ShouldHideToTray(_doc.Settings.CloseToTray, _tray is not null,
+                e.CloseReason == CloseReason.UserClosing, _exitRequested))
             return false;
         e.Cancel = true;
         Hide();
         if (!_trayHintShown)
         {
             _trayHintShown = true;
-            _tray.ShowBalloonTip(4000, "RdpManager è ancora aperto",
-                "Le sessioni restano connesse. Clic sull'icona per riaprire, «Esci» nel suo menu per chiudere.", ToolTipIcon.Info);
+            _tray!.ShowBalloonTip(4000, ClosePolicy.TrayHintTitle, ClosePolicy.TrayHintText, ToolTipIcon.Info);
         }
         return true;
     }
+
+    /// <summary>Cosa fare della VPN all'uscita vera (di serie nulla: lo imposta Program; le prove mettono interfacce finte).</summary>
+    internal RdpManager.Vpn.VpnExitHandler? VpnOnExit { get; set; }
+
+    /// <summary>Per le prove: quante volte la VPN integrata è stata spenta all'uscita.</summary>
+    internal bool VpnStoppedOnExit { get; private set; }
 
     private void OnFormClosedV12(object? sender, FormClosedEventArgs e)
     {
         UnregisterGlobalHotkey();
         UnregisterSessionHotkeys();
         _overviewTimer.Stop();
+        // Uscita vera (la riduzione nell'area di notifica non arriva qui): la VPN integrata si spegne, quella di marshmelloVPN resta.
+        if (VpnOnExit is { } vpnExit)
+            VpnStoppedOnExit = vpnExit.OnExit(windowsEnding: e.CloseReason is CloseReason.WindowsShutDown);
         if (_tray is not null)
         {
             _tray.Visible = false;
@@ -665,6 +674,18 @@ public sealed partial class MainForm
         // «Aggiorna ora» (con riavvio) o «Alla chiusura» (senza): solo un installer ancora verificato.
         if (_installNowRequested || _updates.InstallOnExit)
             StartVerifiedInstaller(relaunch: _installNowRequested);
+    }
+
+    /// <summary>Se la finestra viene liberata senza passare dalla chiusura (prove fallite, errori), l'icona nell'area di notifica non resta orfana.</summary>
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing && _tray is not null)
+        {
+            _tray.Visible = false;
+            _tray.Dispose();
+            _tray = null;
+        }
+        base.Dispose(disposing);
     }
 
     // ---------- aggiornamento automatico con conferma ----------

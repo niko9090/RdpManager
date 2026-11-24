@@ -90,7 +90,7 @@ public sealed class AppSettings
     public bool ShowTrayIcon { get; set; } = true;
 
     /// <summary>Chiudendo la finestra l'app resta nell'area di notifica invece di uscire.</summary>
-    public bool CloseToTray { get; set; }
+    public bool CloseToTray { get; set; } = true;
 
     /// <summary>
     /// Scorciatoia globale (RegisterHotKey) che richiama l'app da qualunque programma; stringa vuota = disattivata.

@@ -20,7 +20,7 @@ public sealed partial class MainForm
         _vpn.Show(this);
     }
 
-    private static WireGuardNtTunnel CreateTunnel()
+    internal static WireGuardNtTunnel CreateTunnel()
     {
         var staging = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RdpManager", "vpn");
         var exe = Environment.ProcessPath ?? Application.ExecutablePath;

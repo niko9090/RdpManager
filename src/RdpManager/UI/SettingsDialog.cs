@@ -16,7 +16,7 @@ public sealed class SettingsDialog : TouchForm
     private readonly ComboBox _sessionTouch = new() { Width = 420, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly Dictionary<TouchGesture, ComboBox> _gestureBoxes = [];
     private readonly CheckBox _tray = new() { Text = "Icona nell'area di notifica con il menu delle connessioni", AutoSize = true };
-    private readonly CheckBox _closeToTray = new() { Text = "Chiudendo la finestra resta nell'area di notifica", AutoSize = true };
+    private readonly CheckBox _closeToTray = new() { Text = "Chiudendo la finestra, resta attivo nell'area di notifica", AutoSize = true };
     private readonly ShortcutBox _globalHotkey = new() { Width = 200 };
     private readonly CheckBox _history = new() { Text = "Annota inizio, fine e motivo di ogni sessione", AutoSize = true };
     private readonly RadioButton _updAuto = new() { Text = "Automatici con conferma: scarica e verifica in sottofondo, poi chiede", AutoSize = true };

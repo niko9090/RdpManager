@@ -61,9 +61,10 @@ public sealed partial class MainWindowViewModel
     /// </summary>
     public CloseAction DecideClose(bool trayReady, bool exiting)
     {
-        if (exiting || !Document.Settings.CloseToTray)
-            return CloseAction.Exit;
-        return trayReady && Document.Settings.ShowTrayIcon ? CloseAction.HideToTray : CloseAction.Minimize;
+        var closeToTray = Document.Settings.CloseToTray;
+        if (ClosePolicy.ShouldHideToTray(closeToTray, trayReady && Document.Settings.ShowTrayIcon, userClosing: true, exitRequested: exiting))
+            return CloseAction.HideToTray;
+        return closeToTray && !exiting ? CloseAction.Minimize : CloseAction.Exit;
     }
 
     /// <summary>L'avviso «resta attivo nella barra» la prima volta; null dopo (si ricorda in un file accanto al ruolo).</summary>
