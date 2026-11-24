@@ -196,6 +196,35 @@ public sealed class DialogLayoutTests
     private static string Describe(Control c) =>
         string.IsNullOrWhiteSpace(c.Text) ? $"{c.GetType().Name}#{c.Name}" : $"{c.GetType().Name}:{(c.Text.Length > 30 ? c.Text[..30] : c.Text)}";
 
+    /// <summary>La finestra della connessione (con la sezione «Schermi») in aree fisse e piccole, indipendenti dallo schermo di chi prova.</summary>
+    [Theory]
+    [InlineData(685, 325)]
+    [InlineData(1370, 698)]
+    public void ConnectionDialog_WithScreensSection_FitsSmallFixedWorkAreas(int width, int height)
+    {
+        OnSta(() =>
+        {
+            var area = new Rectangle(0, 0, width, height);
+            TouchUi.WorkAreaForTests = area;
+            var doc = new ConnectionsDocument { Connections = [new RdpConnection { Name = "Uno", Host = "uno.invalid", Username = "utente" }] };
+            var all = new List<string>();
+            foreach (var make in new Func<Form>[]
+            {
+                () => new ConnectionDialog(doc.Connections[0], doc.AllGroups(), "Modifica connessione", doc.CredentialProfiles),
+                () => new ConnectionDialog(new RdpConnection(), doc.AllGroups(), "Nuova connessione"),
+            })
+            {
+                using var d = make();
+                d.StartPosition = FormStartPosition.Manual;
+                d.Show();
+                Pump(150);
+                all.AddRange(Problems(d, area));
+                d.Close();
+            }
+            Assert.True(all.Count == 0, string.Join(Environment.NewLine, all.Distinct()));
+        });
+    }
+
     [Fact]
     public void EveryDialog_OpensCenteredOnItsOwner_InsideTheWorkArea_WithoutOverlapsOrClippedText()
     {
