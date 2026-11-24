@@ -11,4 +11,19 @@
     <EnableSourceLink>false</EnableSourceLink>
     <EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>
   </PropertyGroup>
+
+  <!--
+    Restore separato per le compilazioni con un RID esplicito (-r linux-x64).
+    Perché: "dotnet build ... -r linux-x64" e "dotnet test" lanciati insieme nella stessa cartella rifanno il restore
+    dello stesso progetto e scrivono lo stesso obj/project.assets.json e obj/*.nuget.*; uno dei due può fallire con
+    NuGet.targets: "Impossibile creare un file, se il file esiste già". Con un RID il restore ha comunque un altro
+    grafo di pacchetti (runtime pack), quindi gli diamo una cartella sua: obj/rid-<RID>/. Va impostato qui, prima
+    dell'import dell'SDK. Senza RID non cambia nulla (obj/ come sempre).
+  -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
+    <BaseIntermediateOutputPath>$(MSBuildProjectDirectory)\obj\rid-$(RuntimeIdentifier)\</BaseIntermediateOutputPath>
+    <MSBuildProjectExtensionsPath>$(BaseIntermediateOutputPath)</MSBuildProjectExtensionsPath>
+    <!-- L'SDK esclude dai file .cs solo BaseIntermediateOutputPath: senza questo entrerebbero i .cs generati in obj\Debug. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);obj\**</DefaultItemExcludes>
+  </PropertyGroup>
 </Project>
