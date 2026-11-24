@@ -437,6 +437,7 @@ public sealed class UiV12Tests : IDisposable
         var doc = new ConnectionsDocument { Connections = [Unreachable("Uno"), Unreachable("Due")] };
         doc.Connections[0].Group = "Clienti";
         doc.Connections[1].IsFavorite = true;
+        doc.Settings.CloseToTray = false;
         // Combinazione libera al momento: non deve scontrarsi con un RdpManager vero o con un'altra esecuzione dei test.
         doc.Settings.GlobalHotkey = FreeGlobalHotkeyText();
         WithMainForm(StoreWith(doc), form =>
