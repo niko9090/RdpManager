@@ -164,6 +164,26 @@ public sealed record WireGuardConfig
         return null;
     }
 
+    /// <summary>
+    /// Indirizzo 10.66.0.N/32 (N da 2 a 254) derivato dal nome del PC: stabile fra un avvio e l'altro e diverso da PC a PC
+    /// (salvo rare coincidenze), per i profili manuali di cui il server non conosce l'elenco. Se <paramref name="used"/> contiene
+    /// già quell'indirizzo si passa al successivo libero.
+    /// </summary>
+    public static string? AddressFromName(string? name, IEnumerable<string>? used = null)
+    {
+        uint h = 2166136261;
+        foreach (var c in (name ?? "").Trim().ToLowerInvariant())
+            h = (h ^ c) * 16777619;
+        var taken = (used ?? []).Select(u => TryParseCidr(u, out var ip, out _) ? ip : u).ToHashSet();
+        for (int i = 0; i < 253; i++)
+        {
+            int n = 2 + (int)((h + (uint)i) % 253);
+            if (!taken.Contains($"10.66.0.{n}"))
+                return $"10.66.0.{n}/32";
+        }
+        return null;
+    }
+
     internal static bool TryParseCidr(string? text, out string ip, out int prefix)
     {
         ip = "";

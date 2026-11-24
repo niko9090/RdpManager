@@ -119,6 +119,20 @@ public class VpnKeyRecoveryTests
     }
 
     [Fact]
+    public async Task Con_l_handshake_sempre_illeggibile_oltre_la_pazienza_ri_registra_una_volta()
+    {
+        var h = new Harness { HandshakeReadable = false };
+        await h.Recovery.TickAsync();
+        h.Now += LinuxVpnKeyRecovery.UnreadablePatience + TimeSpan.FromSeconds(1);
+        var line = await h.Recovery.TickAsync();
+        Assert.Contains("registrata di nuovo", line);
+        Assert.Single(h.Registered);
+        h.Now += TimeSpan.FromMinutes(10);
+        Assert.Equal("", await h.Recovery.TickAsync());
+        Assert.Single(h.Registered);
+    }
+
+    [Fact]
     public void Legge_l_ultimo_handshake_dall_output_di_wg()
     {
         Assert.Equal(0, LinuxWireGuardCommands.ParseLatestHandshake("AAAA=\t0\n"));

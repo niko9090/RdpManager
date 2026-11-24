@@ -32,10 +32,10 @@ public sealed class VpnForm : TouchForm
         _tunnel = tunnel;
         _profilePath = profilePath ?? VpnProfile.DefaultPath;
         _profile = VpnProfile.Load(_profilePath);
-        if (_profile.Address.Length == 0)
-            _profile.Address = WireGuardConfig.NextFreeAddress([]) ?? "";
         if (_profile.PcName.Length == 0)
             _profile.PcName = Environment.MachineName;
+        if (_profile.Address.Length == 0)
+            _profile.Address = WireGuardConfig.AddressFromName(_profile.PcName) ?? "";
 
         Text = "marshmelloVPN (WireGuard)";
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -211,8 +211,33 @@ public sealed class VpnForm : TouchForm
         }
         else
             RefreshKeys();
+        var message = result.Message;
+        if (result.Ok && result.RegisteredOnServer)
+            message += RestartTunnelIfOn();
         if (!result.Ok || result.RegisteredOnServer)
-            Notify(result.Message);
+            Notify(message);
+    }
+
+    /// <summary>
+    /// Il tunnel acceso ha ancora la chiave vecchia (Accendi non fa niente se è già su) e senza handshake: lo si spegne e si
+    /// riaccende col profilo nuovo. Restituisce una frase da aggiungere al messaggio ("" se il tunnel era spento).
+    /// </summary>
+    private string RestartTunnelIfOn()
+    {
+        if (_tunnel.Stato is not (TunnelState.Acceso or TunnelState.InAvvio))
+            return "";
+        try
+        {
+            _tunnel.Spegni();
+            _tunnel.Accendi(_profile.ToConfig());
+            RefreshState();
+            return " Ho riavviato la VPN con la chiave nuova.";
+        }
+        catch (Exception ex) when (ex is VpnException or ArgumentException or InvalidOperationException)
+        {
+            RefreshState();
+            return " Non sono riuscito a riaccendere la VPN con la chiave nuova: " + ex.Message;
+        }
     }
 
     private void RefreshKeys()

@@ -218,7 +218,7 @@ public static class ConfigFileImporter
         if (profile.PcName.Length == 0)
             profile.PcName = VpnProvisioning.SafeName(options.PcName ?? Environment.MachineName);
         if (profile.Address.Length == 0 && !vpn.RequestKeyFromServer)
-            profile.Address = WireGuardConfig.NextFreeAddress([]) ?? "";
+            profile.Address = WireGuardConfig.AddressFromName(profile.PcName) ?? ""; // profilo manuale: indirizzo stabile ricavato dal nome, non sempre .2
         profile.Save(options.ProfilePath);
         return profile;
     }

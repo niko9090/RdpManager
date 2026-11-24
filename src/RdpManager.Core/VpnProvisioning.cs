@@ -69,11 +69,9 @@ public static class VpnProvisioning
             return;
         try
         {
-            var grant = await sync.RequestVpnAsync(profile.PcName.Length > 0 ? profile.PcName : SafeName(Environment.MachineName), profile.PublicKey!, ct);
-            if (grant.Address != profile.Address || grant.ServerPublicKey != profile.ServerPublicKey)
-                return; // il server ha cambiato qualcosa d'altro: non si tocca un profilo che funziona
-            profile.LanEndpoint = grant.LanEndpoint;
-            profile.LanEndpointAsked = true;
+            var grant = await sync.RequestVpnAsync(profile.PcName.Length > 0 ? profile.PcName : SafeName(Environment.MachineName), profile.PublicKey!, ct);            // Il server conosce il PC per nome: se risponde con altri dati (o un altro nome) la risposta vale più del profilo,
+            // che sarebbe comunque senza handshake. Apply salva anche il nome concesso.
+            Apply(profile, grant);
             profile.Save(profilePath);
         }
         catch (Exception ex) when (ex is SyncServerException or SyncUnreachableException or FormatException or IOException)

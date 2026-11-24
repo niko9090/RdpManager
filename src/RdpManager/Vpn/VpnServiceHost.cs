@@ -93,19 +93,22 @@ internal static class VpnServiceHost
             bool hasAlternative = conf.LanEndpoint.Length > 0;
             bool useLan = hasAlternative && VpnEndpointChoice.OnServerLan(conf.LanEndpoint, VpnEndpointChoice.LocalAddresses());
             runner.Start(VpnEndpointChoice.Apply(conf, useLan), _tunnelName);
+            // started = prima accensione della sessione (non cambia mai: ServerUnreachable ne ha bisogno);
+            // attemptStart = inizio del tentativo con l'endpoint corrente (riparte a ogni cambio di endpoint).
             var started = DateTime.UtcNow;
+            var attemptStart = started;
             bool answered = false;
             SetStatus(Running, 0, 0);
             do
             {
                 var status = runner.ReadStatus();
                 answered |= status?.LastHandshakeUtc is not null;
-                if (hasAlternative && !answered && DateTime.UtcNow - started > VpnEndpointChoice.SwitchTimeout)
+                if (hasAlternative && !answered && DateTime.UtcNow - attemptStart > VpnEndpointChoice.SwitchTimeout)
                 {
                     useLan = !useLan;
                     runner.Stop();
                     runner.Start(VpnEndpointChoice.Apply(conf, useLan), _tunnelName);
-                    started = DateTime.UtcNow;
+                    attemptStart = DateTime.UtcNow;
                     status = runner.ReadStatus();
                 }
                 WriteStatus(status is null ? null : status with { StartedUtc = started });

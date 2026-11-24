@@ -106,10 +106,10 @@ public sealed class VpnViewModel : ViewModelBase
         _dialogs = dialogs;
         _profilePath = profilePath ?? VpnProfile.DefaultPath;
         _profile = VpnProfile.Load(_profilePath);
-        if (_profile.Address.Length == 0)
-            _profile.Address = WireGuardConfig.NextFreeAddress([]) ?? "";
         if (_profile.PcName.Length == 0)
             _profile.PcName = Environment.MachineName;
+        if (_profile.Address.Length == 0)
+            _profile.Address = WireGuardConfig.AddressFromName(_profile.PcName) ?? "";
         _pcName = _profile.PcName;
         _address = _profile.Address;
         _endpoint = _profile.Endpoint;
@@ -258,6 +258,35 @@ public sealed class VpnViewModel : ViewModelBase
         else
             RefreshKeys();
         Message = result.Message;
+        if (result.Ok && result.RegisteredOnServer)
+            await RestartTunnelIfUpAsync();
+    }
+
+    /// <summary>
+    /// Chiave nuova registrata: il tunnel acceso ha ancora la vecchia e non farebbe handshake. Lo si ferma e lo si riaccende
+    /// col profilo nuovo, sulla stessa istanza (<see cref="LinuxWireGuard"/> serializza i comandi).
+    /// </summary>
+    private async Task RestartTunnelIfUpAsync()
+    {
+        Busy = true;
+        try
+        {
+            if (!await _tunnel.IsConnectedAsync())
+                return;
+            await _tunnel.DisconnectAsync();
+            var r = await _tunnel.ConnectAsync(_profile.ToConfig());
+            Message += r.Success ? " Ho ricollegato la VPN con la chiave nuova." : " Non sono riuscito a ricollegare la VPN: " + r.Message;
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException
+                                       or OperationCanceledException or System.ComponentModel.Win32Exception)
+        {
+            Message += " Non sono riuscito a ricollegare la VPN: " + ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+        await RefreshStateAsync();
     }
 
     private void RefreshKeys()

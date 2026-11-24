@@ -1,7 +1,7 @@
 namespace RdpManager.Core;
 
 /// <summary>Esito di una rotazione o ri-registrazione della chiave: <see cref="Message"/> è già pronto per l'utente (mai chiavi nel testo).</summary>
-public sealed record VpnKeyResult(bool Ok, string Message, bool RegisteredOnServer = false);
+public sealed record VpnKeyResult(bool Ok, string Message, bool RegisteredOnServer = false, bool ProfileChanged = false);
 
 /// <summary>Registra la chiave pubblica di questo PC sul server: <c>(nomePc, chiavePubblica)</c> → profilo assegnato.</summary>
 public delegate Task<VpnGrant> VpnRegistrar(string pcName, string publicKey, CancellationToken ct);
@@ -63,15 +63,27 @@ public static class VpnKeySync
     }
 
     /// <summary>Rimanda al server la chiave pubblica attuale (nessuna chiave nuova): rimedio al tunnel «su» senza handshake.</summary>
-    public static async Task<VpnKeyResult> ReRegisterAsync(VpnProfile profile, VpnRegistrar register, CancellationToken ct = default)
+    public static async Task<VpnKeyResult> ReRegisterAsync(VpnProfile profile, VpnRegistrar register, CancellationToken ct = default, string? profilePath = null)
     {
         if (!IsRegistered(profile) || profile.PublicKey is not { } pub)
             return new VpnKeyResult(false, "Profilo VPN incompleto: niente da registrare.");
         try
         {
             var grant = await register(NameOf(profile), pub, ct);
-            if (grant.Address != profile.Address || grant.ServerPublicKey != profile.ServerPublicKey)
-                return new VpnKeyResult(false, "Il server ha assegnato dati diversi da quelli del profilo: lo lascio com'è.", true);
+            // Il server identifica il PC per nome: salviamo quello concesso, così la prossima volta si rimanda lo stesso.
+            var nameChanged = grant.Name.Length > 0 && grant.Name != profile.PcName;
+            if (grant.Address != profile.Address || grant.ServerPublicKey != profile.ServerPublicKey
+                || grant.Endpoint != profile.Endpoint)
+            {
+                VpnProvisioning.Apply(profile, grant);
+                profile.Save(profilePath);
+                return new VpnKeyResult(true, "Il server ha assegnato dati nuovi (indirizzo " + profile.Address + "): profilo aggiornato, il tunnel va riavviato.", true, true);
+            }
+            if (nameChanged)
+            {
+                profile.PcName = grant.Name;
+                profile.Save(profilePath);
+            }
             return new VpnKeyResult(true, "Chiave pubblica di questo PC registrata di nuovo sul server.", true);
         }
         catch (Exception ex) when (IsExpected(ex))
