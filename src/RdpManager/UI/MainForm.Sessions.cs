@@ -1041,10 +1041,7 @@ public sealed partial class MainForm
     /// <summary>Monitor dello schermo intero: tutti se la sessione corrente usa tutti i monitor, altrimenti quello scelto.</summary>
     internal Rectangle FullScreenTarget()
     {
-        var all = Screens.All();
-        if (CurrentView?.Connection.UseAllMonitors == true && all.Count > 1)
-            return MonitorLayout.VirtualBounds(all);
-        return (MonitorLayout.ChooseScreen(all, _doc.Settings.PreferredMonitor) ?? all[0]).Bounds;
+        return Screens.FullScreenBounds(Screens.All(), CurrentView?.Connection, _doc.Settings.PreferredMonitor);
     }
 
     private void UpdateFullScreenBounds()

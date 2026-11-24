@@ -72,9 +72,16 @@ public interface IMsRdpClientNonScriptable5
     void Slot33(); void Slot34(); void Slot35(); void Slot36(); void Slot37(); void Slot38();
     void Slot39(); void Slot40(); void Slot41(); void Slot42(); void Slot43(); void Slot44();
     void Slot45(); void Slot46(); void Slot47(); void Slot48(); void Slot49(); void Slot50();
-    void Slot51(); void Slot52(); void Slot53(); void Slot54(); void Slot55(); void Slot56();
-    void Slot57(); void Slot58(); void Slot59(); void Slot60(); void Slot61(); void Slot62();
-    
+    void Slot51(); void Slot52();
+
+    // Slot 53-55 verificati sulla type library di mstscax.dll (oVft).
+    void put_UseMultimon([MarshalAs(UnmanagedType.VariantBool)] bool value);
+    [return: MarshalAs(UnmanagedType.VariantBool)] bool get_UseMultimon();
+    int get_RemoteMonitorCount();
+
+    // 56-62: GetRemoteMonitorsBoundingBox, RemoteMonitorLayoutMatchesLocal, DisableConnectionBar,
+    // DisableRemoteAppCapsCheck (2), WarnAboutDirectXRedirection (2): non usati
+    void Slot56(); void Slot57(); void Slot58(); void Slot59(); void Slot60(); void Slot61(); void Slot62();
 
     void put_AllowPromptingForCredentials([MarshalAs(UnmanagedType.VariantBool)] bool value);
     [return: MarshalAs(UnmanagedType.VariantBool)] bool get_AllowPromptingForCredentials();

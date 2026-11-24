@@ -24,7 +24,14 @@ public sealed class ConnectionDialog : TouchForm
     private readonly CheckBox _printers = new() { Text = "Stampanti", AutoSize = true };
     private readonly CheckBox _microphone = new() { Text = "Microfono", AutoSize = true };
     private readonly ComboBox _audio = new() { Width = 200, DropDownStyle = ComboBoxStyle.DropDownList };
-    private readonly CheckBox _allMonitors = new() { Text = "Usa tutti i monitor", AutoSize = true };
+    private readonly RadioButton _monitorSingle = new() { Text = "Un solo schermo", AutoSize = true, Name = "monitorSingle" };
+    private readonly RadioButton _monitorAll = new() { Text = "Tutti gli schermi", AutoSize = true, Name = "monitorAll" };
+    private readonly RadioButton _monitorSelected = new() { Text = "Scegli quali schermi", AutoSize = true, Name = "monitorSelected" };
+    private readonly FlowLayoutPanel _monitorList = new()
+    {
+        FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoSize = true, Margin = new Padding(24, 0, 0, 0), Name = "monitorList",
+    };
+    private readonly IReadOnlyList<ScreenInfo> _screens;
     private readonly ComboBox _quality = new() { Width = 200, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly CheckBox _keepAlive = new() { Text = "Tieni sveglia la sessione", AutoSize = true };
 
@@ -72,9 +79,10 @@ public sealed class ConnectionDialog : TouchForm
     }
 
     public ConnectionDialog(RdpConnection target, IEnumerable<string> groups, string title,
-        IReadOnlyList<CredentialProfile>? profiles = null)
+        IReadOnlyList<CredentialProfile>? profiles = null, IReadOnlyList<ScreenInfo>? screens = null)
     {
         _target = target;
+        _screens = screens ?? Screens.All();
         _profiles = (profiles ?? []).OrderBy(p => p.DisplayName, StringComparer.CurrentCultureIgnoreCase).ToList();
         Text = title;
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -119,7 +127,13 @@ public sealed class ConnectionDialog : TouchForm
         Row("Risorse", Flow(_clipboard, _drives, _printers, _microphone));
         Row("Audio", _audio);
         Row("Qualità", Flow(_quality, _keepAlive, Help("Rete locale: 32 bit e tutti gli effetti. Connessione lenta: 16 bit, niente sfondo, animazioni e temi, compressione. Automatica: decide il client misurando la rete. «Tieni sveglia» manda un segnale ogni minuto per evitare le disconnessioni per inattività di router e firewall. Valgono anche per «Apri con mstsc» e i file .rdp.")));
-        Row("Monitor", Flow(_allMonitors, Help("A schermo intero la sessione occupa tutti i monitor come un unico desktop. Con «Apri con mstsc» usa la modalità multimonitor di Windows.")));
+        var monitors = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoSize = true, Margin = Padding.Empty };
+        // I tre pulsanti stanno nello stesso contenitore, così si escludono a vicenda.
+        monitors.Controls.Add(_monitorSingle);
+        monitors.Controls.Add(_monitorAll);
+        monitors.Controls.Add(_monitorSelected);
+        monitors.Controls.Add(_monitorList);
+        Row("Schermi", Flow(monitors, Help("A schermo intero la sessione occupa gli schermi indicati come un unico desktop. Con «Apri con mstsc» e nei file .rdp vale «use multimon» e «selectedmonitors».")));
         Row("Riconnessione", Flow(_autoReconnect, _attempts, new Label { Text = "volte", AutoSize = true, Margin = new Padding(3, 6, 0, 0) },
             Help("Dopo una disconnessione non voluta (rete, server riavviato) l'app ritenta con attese crescenti: 2, 4, 8, 16, 30 secondi. Non ritenta se hai chiuso tu la sessione o se le credenziali sono sbagliate.")));
         Row("Elenco", Flow(_favorite, new Label { Text = "Etichetta", AutoSize = true, Margin = new Padding(10, 6, 3, 0) }, _label, _colorSwatch, _color, _noColor));
@@ -191,7 +205,7 @@ public sealed class ConnectionDialog : TouchForm
         _printers.Checked = target.RedirectPrinters;
         _microphone.Checked = target.RedirectMicrophone;
         _audio.SelectedIndex = Math.Max(0, Array.FindIndex(AudioChoices, a => a.Mode == target.AudioMode));
-        _allMonitors.Checked = target.UseAllMonitors;
+        LoadMonitors(target);
         _quality.Items.AddRange(QualityChoices.Select(q => (object)q.Text).ToArray());
         _quality.SelectedIndex = Math.Max(0, Array.FindIndex(QualityChoices, q => q.Profile == target.Quality));
         _keepAlive.Checked = target.KeepAlive;
@@ -202,6 +216,86 @@ public sealed class ConnectionDialog : TouchForm
         _label.Text = target.Label;
         _mac.Text = target.MacAddress;
         SetColor(target.Color);
+    }
+
+    /// <summary>Una casella dell'elenco schermi: <paramref name="Index"/> è la posizione nell'elenco rilevato (o quella salvata, se non collegato).</summary>
+    internal sealed record MonitorChoice(string Text, string Device, int Index, bool Connected, bool Checked);
+
+    /// <summary>
+    /// Le caselle: prima gli schermi collegati (numerati da sinistra), poi quelli salvati e non più collegati,
+    /// spuntati e marcati «(non collegato)» così non si perdono salvando.
+    /// </summary>
+    internal static List<MonitorChoice> BuildMonitorChoices(IReadOnlyList<ScreenInfo> screens, RdpConnection c)
+    {
+        var saved = c.SelectedMonitors;
+        var devices = c.SelectedMonitorDevices;
+        var checkedIndexes = new HashSet<int>();
+        var missing = new List<MonitorChoice>();
+        for (int k = 0; k < saved.Length; k++)
+        {
+            string device = k < devices.Length && !string.IsNullOrWhiteSpace(devices[k]) ? devices[k] : "";
+            int at = device.Length > 0
+                ? screens.ToList().FindIndex(s => s.DeviceName.Equals(device, StringComparison.OrdinalIgnoreCase))
+                : saved[k] < screens.Count ? saved[k] : -1;
+            if (at >= 0)
+                checkedIndexes.Add(at);
+            else
+                missing.Add(new MonitorChoice($"Schermo {saved[k] + 1}: {(device.Length > 0 ? device : "#" + saved[k])} (non collegato)",
+                    device, saved[k], false, true));
+        }
+        var result = new List<MonitorChoice>();
+        var ordered = MonitorLayout.Ordered(screens);
+        for (int n = 0; n < ordered.Count; n++)
+        {
+            var s = ordered[n];
+            int index = screens.ToList().IndexOf(s);
+            result.Add(new MonitorChoice(
+                $"Schermo {n + 1}: {s.DeviceName} ({s.Bounds.Width}×{s.Bounds.Height}{(s.Primary ? ", principale" : "")})",
+                s.DeviceName, index, true, checkedIndexes.Contains(index)));
+        }
+        result.AddRange(missing);
+        return result;
+    }
+
+    private void LoadMonitors(RdpConnection c)
+    {
+        var mode = c.MonitorMode;
+        _monitorSingle.Checked = mode == MonitorMode.Single;
+        _monitorAll.Checked = mode == MonitorMode.All;
+        _monitorSelected.Checked = mode == MonitorMode.Selected;
+        foreach (var choice in BuildMonitorChoices(_screens, c))
+            _monitorList.Controls.Add(new CheckBox { Text = choice.Text, AutoSize = true, Checked = choice.Checked, Tag = choice, Name = "monitorBox" });
+        _monitorSelected.CheckedChanged += (_, _) => UpdateMonitorFields();
+        UpdateMonitorFields();
+    }
+
+    private void UpdateMonitorFields()
+    {
+        foreach (Control box in _monitorList.Controls)
+            box.Enabled = _monitorSelected.Checked;
+    }
+
+    internal RadioButton MonitorSingle => _monitorSingle;
+    internal RadioButton MonitorAll => _monitorAll;
+    internal RadioButton MonitorSelected => _monitorSelected;
+    internal IReadOnlyList<CheckBox> MonitorBoxes => _monitorList.Controls.OfType<CheckBox>().ToList();
+
+    /// <summary>Messaggio d'errore se «Scegli quali schermi» è attivo ma nessuna casella è spuntata, altrimenti null.</summary>
+    internal string? MonitorError =>
+        _monitorSelected.Checked && !MonitorBoxes.Any(b => b.Checked)
+            ? "Hai scelto «Scegli quali schermi» ma nessuna casella è spuntata: spunta almeno uno schermo, oppure scegli «Un solo schermo» o «Tutti gli schermi»."
+            : null;
+
+    private void SaveMonitors()
+    {
+        _target.MonitorMode = _monitorSelected.Checked ? MonitorMode.Selected
+            : _monitorAll.Checked ? MonitorMode.All : MonitorMode.Single;
+        if (_target.MonitorMode != MonitorMode.Selected)
+            return; // la scelta precedente resta memorizzata
+        var chosen = MonitorBoxes.Where(b => b.Checked).Select(b => (MonitorChoice)b.Tag!)
+            .GroupBy(m => m.Index).Select(g => g.First()).OrderBy(m => m.Index).ToList();
+        _target.SelectedMonitors = chosen.Select(m => m.Index).ToArray();
+        _target.SelectedMonitorDevices = chosen.Select(m => m.Device).ToArray();
     }
 
     /// <summary>Posizione del profilo nell'elenco ordinato, -1 se assente.</summary>
@@ -274,6 +368,14 @@ public sealed class ConnectionDialog : TouchForm
             return;
         }
 
+        if (MonitorError is { } monitorError)
+        {
+            MessageBox.Show(this, monitorError, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            DialogResult = DialogResult.None;
+            _monitorSelected.Focus();
+            return;
+        }
+
         string mac = "";
         if (_mac.Text.Trim().Length > 0 && !WakeOnLan.TryNormalizeMac(_mac.Text, out mac))
         {
@@ -304,7 +406,7 @@ public sealed class ConnectionDialog : TouchForm
         _target.RedirectPrinters = _printers.Checked;
         _target.RedirectMicrophone = _microphone.Checked;
         _target.AudioMode = AudioChoices[Math.Max(0, _audio.SelectedIndex)].Mode;
-        _target.UseAllMonitors = _allMonitors.Checked;
+        SaveMonitors();
         _target.Quality = QualityChoices[Math.Max(0, _quality.SelectedIndex)].Profile;
         _target.KeepAlive = _keepAlive.Checked;
         _target.AutoReconnect = _autoReconnect.Checked;
