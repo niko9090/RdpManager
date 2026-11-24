@@ -873,6 +873,15 @@ public class NetworkToolsTests
     }
 
     [Fact]
+    public void Cerca_pc_in_rete_propone_la_rete_della_vpn_se_la_scheda_ha_prefisso_32()
+    {
+        var wg = new AdapterInfo("RdpManager", "RdpManager", System.Net.NetworkInformation.NetworkInterfaceType.Unknown, System.Net.IPAddress.Parse("10.66.0.5"), 32, NetworkKind.WireGuard);
+        var sources = new NetworkScanSources { Adapters = () => [wg], InactiveVpn = () => [] };
+        var vm = new NetworkScanViewModel(new ConnectionsDocument(), (_, _) => new DiscoveryImportResult([], 0), _ => Task.FromResult(true), sources);
+        Assert.Equal("10.66.0.1-10.66.0.254", vm.VpnTab.Range);
+    }
+
+    [Fact]
     public void Cerca_pc_in_rete_dice_che_la_vpn_non_e_collegata()
     {
         var lan = new AdapterInfo("eth0", "eth0", System.Net.NetworkInformation.NetworkInterfaceType.Ethernet, System.Net.IPAddress.Parse("192.168.1.20"), 24, NetworkKind.Local);
