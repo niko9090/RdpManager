@@ -102,6 +102,9 @@ public sealed record FreeRdpLaunchContext
             ? this
             : this with { AvailableWidth = width, AvailableHeight = height };
 
+    /// <summary>Schermi rilevati (stesso ordine dell'elenco delle Impostazioni); vuoto = non rilevati.</summary>
+    public IReadOnlyList<ScreenInfo> Screens { get; init; } = [];
+
     /// <summary>Schermo intero (solo finestra separata).</summary>
     public bool Fullscreen { get; init; }
 
@@ -144,7 +147,35 @@ public static class FreeRdpCommandBuilder
 
     /// <summary>Vero se la sessione verrà incorporata nella scheda con questi dati.</summary>
     public static bool WillEmbed(RdpConnection c, FreeRdpClient client, FreeRdpLaunchContext ctx) =>
-        ctx.ParentWindow is not null && client.CanEmbed && !c.UseAllMonitors;
+        ctx.ParentWindow is not null && client.CanEmbed && c.MonitorMode == MonitorMode.Single;
+
+    /// <summary>
+    /// Argomenti dei monitor per «tutti» e «scelti». Con l'elenco degli schermi rilevati si usa <see cref="MonitorSelection"/>
+    /// (schermo scelto non più collegato: si usano gli altri, o tutti se non ne resta nessuno). Senza elenco (non rilevato)
+    /// «tutti» è <c>/multimon</c> e «scelti» usa gli indici salvati così come sono.
+    /// Mappatura: l'indice salvato è la posizione nell'elenco di Avalonia (da sinistra a destra); <c>/monitors:</c> di FreeRDP 2 e 3
+    /// vuole gli indici di <c>/list:monitor</c>, che sui sistemi comuni seguono lo stesso ordine ma non è garantito
+    /// (X11: ordine di RandR; Wayland/SDL: ordine del compositor). Un solo schermo scelto: <c>/monitors:N</c> senza <c>/multimon</c>.
+    /// </summary>
+    public static IReadOnlyList<string> MonitorArguments(RdpConnection c, IReadOnlyList<ScreenInfo>? screens)
+    {
+        if (screens is { Count: > 0 })
+        {
+            var r = MonitorSelection.Resolve(screens, c);
+            if (r.UseMultimon)
+                return MonitorSelection.FreeRdpArguments(r, screens.Count);
+            // Uno schermo solo: se è stato scelto fra più schermi va indicato, altrimenti basta lo schermo intero.
+            return c.MonitorMode == MonitorMode.Selected && screens.Count > 1 && r.Indexes.Count == 1
+                ? ["/monitors:" + r.Indexes[0].ToString(System.Globalization.CultureInfo.InvariantCulture)]
+                : [];
+        }
+        if (c.MonitorMode == MonitorMode.Selected && c.SelectedMonitors.Length > 0)
+        {
+            var list = string.Join(",", c.SelectedMonitors.Distinct().Order());
+            return c.SelectedMonitors.Distinct().Count() > 1 ? ["/multimon", "/monitors:" + list] : ["/monitors:" + list];
+        }
+        return ["/multimon"];
+    }
 
     public static FreeRdpCommand Build(RdpConnection c, FreeRdpClient client, FreeRdpLaunchContext? ctx = null)
     {
@@ -181,10 +212,10 @@ public static class FreeRdpCommandBuilder
             if (!resizable)
                 args.Add("/smart-sizing");
         }
-        else if (c.UseAllMonitors)
+        else if (c.MonitorMode != MonitorMode.Single)
         {
             args.Add("/f");
-            args.Add("/multimon");
+            args.AddRange(MonitorArguments(c, ctx.Screens));
         }
         else if (ctx.Fullscreen)
         {

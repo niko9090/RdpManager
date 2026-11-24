@@ -140,15 +140,27 @@
           </WrapPanel>
         </Grid>
         <Grid ColumnDefinitions="160,*">
-          <TextBlock Classes="rowLabel" Text="Monitor" />
-          <WrapPanel Grid.Column="1" Orientation="Horizontal">
-            <CheckBox Content="Usa tutti i monitor" IsChecked="{Binding UseAllMonitors}" />
-            <Button Classes="help">
-              <Button.Flyout>
-                <Flyout><TextBlock Classes="helpText" Text="A schermo intero la sessione occupa tutti i monitor come un unico desktop." /></Flyout>
-              </Button.Flyout>
-            </Button>
-          </WrapPanel>
+          <TextBlock Classes="rowLabel" Text="Schermi" />
+          <StackPanel Grid.Column="1" Spacing="4">
+            <WrapPanel Orientation="Horizontal" ItemSpacing="12">
+              <RadioButton GroupName="schermi" Content="Un solo schermo" IsChecked="{Binding SingleScreen}" />
+              <RadioButton GroupName="schermi" Content="Tutti gli schermi" IsChecked="{Binding AllScreens}" />
+              <RadioButton GroupName="schermi" Content="Scegli quali schermi" IsChecked="{Binding ChosenScreens}" />
+              <Button Classes="help">
+                <Button.Flyout>
+                  <Flyout><TextBlock Classes="helpText" Text="Un solo schermo: la sessione sta in una scheda o finestra. Tutti gli schermi, o quelli che scegli: la sessione va a schermo intero in una finestra separata e occupa quegli schermi come un unico desktop. Se uno schermo scelto non è più collegato si usano gli altri, o tutti se non ne resta nessuno." /></Flyout>
+                </Button.Flyout>
+              </Button>
+            </WrapPanel>
+            <ItemsControl ItemsSource="{Binding Screens}" IsVisible="{Binding ChosenScreens}" Margin="20,0,0,0">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ScreenChoice">
+                  <CheckBox Content="{Binding Text}" IsChecked="{Binding IsChecked}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Classes="helpText" Text="{Binding ScreensNote}" IsVisible="{Binding ChosenScreens}" />
+          </StackPanel>
         </Grid>
         <Grid ColumnDefinitions="160,*">
           <TextBlock Classes="rowLabel" Text="Riconnessione" />
