@@ -13,7 +13,7 @@ public sealed class SideBarTouchTests
     private static void Run(Action body)
     {
         Exception? failure = null;
-        var thread = new Thread(() =>
+        var thread = StaTestRunner.Create(() =>
         {
             try { body(); }
             catch (Exception ex) { failure = ex; }

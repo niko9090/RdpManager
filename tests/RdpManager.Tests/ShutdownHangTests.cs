@@ -17,7 +17,7 @@ public sealed class ShutdownHangTests
         var dir = Path.Combine(Path.GetTempPath(), "RdpManagerShutdown-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         Exception? failure = null;
-        var thread = new Thread(() =>
+        var thread = StaTestRunner.Create(() =>
         {
             try
             {

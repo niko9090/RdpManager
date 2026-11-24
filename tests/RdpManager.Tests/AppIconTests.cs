@@ -98,7 +98,7 @@ public sealed class AppIconTests
         var dir = Path.Combine(Path.GetTempPath(), "RdpManagerIcon-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         Exception? failure = null;
-        var thread = new Thread(() =>
+        var thread = StaTestRunner.Create(() =>
         {
             try
             {
@@ -113,7 +113,7 @@ public sealed class AppIconTests
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
-        thread.Join();
+        Assert.True(thread.Join(TimeSpan.FromSeconds(StaTestRunner.LimitSeconds)), "La prova UI non è terminata entro 60 s");
         try { Directory.Delete(dir, recursive: true); } catch (IOException) { }
         if (failure is not null)
             throw new Xunit.Sdk.XunitException(failure.ToString());

@@ -35,7 +35,7 @@ public sealed class CertificateWarningTests : IDisposable
     private void RunSta(Action body)
     {
         Exception? failure = null;
-        var thread = new Thread(() =>
+        var thread = StaTestRunner.Create(() =>
         {
             try { body(); }
             catch (Exception ex) { failure = ex; }

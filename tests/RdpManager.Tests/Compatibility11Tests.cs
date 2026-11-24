@@ -104,7 +104,7 @@ public sealed class Compatibility11Tests : IDisposable
         var s = doc.Settings;
         Assert.Equal(AppTheme.System, s.Theme);
         Assert.True(s.ShowTrayIcon);
-        Assert.False(s.CloseToTray);
+        Assert.True(s.CloseToTray); // di serie resta nell'area di notifica (k-158)
         Assert.Equal(GlobalHotkey.DefaultText, s.GlobalHotkey);
         Assert.True(s.HistoryEnabled);
         Assert.Equal(SplitLayout.DefaultRatio, s.SplitRatio);

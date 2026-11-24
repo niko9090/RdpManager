@@ -41,11 +41,11 @@ public sealed class UiV151Tests : IDisposable
     private static void Run(Action body)
     {
         Exception? failure = null;
-        var thread = new Thread(() =>
+        var thread = StaTestRunner.Create(() =>
         {
             try
             {
-                Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
+                // modalità eccezioni già impostata da StaTestRunner.Create
                 body();
             }
             catch (Exception ex)
@@ -55,7 +55,7 @@ public sealed class UiV151Tests : IDisposable
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
-        Assert.True(thread.Join(TimeSpan.FromSeconds(120)), "La prova UI non è terminata entro 120 s");
+        Assert.True(thread.Join(TimeSpan.FromSeconds(StaTestRunner.LimitSeconds)), "La prova UI non è terminata entro 60 s");
         if (failure is not null)
             ExceptionDispatchInfo.Throw(failure);
     }

@@ -61,7 +61,7 @@ public sealed class ScreenshotTests : IDisposable
         store.Save(doc);
 
         Exception? failure = null;
-        var thread = new Thread(() =>
+        var thread = StaTestRunner.Create(() =>
         {
             try
             {
@@ -192,7 +192,7 @@ public sealed class ScreenshotTests : IDisposable
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
-        Assert.True(thread.Join(TimeSpan.FromSeconds(120)));
+        Assert.True(thread.Join(TimeSpan.FromSeconds(StaTestRunner.LimitSeconds)), "La prova UI non è terminata entro 60 s");
         if (failure is not null)
             ExceptionDispatchInfo.Throw(failure);
     }
@@ -224,7 +224,7 @@ public sealed class ScreenshotTests : IDisposable
         store.Save(doc);
 
         Exception? failure = null;
-        var thread = new Thread(() =>
+        var thread = StaTestRunner.Create(() =>
         {
             try
             {
@@ -277,7 +277,7 @@ public sealed class ScreenshotTests : IDisposable
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
-        Assert.True(thread.Join(TimeSpan.FromSeconds(120)));
+        Assert.True(thread.Join(TimeSpan.FromSeconds(StaTestRunner.LimitSeconds)), "La prova UI non è terminata entro 60 s");
         if (failure is not null)
             ExceptionDispatchInfo.Throw(failure);
     }
@@ -308,7 +308,7 @@ public sealed class ScreenshotTests : IDisposable
         store.Save(doc);
 
         Exception? failure = null;
-        var thread = new Thread(() =>
+        var thread = StaTestRunner.Create(() =>
         {
             try
             {
@@ -374,7 +374,7 @@ public sealed class ScreenshotTests : IDisposable
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
-        Assert.True(thread.Join(TimeSpan.FromSeconds(120)));
+        Assert.True(thread.Join(TimeSpan.FromSeconds(StaTestRunner.LimitSeconds)), "La prova UI non è terminata entro 60 s");
         if (failure is not null)
             ExceptionDispatchInfo.Throw(failure);
     }
@@ -419,7 +419,7 @@ public sealed class ScreenshotTests : IDisposable
         };
 
         Exception? failure = null;
-        var thread = new Thread(() =>
+        var thread = StaTestRunner.Create(() =>
         {
             try
             {
@@ -464,7 +464,7 @@ public sealed class ScreenshotTests : IDisposable
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
-        Assert.True(thread.Join(TimeSpan.FromSeconds(120)));
+        Assert.True(thread.Join(TimeSpan.FromSeconds(StaTestRunner.LimitSeconds)), "La prova UI non è terminata entro 60 s");
         if (failure is not null)
             ExceptionDispatchInfo.Throw(failure);
     }

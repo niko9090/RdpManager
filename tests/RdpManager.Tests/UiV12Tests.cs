@@ -3,6 +3,7 @@ using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using RdpManager.Core;
+using TunnelState = RdpManager.Vpn.TunnelState;
 using RdpManager.UI;
 
 namespace RdpManager.Tests;
@@ -41,16 +42,16 @@ public sealed class UiV12Tests : IDisposable
     private static void OnStaThread(Action body)
     {
         Exception? failure = null;
-        var thread = new Thread(() =>
+        var thread = StaTestRunner.Create(() =>
         {
             // Un'eccezione dell'interfaccia deve far fallire la prova, non aprire il dialogo di .NET e bloccarla.
-            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
+            // modalità eccezioni già impostata da StaTestRunner.Create
             try { body(); }
             catch (Exception ex) { failure = ex; }
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
-        Assert.True(thread.Join(TimeSpan.FromSeconds(120)), "La prova UI non è terminata entro 120 s");
+        Assert.True(thread.Join(TimeSpan.FromSeconds(StaTestRunner.LimitSeconds)), "La prova UI non è terminata entro 60 s");
         if (failure is not null)
             ExceptionDispatchInfo.Throw(failure);
     }
@@ -487,6 +488,121 @@ public sealed class UiV12Tests : IDisposable
             Assert.True(form.IsDisposed);
         });
     }
+
+    // ---------- chiusura: area di notifica e VPN all'uscita (k-158) ----------
+
+    private sealed class FakeTunnel(TunnelState state) : RdpManager.Vpn.IWireGuardTunnel
+    {
+        public int Spegnimenti;
+        public TunnelState Stato { get; private set; } = state;
+        public void Accendi(WireGuardConfig config) => Stato = TunnelState.Acceso;
+        public void Spegni() { Spegnimenti++; Stato = TunnelState.Spento; }
+    }
+
+    private sealed class FakeServices(bool marshmelloInstalled) : RdpManager.Vpn.IVpnServiceControl
+    {
+        public TunnelState Query(string serviceName) => TunnelState.Spento;
+        public bool Exists(string serviceName) => marshmelloInstalled && serviceName == RdpManager.Vpn.VpnExitHandler.ClientServiceName;
+        public void Start(string serviceName) { }
+        public void Stop(string serviceName) { }
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void CloseButton_HidesOrExits_AccordingToOption(bool closeToTray)
+    {
+        var doc = new ConnectionsDocument { Connections = [Unreachable("Uno")] };
+        doc.Settings.CloseToTray = closeToTray;
+        doc.Settings.GlobalHotkey = "";
+        OnStaThread(() =>
+        {
+            using var form = new MainForm(StoreWith(doc), systemIntegration: true);
+            form.Show();
+            Pump(TimeSpan.FromMilliseconds(300));
+            form.Close(); // come la X
+            Pump(TimeSpan.FromMilliseconds(200));
+            Assert.Equal(!closeToTray, form.IsDisposed);
+            if (closeToTray)
+            {
+                Assert.False(form.Visible);
+                form.ExitApp();
+                Pump(TimeSpan.FromMilliseconds(200));
+                Assert.True(form.IsDisposed);
+            }
+        });
+    }
+
+    [Theory]
+    [InlineData(false, true)]  // VPN integrata: si spegne
+    [InlineData(true, false)]  // marshmelloVPN col suo programma: resta accesa
+    public void Exit_StopsBuiltInVpn_OnlyWithoutMarshmelloVpn(bool marshmelloInstalled, bool expectedStopped)
+    {
+        var doc = new ConnectionsDocument { Connections = [Unreachable("Uno")] };
+        doc.Settings.CloseToTray = true;
+        doc.Settings.GlobalHotkey = "";
+        var tunnel = new FakeTunnel(TunnelState.Acceso);
+        OnStaThread(() =>
+        {
+            using var form = new MainForm(StoreWith(doc), systemIntegration: true)
+            {
+                VpnOnExit = new RdpManager.Vpn.VpnExitHandler(tunnel, new FakeServices(marshmelloInstalled)),
+            };
+            form.Show();
+            Pump(TimeSpan.FromMilliseconds(300));
+            form.Close(); // la X riduce: la VPN non si tocca
+            Pump(TimeSpan.FromMilliseconds(200));
+            Assert.False(form.IsDisposed);
+            Assert.Equal(0, tunnel.Spegnimenti);
+            form.ExitApp(); // uscita vera
+            Pump(TimeSpan.FromMilliseconds(200));
+            Assert.True(form.IsDisposed);
+            Assert.Equal(expectedStopped, form.VpnStoppedOnExit);
+            Assert.Equal(expectedStopped ? 1 : 0, tunnel.Spegnimenti);
+        });
+    }
+
+    [Fact]
+    public void Exit_WithOptionOff_StopsBuiltInVpn()
+    {
+        var doc = new ConnectionsDocument { Connections = [Unreachable("Uno")] };
+        doc.Settings.CloseToTray = false;
+        doc.Settings.GlobalHotkey = "";
+        var tunnel = new FakeTunnel(TunnelState.Acceso);
+        OnStaThread(() =>
+        {
+            using var form = new MainForm(StoreWith(doc), systemIntegration: true)
+            {
+                VpnOnExit = new RdpManager.Vpn.VpnExitHandler(tunnel, new FakeServices(false)),
+            };
+            form.Show();
+            Pump(TimeSpan.FromMilliseconds(300));
+            form.Close();
+            Pump(TimeSpan.FromMilliseconds(200));
+            Assert.True(form.IsDisposed);
+            Assert.Equal(1, tunnel.Spegnimenti);
+        });
+    }
+
+    [Fact]
+    public void VpnExitHandler_WindowsShutdown_NeverTouchesVpn_AndSwitchedOffTunnelIsLeftAlone()
+    {
+        var running = new FakeTunnel(TunnelState.Acceso);
+        Assert.False(new RdpManager.Vpn.VpnExitHandler(running, new FakeServices(false)).OnExit(windowsEnding: true));
+        Assert.Equal(0, running.Spegnimenti);
+        var off = new FakeTunnel(TunnelState.Spento);
+        Assert.False(new RdpManager.Vpn.VpnExitHandler(off, new FakeServices(false)).OnExit(windowsEnding: false));
+        Assert.Equal(0, off.Spegnimenti);
+    }
+
+    [Theory]
+    [InlineData(true, true, true, false, true)]
+    [InlineData(false, true, true, false, false)]   // opzione spenta
+    [InlineData(true, false, true, false, false)]   // niente icona
+    [InlineData(true, true, false, false, false)]   // spegnimento o logoff di Windows
+    [InlineData(true, true, true, true, false)]     // «Esci»
+    public void ClosePolicy_ShouldHideToTray(bool option, bool tray, bool user, bool exit, bool expected)
+        => Assert.Equal(expected, ClosePolicy.ShouldHideToTray(option, tray, user, exit));
 
     // ---------- dialoghi nuovi ----------
 
