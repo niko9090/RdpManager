@@ -8,6 +8,7 @@
 - Windows: la sessione incorporata a schermo intero usa davvero più schermi.
 - Linux: FreeRDP riceve `/monitors`.
 - Gli schermi scelti si ritrovano per nome, anche se cambia l'ordine di collegamento.
+- Su schermi piccoli la ricerca dei PC in rete ora scorre invece di coprire i pulsanti con il riquadro VPN, e nell'importazione da CSV il riepilogo va a capo invece di uscire dal bordo.
 
 ## 1.18.1 (2026-11-24)
 
