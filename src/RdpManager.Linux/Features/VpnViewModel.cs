@@ -225,11 +225,39 @@ public sealed class VpnViewModel : ViewModelBase
 
     public async Task GenerateKeysAsync()
     {
-        if (_profile.HasKey && !await _dialogs.ConfirmAsync("marshmelloVPN",
-                "Esiste già una chiave. Crearne una nuova scollega questo PC dal server finché non aggiungi il nuovo frammento. Continuare?"))
+        if (Busy)
             return;
-        _profile.GenerateKeys();
-        Persist();
+        VpnRegistrar? register = _sync is { SignedIn: true } ? _sync.RequestVpnAsync : null;
+        if (_profile.HasKey && !await _dialogs.ConfirmAsync("marshmelloVPN",
+                register is not null && VpnKeySync.IsRegistered(_profile)
+                    ? "Esiste già una chiave. Ne creo una nuova e la registro sul server: se il server non risponde resta quella attuale. Continuare?"
+                    : "Esiste già una chiave. Crearne una nuova scollega questo PC dal server finché non aggiungi il nuovo frammento. Continuare?"))
+            return;
+        Busy = true;
+        VpnKeyResult result;
+        try
+        {
+            result = await VpnKeySync.RotateAsync(_profile, _profilePath, register);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            result = new VpnKeyResult(false, "Impossibile salvare le chiavi: " + ex.Message);
+        }
+        finally
+        {
+            Busy = false;
+        }
+        if (result.Ok)
+        {
+            PcName = _profile.PcName;
+            Address = _profile.Address;
+            Endpoint = _profile.Endpoint;
+            ServerPublicKey = _profile.ServerPublicKey;
+            Persist();
+        }
+        else
+            RefreshKeys();
+        Message = result.Message;
     }
 
     private void RefreshKeys()
