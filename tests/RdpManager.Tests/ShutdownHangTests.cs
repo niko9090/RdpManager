@@ -34,9 +34,24 @@ public sealed class ShutdownHangTests
             throw new Xunit.Sdk.XunitException(failure.ToString());
     }
 
-    private static MainForm NewForm() =>
-        new(new ConnectionStore(Path.Combine(Path.GetTempPath(), "RdpManagerShutdown-" + Guid.NewGuid().ToString("N") + ".json")),
-            systemIntegration: false);
+    private static MainForm NewForm()
+    {
+        // Indipendente dal valore di serie: la prova vuole l'uscita vera da Close(), non la riduzione nell'area di notifica.
+        var store = new ConnectionStore(Path.Combine(Path.GetTempPath(), "RdpManagerShutdown-" + Guid.NewGuid().ToString("N") + ".json"));
+        var doc = new ConnectionsDocument();
+        doc.Settings.CloseToTray = false;
+        store.Save(doc);
+        return new MainForm(store, systemIntegration: false);
+    }
+
+    /// <summary>Salvagente per le prove con Application.Run: dopo 20 s forza l'uscita del ciclo, così una prova fallita non lascia un testhost appeso.</summary>
+    private static System.Windows.Forms.Timer StartRunSafety()
+    {
+        var safety = new System.Windows.Forms.Timer { Interval = 20_000 };
+        safety.Tick += (_, _) => { safety.Stop(); Application.ExitThread(); };
+        safety.Start();
+        return safety;
+    }
 
     private static bool PumpUntil(Func<bool> condition, int ms)
     {
@@ -89,6 +104,7 @@ public sealed class ShutdownHangTests
             closer.Start();
             // L'uscita forzata deve arrivare mentre il thread dell'interfaccia è ancora fermo nel gestore.
             var watcher = Task.Run(() => { var fired = exited.Wait(TimeSpan.FromSeconds(10)); release.Set(); return fired; });
+            using var safety = StartRunSafety();
             Application.Run(form);
 
             Assert.True(watcher.Result, "la chiusura bloccata non ha fatto uscire il programma");
@@ -300,6 +316,7 @@ public sealed class ShutdownHangTests
             closer.Tick += (_, _) => { closer.Stop(); form.Close(); };
             closer.Start();
             var watcher = Task.Run(() => { var fired = exited.Wait(TimeSpan.FromSeconds(10)); release.Set(); return fired; });
+            using var safety = StartRunSafety();
             Application.Run(form);
 
             Assert.True(inShutdownDuringNested, "la chiusura annidata ha annullato la chiusura in corso");
