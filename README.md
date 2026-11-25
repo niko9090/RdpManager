@@ -552,6 +552,14 @@ chiavi finte).
 (coperti solo la compilazione dell'installer e i test automatici di lettura/applicazione del file con server finto); il
 rilevamento del file accanto all'installer e `/CONFIG` (script Inno, mai eseguito).
 
+## marshmelloVPN su un NAS Synology
+
+Un NAS Synology (DSM 7, aarch64 o x86_64, senza modulo WireGuard e senza Docker) entra nella VPN come un PC, con lo stesso
+file `.rdpmconfig`: copia `server/nas-client` e il file sul NAS, poi via SSH
+`sudo sh installa-nas.sh --config ../RdpManager.rdpmconfig`. Il NAS crea le sue chiavi, si registra su rdpm-sync, accende
+il tunnel (wireguard-go + wg, binari statici inclusi) e lo tiene vivo come il servizio Windows; parte da solo all'accensione.
+Passi, firewall di DSM, Tailscale e disinstallazione: [`server/nas-client/LEGGIMI.md`](server/nas-client/LEGGIMI.md).
+
 ## Pubblicare a mano (cartella o eseguibile unico)
 
 ```powershell
