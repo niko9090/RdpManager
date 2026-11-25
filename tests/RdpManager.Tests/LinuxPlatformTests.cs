@@ -274,6 +274,44 @@ public sealed class LinuxPlatformTests : IDisposable
         Assert.False(File.Exists(conf), "la copia con la chiave privata va cancellata dopo l'import");
     }
 
+    private async Task<string> ConfAlImportAsync(WireGuardConfig cfg, params string[] localIps)
+    {
+        var conf = Path.Combine(_dir, "vpn", "RdpManager.conf");
+        string text = "";
+        var r = new FakeRunner();
+        r.Handler = l =>
+        {
+            if (l.Contains(" import "))
+                text = File.ReadAllText(conf);
+            return new ProcessResult(0, "", "");
+        };
+        var wg = new LinuxWireGuard(r, conf, LinuxVpnBackend.NetworkManager,
+            () => localIps.Select(System.Net.IPAddress.Parse).ToList());
+        Assert.True((await wg.ConnectAsync(cfg)).Success);
+        return text;
+    }
+
+    [Fact]
+    public async Task Connetti_ConEndpointLan_ConfSenzaChiaveSconosciuta()
+    {
+        // k-203: «LanEndpoint» non è una chiave WireGuard: wg-quick e nmcli rifiutano il file intero.
+        var cfg = SampleConfig() with { LanEndpoint = "192.168.1.199:51820" };
+        var fuori = await ConfAlImportAsync(cfg, "10.0.0.5");
+        Assert.DoesNotContain("LanEndpoint", fuori);
+        Assert.Contains("Endpoint = vpn.example.com:51820", fuori);
+        Assert.DoesNotContain("LanEndpoint", LinuxWireGuardCommands.ConfText(cfg));
+    }
+
+    [Fact]
+    public async Task Connetti_NellaLanDelServer_UsaLEndpointLan()
+    {
+        var cfg = SampleConfig() with { LanEndpoint = "192.168.1.199:51820" };
+        var dentro = await ConfAlImportAsync(cfg, "192.168.1.50");
+        Assert.Contains("Endpoint = 192.168.1.199:51820", dentro);
+        Assert.DoesNotContain("vpn.example.com", dentro);
+        Assert.DoesNotContain("LanEndpoint", dentro);
+    }
+
     [Fact]
     public async Task Connetti_ImportFallito_RiportaErrore_ConfigNonValidaNonLanciaNulla()
     {
