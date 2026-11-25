@@ -1,5 +1,11 @@
 # Novità di RdpManager
 
+## 1.19.2 (25/11/2026)
+
+**Chiusura con la X e attesa della connessione**
+- Windows: chiudendo con la X il programma resta di nuovo come icona accanto all'orologio anche per chi aveva una vecchia impostazione salvata (la correzione si applica una sola volta ai file salvati prima). La scelta resta modificabile nelle Impostazioni; «Esci» dal menu dell'icona chiude davvero.
+- Mentre si apre un desktop remoto compare al centro la scritta «Connessione in corso…», che sparisce a connessione pronta.
+
 ## 1.19.1 (2026-11-24)
 
 **VPN: ora si vedono i PC delle altre reti**
