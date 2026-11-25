@@ -10,9 +10,10 @@ public sealed partial class ConnectionsDocument
     /// Versione scritta da questa build: 1 = RdpManager 1.0.x, 2 = 1.1 (campi nuovi e impostazioni),
     /// 3 = 1.2 (profili di credenziali, gateway, testi rapidi), 4 = 1.3 (impostazioni nuove, ordine manuale),
     /// 5 = 1.4 (spazi di lavoro, PIN di blocco, profili di qualità, sessione tenuta sveglia),
-    /// 6 = 1.5 (barra a schermo intero personalizzabile), 7 = 1.5.1 (larghezza della barra laterale della finestra).
+    /// 6 = 1.5 (barra a schermo intero personalizzabile), 7 = 1.5.1 (larghezza della barra laterale della finestra),
+    /// 8 = 1.19.2 («resta nell'area di notifica» acceso di serie: i file più vecchi lo riaccendono una volta).
     /// </summary>
-    public const int CurrentVersion = 7;
+    public const int CurrentVersion = 8;
 
     /// <summary>Versione letta dal file; i file della 1.0.0 e 1.1.0 hanno 1 e 2 e si caricano con i valori predefiniti per i campi nuovi.</summary>
     public int Version { get; set; } = CurrentVersion;
@@ -230,6 +231,11 @@ public sealed class ConnectionStore
         doc.Connections ??= [];
         doc.Settings ??= new AppSettings();
         doc.Settings.Normalize();
+        // Migrazione una tantum (versione 8): i file scritti prima portano CloseToTray=false, che vinceva sul nuovo
+        // valore di serie (true) e faceva chiudere il programma con la X. Una volta salvato, il file è versione 8
+        // e la scelta dell'utente non si tocca più.
+        if (doc.Version < 8 && doc.Version >= 1)
+            doc.Settings.CloseToTray = true;
         doc.CredentialProfiles ??= [];
         doc.CredentialProfiles.RemoveAll(p => p is null);
         foreach (var p in doc.CredentialProfiles)
