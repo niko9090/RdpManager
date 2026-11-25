@@ -16,9 +16,12 @@ public static class LinuxWireGuardCommands
     public static string DefaultConfPath(string? dataFolder = null, string tunnel = VpnDefaults.TunnelName) =>
         Path.Combine(dataFolder ?? AppPaths.DataFolder, "vpn", tunnel + ".conf");
 
-    /// <summary>Il .conf per Linux: stesso contenuto del Core, righe con LF.</summary>
+    /// <summary>
+    /// Il .conf per Linux: stesso contenuto del Core, righe con LF. «LanEndpoint» è una chiave solo di RdpManager: wg-quick
+    /// (wg setconf) e NetworkManager non la conoscono e rifiutano il file («Line unrecognized»), quindi qui non si scrive mai.
+    /// </summary>
     public static string ConfText(WireGuardConfig config) =>
-        config.ToConf().Replace("\r\n", "\n");
+        (config with { LanEndpoint = "" }).ToConf().Replace("\r\n", "\n");
 
     // NetworkManager: l'importazione dà alla connessione il nome del file.
     public static LinuxCommand NmImport(string confPath) => new("nmcli", ["connection", "import", "type", "wireguard", "file", confPath]);
@@ -99,11 +102,15 @@ public sealed class LinuxWireGuard
     private readonly string _confPath;
     private LinuxVpnBackend? _backend;
 
-    public LinuxWireGuard(IProcessRunner? runner = null, string? confPath = null, LinuxVpnBackend? backend = null)
+    private readonly Func<IReadOnlyList<System.Net.IPAddress>> _localAddresses;
+
+    public LinuxWireGuard(IProcessRunner? runner = null, string? confPath = null, LinuxVpnBackend? backend = null,
+        Func<IReadOnlyList<System.Net.IPAddress>>? localAddresses = null)
     {
         _runner = runner ?? new SystemProcessRunner();
         _confPath = confPath ?? LinuxWireGuardCommands.DefaultConfPath();
         _backend = backend;
+        _localAddresses = localAddresses ?? VpnEndpointChoice.LocalAddresses;
     }
 
     public string ConfPath => _confPath;
@@ -165,6 +172,8 @@ public sealed class LinuxWireGuard
         var errors = config.Validate();
         if (errors.Count > 0)
             return new LinuxVpnResult(false, string.Join(" ", errors));
+        // Nella LAN del server il nome pubblico non risponde (niente hairpin NAT sul router): si usa l'indirizzo LAN.
+        config = VpnEndpointChoice.Apply(config, VpnEndpointChoice.OnServerLan(config.LanEndpoint, _localAddresses()));
 
         if (await GetBackendAsync(ct).ConfigureAwait(false) == LinuxVpnBackend.NetworkManager)
         {

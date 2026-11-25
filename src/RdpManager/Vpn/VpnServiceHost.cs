@@ -87,31 +87,16 @@ internal static class VpnServiceHost
         {
             SetStatus(StartPending, 0, 20000);
             VpnInbox.Collect(_programData, _tunnelName, VpnFiles.RestrictToAdministrators); // configurazione lasciata dall'utente senza UAC
-            var conf = WireGuardConfig.Parse(File.ReadAllText(VpnPaths.Conf(_programData, _tunnelName)));
-            // Con un endpoint LAN nel profilo: nella LAN del server si parte da quello (niente hairpin NAT sul router); se non
-            // arriva l'handshake si prova l'altro endpoint e si tiene quello che risponde.
-            bool hasAlternative = conf.LanEndpoint.Length > 0;
-            bool useLan = hasAlternative && VpnEndpointChoice.OnServerLan(conf.LanEndpoint, VpnEndpointChoice.LocalAddresses());
-            runner.Start(VpnEndpointChoice.Apply(conf, useLan), _tunnelName);
-            // started = prima accensione della sessione (non cambia mai: ServerUnreachable ne ha bisogno);
-            // attemptStart = inizio del tentativo con l'endpoint corrente (riparte a ogni cambio di endpoint).
-            var started = DateTime.UtcNow;
-            var attemptStart = started;
-            bool answered = false;
+            // Il ciclo (VpnServiceLoop) sceglie l'endpoint (LAN nella rete del server, se il profilo lo ha), passa all'altro se
+            // non arriva l'handshake e ricrea il tunnel quando smette di rispondere (router riavviato, hairpin NAT inceppato).
+            WireGuardConfig LoadConf() => WireGuardConfig.Parse(File.ReadAllText(VpnPaths.Conf(_programData, _tunnelName)));
+            LoadConf(); // configurazione illeggibile: il servizio si ferma con errore, come prima
+            var loop = new VpnServiceLoop(runner, LoadConf, _tunnelName, () => DateTime.UtcNow, log: LogLine);
             SetStatus(Running, 0, 0);
             do
             {
-                var status = runner.ReadStatus();
-                answered |= status?.LastHandshakeUtc is not null;
-                if (hasAlternative && !answered && DateTime.UtcNow - attemptStart > VpnEndpointChoice.SwitchTimeout)
-                {
-                    useLan = !useLan;
-                    runner.Stop();
-                    runner.Start(VpnEndpointChoice.Apply(conf, useLan), _tunnelName);
-                    attemptStart = DateTime.UtcNow;
-                    status = runner.ReadStatus();
-                }
-                WriteStatus(status is null ? null : status with { StartedUtc = started });
+                loop.Tick();
+                WriteStatus(loop.LastStatus);
             }
             while (!StopEvent.WaitOne(2000));
         }
@@ -160,6 +145,17 @@ internal static class VpnServiceHost
             var path = VpnPaths.Status(_programData);
             File.WriteAllText(path + ".tmp", status.Format());
             File.Move(path + ".tmp", path, overwrite: true);
+        }
+        catch (IOException)
+        {
+        }
+    }
+
+    private static void LogLine(string line)
+    {
+        try
+        {
+            File.AppendAllText(VpnPaths.Log(_programData), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {line}\r\n");
         }
         catch (IOException)
         {

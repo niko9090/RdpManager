@@ -172,6 +172,33 @@ public sealed partial class MainForm
     }
 
     /// <summary>
+    /// Profilo nato prima dell'endpoint LAN: lo si chiede una volta al server e, se arriva e il tunnel è acceso, si rimette la
+    /// configurazione (dalla cartella d'ingresso, senza UAC). Senza, un PC nella LAN del server passa dal nome pubblico e
+    /// dipende dall'hairpin NAT del router, che il FRITZ!Box perde dopo un'interruzione.
+    /// </summary>
+    private async Task<string> RefreshLanEndpointAsync(VpnProfile before)
+    {
+        if (VpnClientGuard.IsManagedByClient(new ScControl(), msg => AppLog.Default?.Info(msg)))
+            return "";
+        var profile = await VpnProvisioning.EnsureAsync(_sync, ct: _shutdownCts.Token);
+        if (profile is null || profile.LanEndpoint.Length == 0 || profile.LanEndpoint == before.LanEndpoint)
+            return "";
+        AppLog.Default?.Info("VPN: endpoint LAN ricevuto dal server (" + profile.LanEndpoint + ")");
+        if (!Vpn.WireGuardNative.DllPresent)
+            return "";
+        var tunnel = CreateTunnel();
+        if (tunnel.Stato is not (TunnelState.Acceso or TunnelState.InAvvio))
+            return "";
+        var config = profile.ToConfig();
+        await Task.Run(() =>
+        {
+            tunnel.Spegni();
+            tunnel.Accendi(config);
+        });
+        return "VPN aggiornata: nella rete del server si collega direttamente (" + profile.LanEndpoint + ").";
+    }
+
+    /// <summary>
     /// VPN automatica: se questo PC non ha ancora un profilo e si è nell'account, lo ottiene dal server (chiavi create qui,
     /// al server va solo la pubblica) e accende il tunnel. Restituisce una riga di stato per chi l'ha chiamata ("" = niente da fare).
     /// </summary>
@@ -179,8 +206,11 @@ public sealed partial class MainForm
     {
         try
         {
-            if (IsDisposed || !_sync.SignedIn || _shutdownCts.IsCancellationRequested || !VpnProvisioning.NeedsProvisioning(VpnProfile.Load()))
+            if (IsDisposed || !_sync.SignedIn || _shutdownCts.IsCancellationRequested)
                 return "";
+            var before = VpnProfile.Load();
+            if (!VpnProvisioning.NeedsProvisioning(before))
+                return before.LanEndpointAsked ? "" : await RefreshLanEndpointAsync(before);
             if (VpnClientGuard.IsManagedByClient(new ScControl(), msg => AppLog.Default?.Info(msg)))
             {
                 AppLog.Default?.Info(VpnClientGuard.SkipMessage);

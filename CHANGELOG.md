@@ -1,5 +1,12 @@
 # Novità di RdpManager
 
+## 1.19.3 (25/11/2026)
+
+**VPN: il tunnel si riprende da solo**
+- Windows: se la VPN smette di rispondere (router riavviato, interruzione di linea, rete cambiata) il servizio la ricrea da solo entro circa 3 minuti, con una porta nuova e scegliendo di nuovo tra indirizzo LAN e pubblico. Prima, dopo un'interruzione, il PC restava fuori dalla VPN finché non si riavviava.
+- Windows e Linux: i PC registrati prima chiedono al server l'indirizzo LAN della VPN; nella rete del server si collegano direttamente al NAS invece di passare dal router (il FRITZ!Box perdeva la strada di ritorno).
+- Linux: il file per wg-quick e NetworkManager non contiene più la riga «LanEndpoint», che li faceva rifiutare la configurazione; nella LAN del server si usa l'indirizzo LAN.
+
 ## 1.19.2 (25/11/2026)
 
 **Chiusura con la X e attesa della connessione**

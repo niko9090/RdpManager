@@ -411,8 +411,24 @@ public sealed class VpnViewModel : ViewModelBase
     {
         try
         {
-            if (!sync.SignedIn || !VpnProvisioning.NeedsProvisioning(VpnProfile.Load(profilePath)))
+            if (!sync.SignedIn)
                 return "";
+            var before = VpnProfile.Load(profilePath);
+            if (!VpnProvisioning.NeedsProvisioning(before))
+            {
+                // Profilo nato prima dell'endpoint LAN: lo si chiede una volta al server; se arriva e la VPN è accesa si
+                // ricollega (con NetworkManager non chiede la password; con wg-quick vale dalla prossima accensione).
+                if (before.LanEndpointAsked)
+                    return "";
+                var refreshed = await VpnProvisioning.EnsureAsync(sync, profilePath, ct: ct);
+                if (refreshed is null || refreshed.LanEndpoint.Length == 0 || refreshed.LanEndpoint == before.LanEndpoint)
+                    return "";
+                AppLog.Default?.Info("VPN: endpoint LAN ricevuto dal server (" + refreshed.LanEndpoint + ")");
+                if (await tunnel.GetBackendAsync(ct) != LinuxVpnBackend.NetworkManager || !await tunnel.IsConnectedAsync(ct))
+                    return "";
+                var again = await tunnel.ConnectAsync(refreshed.ToConfig(), ct);
+                return again.Success ? "VPN aggiornata con l'endpoint LAN del server." : "";
+            }
             var profile = await VpnProvisioning.EnsureAsync(sync, profilePath, ct: ct);
             if (profile is null)
                 return "";
