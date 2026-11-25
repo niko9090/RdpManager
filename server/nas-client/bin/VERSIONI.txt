@@ -1,0 +1,8 @@
+Binari del pacchetto marshmelloVPN per NAS (costruiti da build/costruisci-binari.sh, 2026-11-25)
+wireguard-go 0.0.20250522 (commit f333402bd9cbe0f3eeb02507bd14e23d7d639280), https://git.zx2c4.com/wireguard-go
+wireguard-tools v1.0.20260223 (commit 49ce333da02056ae7b22ee2aeb6afe8aaed79b19), https://git.zx2c4.com/wireguard-tools, solo «wg», statico musl
+mvpn-helper (helper/ di questo repository)
+Compilatore Go: go version go1.27.4 linux/amd64 (https://go.dev/dl/, sha256 7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab24840)
+Compilatore C amd64: gcc (Alpine 14.2.0) 14.2.0 (alpine@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f)
+Compilatore C arm64: gcc (Alpine 14.2.0) 14.2.0 (alpine@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f, emulato con QEMU)
+Licenze: wireguard-go MIT, wireguard-tools GPL-2.0 (sorgenti al commit indicato sopra).

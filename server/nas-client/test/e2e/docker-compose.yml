@@ -1,0 +1,83 @@
+# Prova end-to-end del pacchetto per NAS, tutta in locale (nessun server vero, nessun NAS vero):
+#   - wgserver: server WireGuard finto (wireguard-go + wg del pacchetto), 10.66.0.1, sulla «LAN» 172.30.1.10
+#     e su «Internet» 172.30.2.10 (nome pubblico vpn.prova.test);
+#   - rdpm-sync: il server vero di questo repository, nella rete di wgserver (come sul Synology);
+#   - nas-lan: un «NAS» nella stessa /24 del server -> deve usare l'endpoint LAN;
+#   - nas-fuori: un «NAS» fuori casa -> deve usare l'endpoint pubblico.
+# La lancia test/esegui-e2e.sh.
+name: mvpn-nas-e2e
+
+networks:
+  lan:
+    ipam:
+      config:
+        - subnet: 172.30.1.0/24
+  pubblica:
+    ipam:
+      config:
+        - subnet: 172.30.2.0/24
+
+volumes:
+  vpn:
+  wgrun:
+
+x-nas: &nas
+  image: alpine:3.22
+  cap_add: [NET_ADMIN]
+  devices: ["/dev/net/tun:/dev/net/tun"]
+  volumes:
+    - ../..:/pkg:ro
+    - ./:/prova:ro
+  command: ["sh", "-c", "apk add --no-cache -q iproute2 iptables >/dev/null && mkdir -p /volume1 && touch /pronto && sleep infinity"]
+
+services:
+  wgserver:
+    image: alpine:3.22
+    cap_add: [NET_ADMIN]
+    devices: ["/dev/net/tun:/dev/net/tun"]
+    sysctls:
+      net.ipv4.ip_forward: "1"
+    networks:
+      lan:
+        ipv4_address: 172.30.1.10
+      pubblica:
+        ipv4_address: 172.30.2.10
+        aliases: [vpn.prova.test]
+    volumes:
+      - ../..:/pkg:ro
+      - ./:/prova:ro
+      - vpn:/vpn
+      - wgrun:/var/run/wireguard
+    command: ["sh", "/prova/server-wg.sh"]
+
+  rdpm-sync:
+    build: ../../../rdpm-sync
+    image: rdpm-sync:prova-nas
+    network_mode: "service:wgserver"
+    depends_on: [wgserver]
+    user: "0:0"
+    restart: on-failure
+    environment:
+      RDPM_SYNC_REGISTRATION_CODE: codice-di-prova-lungo-e-casuale
+      RDPM_VPN_CONF: /vpn/wg0.conf
+      RDPM_VPN_ENDPOINT: vpn.prova.test:51820
+      RDPM_VPN_LAN_ENDPOINT: 172.30.1.10:51820
+    volumes:
+      - vpn:/vpn
+      - wgrun:/var/run/wireguard
+
+  nas-lan:
+    <<: *nas
+    hostname: DS-LAN
+    networks:
+      lan:
+        ipv4_address: 172.30.1.20
+    # Il nome pubblico si risolve ma dalla LAN non risponde (come un router senza hairpin NAT).
+    extra_hosts: ["vpn.prova.test:172.30.2.10"]
+
+  nas-fuori:
+    <<: *nas
+    hostname: DS-Fuori
+    networks:
+      pubblica:
+        ipv4_address: 172.30.2.30

@@ -7,3 +7,11 @@ server/**/*.modello text eol=lf
 packaging/linux/*.sh text eol=lf
 packaging/linux/*.desktop text eol=lf
 packaging/linux/*.png binary
+
+# Pacchetto per NAS: binari statici e sorgenti Go
+server/nas-client/bin/amd64/* binary
+server/nas-client/bin/arm64/* binary
+server/nas-client/bin/SHA256SUMS text eol=lf
+server/nas-client/**/*.go text eol=lf
+server/nas-client/**/*.env text eol=lf
+server/nas-client/helper/go.* text eol=lf
