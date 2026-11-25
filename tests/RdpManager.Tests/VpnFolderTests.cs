@@ -249,26 +249,15 @@ public class VpnFolderTests
     }
 
     [Fact]
-    public void Il_pc_stesso_non_compare_nella_cartella()
+    public void Il_pc_stesso_resta_nella_cartella_sincronizzata_e_nessun_pc_sparisce_agli_altri()
     {
-        var doc = new ConnectionsDocument();
-        VpnFolder.Apply(doc, [Dev("MIO-PC", "10.8.0.2"), Dev("PC-B", "10.8.0.3")], "mio-pc");
-        Assert.Equal("PC-B", Auto(doc).Single().Name);
-
-        // Anche una connessione automatica che c'era già per sé stesso sparisce.
-        var doc2 = new ConnectionsDocument();
-        VpnFolder.Apply(doc2, [Dev("MIO-PC", "10.8.0.2")], "altro");
-        Assert.Single(Auto(doc2));
-        VpnFolder.Apply(doc2, [Dev("MIO-PC", "10.8.0.2"), Dev("PC-B", "10.8.0.3")], "MIO-PC");
-        Assert.Equal("PC-B", Auto(doc2).Single().Name);
-    }
-
-    [Fact]
-    public void Il_pc_stesso_si_riconosce_anche_dal_proprio_ip_vpn()
-    {
-        var doc = new ConnectionsDocument();
-        VpnFolder.Apply(doc, [Dev("QUALCOSA", "10.8.0.2/32"), Dev("QUALCOSA", "10.8.0.4")], "mio-pc", "10.8.0.2");
-        Assert.Equal("10.8.0.4", Auto(doc).Single().Host);
+        // Caso reale (26/11/2026): ogni PC toglieva sé stesso dalla cartella sincronizzata, e l'ultimo che sincronizzava
+        // cancellava la propria voce per tutti (DESKTOP-G24D499 mancava dalla cartella degli altri PC).
+        var shared = new ConnectionsDocument();
+        var devices = new[] { Dev("PC-A", "10.8.0.2"), Dev("PC-B", "10.8.0.3"), Dev("PC-C", "10.8.0.4") };
+        VpnFolder.Apply(shared, devices);   // lo applica PC-A
+        VpnFolder.Apply(shared, devices);   // poi PC-B, sullo stesso documento
+        Assert.Equal(["PC-A", "PC-B", "PC-C"], Auto(shared).Select(c => c.Name).Order());
     }
 
     [Fact]
@@ -394,7 +383,7 @@ public class VpnFolderTests
         Assert.Equal(18, doc.Connections.Count);
         Assert.All(doc.Connections, c => Assert.Null(c.AutoVpnDevice));
 
-        Assert.True(VpnFolder.Apply(doc, SixDevices(), selfName: "altro-pc"));
+        Assert.True(VpnFolder.Apply(doc, SixDevices()));
 
         Assert.Equal(6, doc.Connections.Count);
         foreach (var (pc, i) in Pcs.Select((p, i) => (p, i)))
@@ -409,7 +398,7 @@ public class VpnFolderTests
         Assert.Equal("#112233", doc.Connections.Single(x => x.AutoVpnDevice == "bravo").Color);
 
         // Rilanciato non cambia più niente.
-        Assert.False(VpnFolder.Apply(doc, SixDevices(), selfName: "altro-pc"));
+        Assert.False(VpnFolder.Apply(doc, SixDevices()));
         Assert.Equal(6, doc.Connections.Count);
     }
 
@@ -421,7 +410,7 @@ public class VpnFolderTests
         doc.Connections.Add(new RdpConnection { Name = "alfa", Host = "10.66.0.2", Group = "marshmelloVPN", Username = "nuovo", Domain = "D", LastConnectedUtc = new DateTime(2026, 1, 1) });
         doc.Connections.Add(new RdpConnection { Name = "alfa", Host = "10.66.0.2", Group = "marshmelloVPN", Username = "piuRecente", LastConnectedUtc = new DateTime(2026, 5, 1) });
 
-        VpnFolder.Apply(doc, [Dev("alfa", "10.66.0.2")], selfName: "altro-pc");
+        VpnFolder.Apply(doc, [Dev("alfa", "10.66.0.2")]);
 
         var c = Assert.Single(doc.Connections);
         Assert.Equal("nuovo", c.Username); // la più completa
@@ -437,7 +426,7 @@ public class VpnFolderTests
         doc.Connections.Add(orphan);
         doc.Connections.Add(ambiguous);
 
-        VpnFolder.Apply(doc, SixDevices(), selfName: "altro-pc");
+        VpnFolder.Apply(doc, SixDevices());
 
         Assert.Contains(orphan, doc.Connections);
         Assert.Contains(ambiguous, doc.Connections);
@@ -455,7 +444,7 @@ public class VpnFolderTests
         var sub = new RdpConnection { Name = "charlie", Host = "10.66.0.4", Group = "marshmelloVPN/Extra", Username = "mario" };
         doc.Connections.AddRange([moved, root, sub]);
 
-        VpnFolder.Apply(doc, SixDevices(), selfName: "altro-pc");
+        VpnFolder.Apply(doc, SixDevices());
 
         foreach (var c in new[] { moved, root, sub })
         {
@@ -477,7 +466,7 @@ public class VpnFolderTests
         var fp = new SyncFingerprints(new byte[32]);
         var baseHashes = fp.Of(local);
 
-        VpnFolder.Apply(local, SixDevices(), selfName: "altro-pc");
+        VpnFolder.Apply(local, SixDevices());
         SyncMerge.MergeInto(local, remote, baseHashes, fp);
 
         Assert.Equal(6, local.Connections.Count);

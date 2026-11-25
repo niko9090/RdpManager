@@ -1,5 +1,10 @@
 # Novità di RdpManager
 
+## 1.19.5 (26/11/2026)
+
+**Cartella marshmelloVPN completa su tutti i PC**
+- Nella cartella marshmelloVPN ora compaiono sempre tutti i PC della VPN. Prima ogni PC toglieva sé stesso dalla cartella, ma la cartella è sincronizzata: l'ultimo PC che sincronizzava spariva dalla cartella di tutti gli altri, e quindi non si riusciva a raggiungerlo. Ora compare anche il PC su cui si sta lavorando.
+
 ## 1.19.4 (25/11/2026)
 
 **Aspetto più curato**

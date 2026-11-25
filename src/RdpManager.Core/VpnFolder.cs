@@ -27,8 +27,7 @@ public static class VpnFolder
     /// cartella stessa per PC non più in rete. Con l'elenco vuoto non fa niente (meglio un PC in più che perdere tutto per
     /// una risposta vuota). Vero se il documento è cambiato.
     /// </summary>
-    public static bool Apply(ConnectionsDocument doc, IReadOnlyList<VpnDashboardDevice> devices,
-        string? selfName = null, string? selfAddress = null)
+    public static bool Apply(ConnectionsDocument doc, IReadOnlyList<VpnDashboardDevice> devices)
     {
         // Tutti i PC con un nome, anche ripetuto: servono a riconoscere gli abbinamenti ambigui.
         var entries = new List<Entry>();
@@ -42,18 +41,13 @@ public static class VpnFolder
             return false; // elenco vuoto (anche solo transitorio): non si cancella niente
         var all = entries.Select(e => (e.Name, e.Address)).ToList();
 
-        // Il PC stesso non va in cartella: si riconosce dal nome (e, se lo si conosce, dal proprio IP VPN).
-        selfName = (selfName ?? SyncService.VpnDeviceName).Trim();
-        var selfIp = VpnDashboardModel.StripMask(selfAddress ?? "");
-        bool IsSelf(Entry e) =>
-            (selfIp.Length > 0 && e.Address.Equals(selfIp, StringComparison.OrdinalIgnoreCase))
-            || (e.Name.Equals(selfName, StringComparison.OrdinalIgnoreCase)
-                && (selfIp.Length == 0 || e.Address.Length == 0 || e.Address.Equals(selfIp, StringComparison.OrdinalIgnoreCase)));
+        // Anche il PC stesso resta in cartella: la cartella è nel documento sincronizzato, e se ogni PC togliesse sé stesso
+        // l'ultimo che sincronizza cancellerebbe la propria voce per tutti (il PC spariva a turno dagli altri PC).
 
         // Lo stesso nome può comparire più volte (stesso PC registrato da due account, o due PC con lo stesso nome):
         // si tengono i PC distinti, vedi Resolve.
         var list = new List<(string Name, string Address)>();
-        foreach (var g in entries.Where(e => !IsSelf(e)).GroupBy(e => e.Name, StringComparer.OrdinalIgnoreCase))
+        foreach (var g in entries.GroupBy(e => e.Name, StringComparer.OrdinalIgnoreCase))
             list.AddRange(Resolve(doc, g.Key, g.ToList()));
 
         bool changed = false;
