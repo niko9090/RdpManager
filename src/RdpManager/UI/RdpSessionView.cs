@@ -997,8 +997,42 @@ public sealed class RdpSessionView : UserControl
             AppLog.Default?.Connection(LogLevel.Info, "Connessa", Connection);
         if (_rdp is not null)
             _rdp.Visible = state != SessionState.Disconnected;
+        UpdateLoadingOverlay(state, text);
         StateChanged?.Invoke(this, EventArgs.Empty);
     }
+
+    /// <summary>
+    /// Il controllo RDP (finestra nativa, a pieno riquadro) copre sempre la scritta sotto di lui: durante la connessione la
+    /// scritta «Connessione in corso…» va quindi portata sopra, e tolta appena la sessione è connessa. Se il controllo
+    /// mostra una sua finestra (avviso del certificato, credenziali) la scritta si fa da parte per non coprirla.
+    /// </summary>
+    private void UpdateLoadingOverlay(SessionState state, string text)
+    {
+        if (state == SessionState.Connecting && !AuthenticationWarningVisible)
+        {
+            _message.Text = text;
+            _message.Visible = true;
+            _message.BringToFront();
+        }
+        else if (state != SessionState.Disconnected)
+        {
+            _message.Visible = false;
+            _rdp?.BringToFront();
+        }
+        else
+        {
+            _message.Visible = true;
+            _message.BringToFront();
+        }
+    }
+
+    /// <summary>Per le prove: la scritta di caricamento è visibile e sta sopra a tutti gli altri controlli della sessione.</summary>
+    internal bool LoadingOverlayOnTop => _message.Visible && _host.Controls.GetChildIndex(_message) == 0;
+
+    internal void SetAuthenticationWarningForTests(bool visible) => AuthenticationWarningVisible = visible;
+
+    /// <summary>Per le prove: aggiunge un controllo che copre la scheda come il controllo RDP vero.</summary>
+    internal void AddCoverForTests(Control cover) { cover.Dock = DockStyle.Fill; _host.Controls.Add(cover); cover.BringToFront(); }
 
     /// <summary>Colore del testo di stato, leggibile nel tema corrente.</summary>
     private void ApplyStateColor()
