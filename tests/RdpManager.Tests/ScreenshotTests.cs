@@ -478,6 +478,8 @@ public sealed class ScreenshotTests : IDisposable
     {
         var outDir = Environment.GetEnvironmentVariable(FolderVariable)!;
         Directory.CreateDirectory(outDir);
+        // Come il programma vero (ApplicationConfiguration.Initialize): controlli con lo stile di Windows, non quello classico.
+        Application.EnableVisualStyles();
         foreach (var theme in new[] { AppTheme.Light, AppTheme.Dark })
         {
             string t = theme == AppTheme.Light ? "chiaro" : "scuro";
@@ -518,6 +520,16 @@ public sealed class ScreenshotTests : IDisposable
                     form.Tabs.SelectedIndex = 0;
                     Pump(300);
                     SaveWindow(form, Path.Combine(outDir, $"b-finestra-sessioni-{t}.png"));
+
+                    // Menu «Connessioni» aperto, con la seconda voce sotto il mouse (evidenziazione).
+                    var connMenu = (ToolStripMenuItem)form.MainMenuStrip!.Items[1];
+                    connMenu.ShowDropDown();
+                    Pump(200);
+                    connMenu.DropDownItems[1].Select();
+                    Pump(200);
+                    SaveWindow(connMenu.DropDown, Path.Combine(outDir, $"b2-menu-{t}.png"));
+                    connMenu.HideDropDown();
+                    Pump(100);
 
                     using (var settings = new SettingsDialog(form.Document.Settings.Clone()) { StartPosition = FormStartPosition.Manual, Location = new Point(80, 80) })
                     {
@@ -576,7 +588,7 @@ public sealed class ScreenshotTests : IDisposable
     /// Fa disegnare la finestra da sola (PrintWindow con PW_RENDERFULLCONTENT): l'immagine è giusta anche se la
     /// finestra è coperta da altre e non contiene mai il resto dello schermo.
     /// </summary>
-    private static void SaveWindow(Form form, string path)
+    private static void SaveWindow(Control form, string path)
     {
         Pump(250);
         var b = form.Bounds;

@@ -21,7 +21,7 @@ public sealed class RdpSessionView : UserControl
     private readonly ToolStripButton _touchModeButton = new() { ToolTipText = "Come agisce il dito sulla sessione: passato al PC remoto, oppure fa da mouse (pressione lunga = clic destro, due dita = scorrimento)" };
     private readonly ToolStripButton _rightClickButton = new("Clic destro") { CheckOnClick = true, ToolTipText = "Il prossimo tocco sulla sessione vale come clic destro" };
     private readonly ToolStripDropDownButton _sendButton = new("Invia") { ToolTipText = "Comandi verso il PC remoto" };
-    private readonly Panel _host = new() { Dock = DockStyle.Fill, BackColor = Color.FromArgb(32, 32, 32) };
+    private readonly Panel _host = new() { Dock = DockStyle.Fill, BackColor = UiColors.SessionBackdrop };
     private readonly Label _message = new()
     {
         Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter,
@@ -1034,16 +1034,16 @@ public sealed class RdpSessionView : UserControl
     /// <summary>Per le prove: aggiunge un controllo che copre la scheda come il controllo RDP vero.</summary>
     internal void AddCoverForTests(Control cover) { cover.Dock = DockStyle.Fill; _host.Controls.Add(cover); cover.BringToFront(); }
 
-    /// <summary>Colore del testo di stato, leggibile nel tema corrente.</summary>
+    /// <summary>Colore del testo di stato, leggibile nel tema corrente (almeno 4,5:1 sul fondo della barra).</summary>
     private void ApplyStateColor()
     {
-        bool dark = ThemeManager.Current.IsDark;
+        var p = ThemeManager.Current;
         _stateLabel.ForeColor = State switch
         {
-            SessionState.Connected => dark ? Color.FromArgb(110, 210, 120) : Color.DarkGreen,
-            SessionState.Disconnected => dark ? Color.FromArgb(240, 120, 110) : Color.Firebrick,
-            SessionState.Connecting => dark ? Color.FromArgb(235, 190, 90) : Color.DarkGoldenrod,
-            _ => ThemeManager.Current.Text,
+            SessionState.Connected => p.Success,
+            SessionState.Disconnected => p.Danger,
+            SessionState.Connecting => p.Warning,
+            _ => p.Text,
         };
     }
 
@@ -1061,10 +1061,10 @@ public sealed class RdpSessionView : UserControl
 
     public static Color StateColor(SessionState state) => state switch
     {
-        SessionState.Connected => Color.FromArgb(46, 160, 67),
-        SessionState.Connecting => Color.FromArgb(210, 150, 20),
-        SessionState.Disconnected => Color.FromArgb(200, 60, 50),
-        _ => Color.Gray,
+        SessionState.Connected => UiColors.Connected,
+        SessionState.Connecting => UiColors.Connecting,
+        SessionState.Disconnected => UiColors.Disconnected,
+        _ => UiColors.Idle,
     };
 
     private static Size ClampSize(Size s) =>

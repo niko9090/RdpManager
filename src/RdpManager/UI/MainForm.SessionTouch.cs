@@ -95,7 +95,7 @@ public sealed partial class MainForm
         {
             _fsHandle = new Button
             {
-                FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(40, 90, 160), ForeColor = Color.White, TabStop = false,
+                FlatStyle = FlatStyle.Flat, BackColor = UiColors.ImmersiveSelected, ForeColor = Color.White, TabStop = false,
                 UseMnemonic = false, UseVisualStyleBackColor = false, Font = new Font(Font.FontFamily, 18f, FontStyle.Bold),
             };
             _fsHandle.FlatAppearance.BorderSize = 0;

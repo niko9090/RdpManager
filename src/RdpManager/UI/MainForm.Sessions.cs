@@ -9,7 +9,7 @@ public sealed partial class MainForm
     private readonly Panel _root = new() { Dock = DockStyle.Fill };
     private readonly Panel _sidebar = new() { Dock = DockStyle.Left, Width = 280, BackColor = SystemColors.Window };
     private readonly Splitter _splitter = new() { Dock = DockStyle.Left, Width = 5, MinSize = 180, MinExtra = 300 };
-    private readonly Panel _edge = new() { Dock = DockStyle.Left, Width = 6, BackColor = Color.FromArgb(200, 205, 215), Cursor = Cursors.Hand, Visible = false };
+    private readonly Panel _edge = new() { Dock = DockStyle.Left, Width = 6, BackColor = ThemeManager.Light.Rail, Cursor = Cursors.Hand, Visible = false };
     private readonly Panel _content = new() { Dock = DockStyle.Fill };
     private readonly FullScreenSideBar _fsBar = new() { Visible = false };
     private readonly ToolStripButton _pinButton = new("A comparsa") { Alignment = ToolStripItemAlignment.Right, CheckOnClick = false };

@@ -37,6 +37,7 @@ public sealed partial class MainForm
         foreach (var d in _detached)
             ThemeManager.Apply(d);
         _split.BackColor = ThemeManager.Current.Border;
+        _edge.BackColor = ThemeManager.Current.Rail;
         foreach (var v in AllViews)
             v.RefreshStateColors();
         _tree.Invalidate();

@@ -25,7 +25,7 @@ public sealed partial class MainForm : Form
     private readonly TreeView _tree = new()
     {
         Dock = DockStyle.Fill, HideSelection = false, AllowDrop = true, ShowNodeToolTips = true,
-        BorderStyle = BorderStyle.None, ItemHeight = 22, Sorted = false,
+        BorderStyle = BorderStyle.None, ItemHeight = 22, Sorted = false, ShowLines = false,
     };
     private readonly TabControl _tabs = new() { Dock = DockStyle.Fill, ShowToolTips = true, Visible = false };
     private readonly Label _emptyHint = new()
@@ -70,6 +70,9 @@ public sealed partial class MainForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         Font = SystemFonts.MessageBoxFont ?? Font;
         Icon = AppIcon.Instance;
+        // Messaggio a centro finestra un po' più grande del resto; barra di stato con un po' d'aria ai lati.
+        _emptyHint.Font = UiMetrics.Lead(Font);
+        _statusStrip.Padding = new Padding(8, 2, 14, 2);
 
         BuildImages();
         _tree.ImageList = _treeImages;
@@ -606,8 +609,8 @@ public sealed partial class MainForm : Form
             return (RdpSessionView.StateWord(view.State), RdpSessionView.StateColor(view.State), true);
         return _reach.GetValueOrDefault(c.Id) switch
         {
-            ReachabilityStatus.Reachable => ("Raggiungibile", Color.FromArgb(46, 160, 67), false),
-            ReachabilityStatus.Unreachable => ("Non raggiungibile", Color.FromArgb(150, 150, 150), false),
+            ReachabilityStatus.Reachable => ("Raggiungibile", UiColors.Connected, false),
+            ReachabilityStatus.Unreachable => ("Non raggiungibile", UiColors.Unreachable, false),
             _ => ("Non verificata", null, false),
         };
     }
@@ -1177,8 +1180,8 @@ public sealed partial class MainForm : Form
         var folder = new Bitmap(16, 16);
         using (var g = Graphics.FromImage(folder))
         {
-            using var fill = new SolidBrush(Color.FromArgb(240, 196, 80));
-            using var edge = new Pen(Color.FromArgb(190, 140, 40));
+            using var fill = new SolidBrush(UiColors.FolderFill);
+            using var edge = new Pen(UiColors.FolderEdge);
             g.FillRectangle(fill, 1, 4, 14, 10);
             g.FillRectangle(fill, 1, 2, 6, 3);
             g.DrawRectangle(edge, 1, 4, 13, 9);
@@ -1196,7 +1199,7 @@ public sealed partial class MainForm : Form
                 double r = i % 2 == 0 ? 7.5 : 3.2;
                 return new PointF((float)(8 + r * Math.Cos(angle)), (float)(8.5 + r * Math.Sin(angle)));
             }).ToArray();
-            using var fill = new SolidBrush(Color.FromArgb(245, 180, 30));
+            using var fill = new SolidBrush(UiColors.Star);
             g.FillPolygon(fill, points);
         }
         _treeImages.Images.Add(star);
@@ -1205,7 +1208,7 @@ public sealed partial class MainForm : Form
         using (var g = Graphics.FromImage(clock))
         {
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            using var pen = new Pen(Color.FromArgb(90, 110, 140), 1.6f);
+            using var pen = new Pen(UiColors.Clock, 1.6f);
             g.DrawEllipse(pen, 1.5f, 1.5f, 13, 13);
             g.DrawLine(pen, 8, 8, 8, 4);
             g.DrawLine(pen, 8, 8, 11, 9.5f);
@@ -1226,8 +1229,8 @@ public sealed partial class MainForm : Form
     {
         var bmp = new Bitmap(16, 16);
         using var g = Graphics.FromImage(bmp);
-        using var frame = new SolidBrush(Color.FromArgb(60, 60, 70));
-        using var screen = new SolidBrush(color ?? Color.FromArgb(70, 140, 220));
+        using var frame = new SolidBrush(UiColors.ComputerFrame);
+        using var screen = new SolidBrush(color ?? UiColors.ComputerScreen);
         g.FillRectangle(frame, 1, 2, 14, 10);
         g.FillRectangle(screen, 2, 3, 12, 8);
         g.FillRectangle(frame, 6, 12, 4, 2);
