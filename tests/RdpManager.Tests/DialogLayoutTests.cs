@@ -229,13 +229,21 @@ public sealed class DialogLayoutTests
         });
     }
 
-    [Fact]
-    public void EveryDialog_OpensCenteredOnItsOwner_InsideTheWorkArea_WithoutOverlapsOrClippedText()
+    // Un'area per prova: tutte insieme superavano i 55 s del limite di StaTestRunner sui PC carichi, il limite
+    // chiudeva il ciclo messaggi e scartava le finestre (ObjectDisposedException su Show) a metà giro.
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(5)]
+    public void EveryDialog_OpensCenteredOnItsOwner_InsideTheWorkArea_WithoutOverlapsOrClippedText(int areaIndex)
     {
         OnSta(() =>
         {
             var all = new List<string>();
-            foreach (var area in Areas())
+            foreach (var area in Areas().Skip(areaIndex).Take(1))
             {
                 TouchUi.WorkAreaForTests = area;
                 using var owner = new Form
@@ -249,7 +257,14 @@ public sealed class DialogLayoutTests
                 foreach (var (name, make) in Dialogs())
                 {
                     using var d = make();
-                    d.Show(owner);
+                    try { d.Show(owner); }
+                    catch (ObjectDisposedException ex)
+                    {
+                        // Dice quale finestra (e quale delle due, lei o la proprietaria) era già scartata.
+                        throw new InvalidOperationException(
+                            $"[area {area.Width}x{area.Height}] {name} ({d.GetType().Name}): Show(owner) su finestra scartata " +
+                            $"(dialogo scartato: {d.IsDisposed}, proprietaria scartata: {owner.IsDisposed})", ex);
+                    }
                     Pump(120);
                     foreach (var p in Problems(d, area))
                         all.Add($"[area {area.Width}x{area.Height}] {p}");
