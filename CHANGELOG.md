@@ -1,5 +1,14 @@
 # Novità di RdpManager
 
+## 1.19.4 (25/11/2026)
+
+**Aspetto più curato**
+- Windows: colori e spaziature raccolti in un solo tema, con un colore d'accento e testi leggibili (contrasto adeguato) sia nel tema chiaro sia in quello scuro.
+- Menu e barre degli strumenti piatti con evidenziazione arrotondata; nel tema scuro liste, caselle di testo e barre di scorrimento scure, e il pulsante principale delle finestre in evidenza.
+- Elenco delle connessioni con le frecce al posto delle linee tratteggiate, barra di stato più ordinata, sezione scelta delle Impostazioni in stile Windows 11.
+- La scritta «In connessione» nella barra della sessione ora si legge bene anche nel tema chiaro.
+- Linux: stessi colori di Windows e menu con evidenziazione morbida.
+
 ## 1.19.3 (25/11/2026)
 
 **VPN: il tunnel si riprende da solo**
