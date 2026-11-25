@@ -52,7 +52,7 @@ internal sealed class ResizeGrip : Control
     }
 
     /// <summary>Colore della linea che si accende con il mouse sopra o durante il trascinamento.</summary>
-    public Color HighlightColor { get; set; } = Color.FromArgb(70, 130, 210);
+    public Color HighlightColor { get; set; } = UiColors.GripHighlight;
 
     /// <summary>Vero mentre si trascina: la barra a comparsa non deve richiudersi.</summary>
     public bool IsDragging => _start is not null;

@@ -244,9 +244,9 @@ public sealed class SettingsDialog : TouchForm
             host.Controls.Add(page.Panel);
         }
         _host = host;
-        _title.Font = new Font(Font.FontFamily, Font.Size * 1.5f, FontStyle.Bold);
+        _title.Font = UiMetrics.Title(Font);
         _subtitle.ForeColor = SystemColors.GrayText;
-        var header = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoSize = true, Dock = DockStyle.Top, Padding = new Padding(16, 12, 16, 4) };
+        var header = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoSize = true, Dock = DockStyle.Top, Padding = UiMetrics.PageHeader };
         header.Controls.AddRange([_title, _subtitle]);
         _header = header;
         var right = new Panel { Dock = DockStyle.Fill };
@@ -263,9 +263,9 @@ public sealed class SettingsDialog : TouchForm
         _nav.DrawItem += DrawNavItem;
         _nav.SelectedIndexChanged += (_, _) => ShowPage(_nav.SelectedIndex);
 
-        var ok = new Button { Text = "Salva", DialogResult = DialogResult.OK, AutoSize = true, MinimumSize = new Size(96, 0) };
-        var cancel = new Button { Text = "Annulla", DialogResult = DialogResult.Cancel, AutoSize = true, MinimumSize = new Size(96, 0) };
-        var buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, AutoSize = true, Dock = DockStyle.Bottom, Padding = new Padding(12, 10, 12, 10) };
+        var ok = new Button { Text = "Salva", DialogResult = DialogResult.OK, AutoSize = true, MinimumSize = new Size(UiMetrics.DialogButtonWidth, 0) };
+        var cancel = new Button { Text = "Annulla", DialogResult = DialogResult.Cancel, AutoSize = true, MinimumSize = new Size(UiMetrics.DialogButtonWidth, 0) };
+        var buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, AutoSize = true, Dock = DockStyle.Bottom, Padding = UiMetrics.ButtonBar };
         buttons.Controls.Add(cancel);
         buttons.Controls.Add(ok);
         CancelButton = cancel;
@@ -316,12 +316,27 @@ public sealed class SettingsDialog : TouchForm
             return;
         var p = ThemeManager.Current;
         bool selected = (e.State & DrawItemState.Selected) != 0;
-        using (var back = new SolidBrush(selected ? p.Highlight : _nav.BackColor))
+        using (var back = new SolidBrush(_nav.BackColor))
             e.Graphics.FillRectangle(back, e.Bounds);
-        int pad = Math.Max(8, e.Bounds.Height / 4);
+        int inset = TouchUi.Px(this, 6);
+        if (selected)
+        {
+            // Voce scelta come nelle impostazioni di Windows 11: fondo arrotondato tenue e trattino d'accento a sinistra.
+            var pill = Rectangle.Inflate(e.Bounds, -inset, -TouchUi.Px(this, 2));
+            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            using (var fill = new SolidBrush(p.IsDark ? p.Hover : p.Pressed))
+            using (var path = UiMetrics.RoundedRect(pill, TouchUi.Px(this, UiMetrics.CornerRadius)))
+                e.Graphics.FillPath(fill, path);
+            int barHeight = Math.Max(TouchUi.Px(this, 12), pill.Height / 2);
+            var bar = new Rectangle(pill.X, pill.Y + (pill.Height - barHeight) / 2, TouchUi.Px(this, 3), barHeight);
+            using (var accent = new SolidBrush(p.IsDark ? p.Accent : p.Highlight))
+            using (var path = UiMetrics.RoundedRect(bar, bar.Width / 2))
+                e.Graphics.FillPath(accent, path);
+        }
+        int pad = inset + Math.Max(TouchUi.Px(this, 10), e.Bounds.Height / 4);
         TextRenderer.DrawText(e.Graphics, _nav.Items[e.Index].ToString(), _nav.Font,
-            new Rectangle(e.Bounds.X + pad, e.Bounds.Y, e.Bounds.Width - pad, e.Bounds.Height),
-            selected ? p.HighlightText : p.Text, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+            new Rectangle(e.Bounds.X + pad, e.Bounds.Y, e.Bounds.Width - pad - inset, e.Bounds.Height),
+            p.Text, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
     }
 
     /// <summary>Misura voluta: la sezione più grande (ma non oltre un'altezza comoda: poi scorre) più elenco, titolo e pulsanti.</summary>
@@ -413,15 +428,15 @@ public sealed class SettingsDialog : TouchForm
     /// <summary>Gruppo di opzioni: titolo in grassetto, contenuto rientrato, spazio uniforme sotto.</summary>
     private static FlowLayoutPanel Group(string title, params Control[] content)
     {
-        var box = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Margin = new Padding(0, 0, 0, 18) };
+        var box = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Margin = new Padding(0, 0, 0, UiMetrics.SectionGap) };
         box.Controls.Add(new Label
         {
             Text = title,
             AutoSize = true,
-            Font = new Font(SystemFonts.MessageBoxFont ?? SystemFonts.DefaultFont, FontStyle.Bold),
+            Font = UiMetrics.Heading(UiMetrics.BaseFont),
             Margin = new Padding(0, 0, 0, 6),
         });
-        var inner = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Margin = new Padding(14, 0, 0, 0) };
+        var inner = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Margin = new Padding(UiMetrics.GroupIndent, 0, 0, 0) };
         foreach (var c in content)
         {
             if (c is Label { AutoSize: true } note && note.ForeColor == SystemColors.GrayText)

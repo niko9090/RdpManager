@@ -469,6 +469,139 @@ public sealed class ScreenshotTests : IDisposable
             ExceptionDispatchInfo.Throw(failure);
     }
 
+    /// <summary>
+    /// Finestre principali nei due temi, per confrontare l'aspetto prima e dopo una revisione grafica: finestra vuota,
+    /// finestra con sessioni, impostazioni, modifica connessione, scorciatoie e profili di credenziali.
+    /// </summary>
+    [ScreenshotFact]
+    public void SaveScreenshotsOfTheMainWindowsInBothThemes()
+    {
+        var outDir = Environment.GetEnvironmentVariable(FolderVariable)!;
+        Directory.CreateDirectory(outDir);
+        // Come il programma vero (ApplicationConfiguration.Initialize): controlli con lo stile di Windows, non quello classico.
+        Application.EnableVisualStyles();
+        foreach (var theme in new[] { AppTheme.Light, AppTheme.Dark })
+        {
+            string t = theme == AppTheme.Light ? "chiaro" : "scuro";
+            var profile = new CredentialProfile { Name = "Amministratore", Username = "admin", Domain = "UFFICIO" };
+            RdpConnection C(string name, string group, string label = "", string? color = null, bool favorite = false) =>
+                new() { Name = name, Host = name.ToLowerInvariant().Replace(' ', '-') + ".invalid", Group = group, Label = label, Color = color, IsFavorite = favorite, CredentialProfileId = profile.Id };
+            var doc = new ConnectionsDocument
+            {
+                Connections =
+                [
+                    C("Magazzino", "Clienti/Rossi", "PROD", "#E67E22", favorite: true),
+                    C("Ufficio", "Clienti/Rossi", color: "#2E86DE"),
+                    C("Laboratorio", "Interni", "TEST", "#27AE60"),
+                    C("Server posta", "Interni", "PROD", "#C0392B"),
+                ],
+                CredentialProfiles = [profile],
+            };
+            doc.Settings.Theme = theme;
+            var dir = Path.Combine(_dir, t);
+            Directory.CreateDirectory(dir);
+            var store = new ConnectionStore(Path.Combine(dir, "connections.json"));
+            store.Save(doc);
+
+            Exception? failure = null;
+            var thread = StaTestRunner.Create(() =>
+            {
+                try
+                {
+                    using var form = new MainForm(store) { StartPosition = FormStartPosition.Manual, Location = new Point(40, 40), Size = new Size(1100, 700) };
+                    form.Show();
+                    Pump(400);
+                    SaveWindow(form, Path.Combine(outDir, $"a-finestra-vuota-{t}.png"));
+                    foreach (var c in form.Document.Connections.Take(2))
+                        form.OpenSession(c);
+                    Pump(300);
+                    foreach (var v in form.AllViews.Take(1))
+                        v.SetStateForTests(SessionState.Connected, "Connessa");
+                    form.Tabs.SelectedIndex = 0;
+                    Pump(300);
+                    SaveWindow(form, Path.Combine(outDir, $"b-finestra-sessioni-{t}.png"));
+
+                    // Menu «Connessioni» aperto, con la seconda voce sotto il mouse (evidenziazione).
+                    var connMenu = (ToolStripMenuItem)form.MainMenuStrip!.Items[1];
+                    connMenu.ShowDropDown();
+                    Pump(200);
+                    connMenu.DropDownItems[1].Select();
+                    Pump(200);
+                    SaveWindow(connMenu.DropDown, Path.Combine(outDir, $"b2-menu-{t}.png"));
+                    connMenu.HideDropDown();
+                    Pump(100);
+
+                    using (var settings = new SettingsDialog(form.Document.Settings.Clone()) { StartPosition = FormStartPosition.Manual, Location = new Point(80, 80) })
+                    {
+                        settings.Show();
+                        Pump(400);
+                        SaveWindow(settings, Path.Combine(outDir, $"c-impostazioni-{t}.png"));
+                    }
+                    using (var edit = new ConnectionDialog(form.Document.Connections[0].Clone(), form.Document.AllGroups(), "Modifica: Magazzino", form.Document.CredentialProfiles)
+                           { StartPosition = FormStartPosition.Manual, Location = new Point(80, 80) })
+                    {
+                        ThemeManager.Apply(edit);
+                        edit.Show();
+                        Pump(400);
+                        SaveWindow(edit, Path.Combine(outDir, $"d-connessione-{t}.png"));
+                    }
+                    using (var f1 = new ShortcutsDialog(form.ShortcutLines()) { StartPosition = FormStartPosition.Manual, Location = new Point(80, 60) })
+                    {
+                        f1.Show();
+                        Pump(400);
+                        SaveWindow(f1, Path.Combine(outDir, $"e-scorciatoie-{t}.png"));
+                    }
+                    using (var profiles = new CredentialProfilesDialog(form.Document) { StartPosition = FormStartPosition.Manual, Location = new Point(80, 60) })
+                    {
+                        profiles.Show();
+                        Pump(400);
+                        SaveWindow(profiles, Path.Combine(outDir, $"f-profili-{t}.png"));
+                    }
+                    foreach (var v in form.AllViews.ToList())
+                    {
+                        v.SetStateForTests(SessionState.Disconnected, "Disconnessa");
+                        form.CloseSession(v);
+                    }
+                    Pump(200);
+                    form.StartInstaller = _ => { };
+                    form.ExitApp();
+                    Pump(200);
+                }
+                catch (Exception ex)
+                {
+                    failure = ex;
+                }
+            });
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            Assert.True(thread.Join(TimeSpan.FromSeconds(StaTestRunner.LimitSeconds)), "La prova UI non è terminata entro 60 s");
+            if (failure is not null)
+                ExceptionDispatchInfo.Throw(failure);
+        }
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool PrintWindow(IntPtr hwnd, IntPtr hdc, uint flags);
+
+    /// <summary>
+    /// Fa disegnare la finestra da sola (PrintWindow con PW_RENDERFULLCONTENT): l'immagine è giusta anche se la
+    /// finestra è coperta da altre e non contiene mai il resto dello schermo.
+    /// </summary>
+    private static void SaveWindow(Control form, string path)
+    {
+        Pump(250);
+        var b = form.Bounds;
+        using var bmp = new Bitmap(b.Width, b.Height);
+        using (var g = Graphics.FromImage(bmp))
+        {
+            var hdc = g.GetHdc();
+            try { PrintWindow(form.Handle, hdc, 2); }
+            finally { g.ReleaseHdc(hdc); }
+        }
+        bmp.Save(path, ImageFormat.Png);
+    }
+
     private static void Save(Form form, string path)
     {
         form.Activate();

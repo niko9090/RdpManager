@@ -23,23 +23,23 @@ internal sealed class FullScreenSideBar : Panel
         bool CanTypeText,
         bool MultipleMonitors);
 
-    private static readonly Color Back = Color.FromArgb(30, 32, 38);
-    private static readonly Color SectionBack = Color.FromArgb(36, 38, 45);
-    private static readonly Color ButtonBack = Color.FromArgb(48, 51, 60);
-    private static readonly Color SelectedBack = Color.FromArgb(40, 90, 160);
-    private static readonly Color HeaderFore = Color.FromArgb(150, 160, 180);
+    private static readonly Color Back = UiColors.ImmersiveSurface;
+    private static readonly Color SectionBack = UiColors.ImmersiveSection;
+    private static readonly Color ButtonBack = UiColors.ImmersiveControl;
+    private static readonly Color SelectedBack = UiColors.ImmersiveSelected;
+    private static readonly Color HeaderFore = UiColors.ImmersiveHeader;
     private const int SectionWidthBottom = 230;
     private static readonly Font InitialsFont = new(Control.DefaultFont.FontFamily, 16f, FontStyle.Bold);
     private static readonly Font HeaderFont = new((SystemFonts.MessageBoxFont ?? Control.DefaultFont).FontFamily, 10.5f, FontStyle.Bold);
     private static readonly Font ItemFont = new((SystemFonts.MessageBoxFont ?? Control.DefaultFont).FontFamily, 10.5f);
     private static readonly Font SelectedFont = new((SystemFonts.MessageBoxFont ?? Control.DefaultFont).FontFamily, 10.5f, FontStyle.Bold);
     private static readonly Font GlyphFont = new("Segoe UI Symbol", 13f);
-    private static readonly Color Accent = Color.FromArgb(90, 150, 230);
+    private static readonly Color Accent = UiColors.ImmersiveAccent;
     private const string HideGlyph = "✕", FavoriteGlyph = "★", WorkspaceGlyph = "▤", TextGlyph = "✎";
 
     private readonly FlowLayoutPanel _flow = new() { Dock = DockStyle.Fill, WrapContents = false, AutoScroll = true, BackColor = Back };
     private readonly ToolTip _tips = new();
-    private readonly ResizeGrip _grip = new() { BackColor = Color.FromArgb(44, 47, 55) };
+    private readonly ResizeGrip _grip = new() { BackColor = UiColors.ImmersiveGrip };
     private readonly Dictionary<RdpSessionView, Bitmap> _thumbnails = [];
     private FlowLayoutPanel? _sessionsBody;
     private ListBox? _connectionsList;
@@ -370,7 +370,7 @@ internal sealed class FullScreenSideBar : Panel
                 }
             };
             if (view.State != SessionState.Connected)
-                b.ForeColor = Color.FromArgb(170, 170, 175);
+                b.ForeColor = UiColors.ImmersiveDim;
             _tips.SetToolTip(b, $"{RdpFile.FormatAddress(c.Host, c.Port)} — {RdpSessionView.StateWord(view.State)}" +
                                 (item.Number is int k ? $"\nCtrl+Alt+{k}" : ""));
             b.Click += (_, _) => SessionClicked?.Invoke(this, view);
@@ -381,7 +381,7 @@ internal sealed class FullScreenSideBar : Panel
             }
             var pic = new PictureBox
             {
-                Tag = view, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.FromArgb(20, 22, 26), Cursor = Cursors.Hand,
+                Tag = view, SizeMode = PictureBoxSizeMode.Zoom, BackColor = UiColors.ImmersiveThumb, Cursor = Cursors.Hand,
                 Margin = new Padding(0, 0, 0, 0), Image = _thumbnails.GetValueOrDefault(view),
             };
             pic.Paint += (_, e) =>
@@ -389,11 +389,11 @@ internal sealed class FullScreenSideBar : Panel
                 if (pic.Image is not null)
                     return;
                 // Ancora nessuna miniatura: il colore e le iniziali della connessione.
-                using var brush = new SolidBrush(stripe ?? Color.FromArgb(70, 75, 90));
+                using var brush = new SolidBrush(stripe ?? UiColors.ImmersiveLine);
                 e.Graphics.FillRectangle(brush, 0, 0, pic.Width, 4);
                 var initials = string.Concat(c.DisplayName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(w => char.ToUpperInvariant(w[0])));
                 TextRenderer.DrawText(e.Graphics, initials, InitialsFont, pic.ClientRectangle,
-                    Color.FromArgb(120, 125, 140), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                    UiColors.ImmersiveDisabled, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             };
             pic.Click += (_, _) => SessionClicked?.Invoke(this, view);
             var card = new FlowLayoutPanel
@@ -587,7 +587,7 @@ internal sealed class FullScreenSideBar : Panel
         };
         var header = new Label
         {
-            Text = title.ToUpperInvariant(), AutoSize = true, ForeColor = Color.FromArgb(200, 210, 230), Margin = new Padding(0, 4, 0, 8),
+            Text = title.ToUpperInvariant(), AutoSize = true, ForeColor = UiColors.ImmersiveTitle, Margin = new Padding(0, 4, 0, 8),
             Padding = new Padding(10, 3, 0, 3), Font = HeaderFont,
         };
         // Intestazione di gruppo: segno colorato a sinistra e filo sotto, per separare i gruppi a colpo d'occhio.
@@ -595,7 +595,7 @@ internal sealed class FullScreenSideBar : Panel
         {
             using var mark = new SolidBrush(Accent);
             e.Graphics.FillRectangle(mark, 0, 2, 4, header.Height - 4);
-            using var line = new Pen(Color.FromArgb(70, 75, 90));
+            using var line = new Pen(UiColors.ImmersiveLine);
             e.Graphics.DrawLine(line, 0, header.Height - 1, header.Width, header.Height - 1);
         };
         section.Controls.Add(header);
@@ -683,7 +683,7 @@ internal sealed class FullScreenSideBar : Panel
                 g.FillRectangle(back, ClientRectangle);
             DrawGlyph(g);
             var l = CurrentLayout();
-            var fore = Enabled ? ForeColor : Color.FromArgb(120, 125, 135);
+            var fore = Enabled ? ForeColor : UiColors.ImmersiveDisabled;
             var flags = TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding |
                         (l.TwoLines ? TextFormatFlags.Top : TextFormatFlags.VerticalCenter);
             var nameRect = l.TwoLines ? l.Name : l.Name with { Height = Height };
@@ -723,7 +723,7 @@ internal sealed class FullScreenSideBar : Panel
             Cursor = Cursors.Hand;
             UseMnemonic = false;
             FlatAppearance.BorderSize = 0;
-            FlatAppearance.MouseOverBackColor = Color.FromArgb(70, 110, 180);
+            FlatAppearance.MouseOverBackColor = UiColors.ImmersiveSelectedHover;
         }
 
         /// <summary>Icona (un carattere di Segoe UI Symbol); vuota = nessuna icona.</summary>
@@ -753,7 +753,7 @@ internal sealed class FullScreenSideBar : Panel
         {
             if (Glyph.Length == 0)
                 return;
-            var color = Enabled ? Color.FromArgb(170, 200, 245) : Color.FromArgb(110, 115, 125);
+            var color = Enabled ? UiColors.ImmersiveAccentText : UiColors.ImmersiveDisabled;
             TextRenderer.DrawText(g, Glyph, GlyphFont, new Rectangle(0, 0, Indent, Height), color,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
         }

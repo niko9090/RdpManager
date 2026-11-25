@@ -20,7 +20,12 @@
           <SolidColorBrush x:Key="AppTextBrush" Color="#000000" />
           <SolidColorBrush x:Key="AppBorderBrush" Color="#A0A0A0" />
           <SolidColorBrush x:Key="AppMutedBrush" Color="#6D6D6D" />
-          <SolidColorBrush x:Key="AppDangerBrush" Color="#B22222" />
+          <SolidColorBrush x:Key="AppDangerBrush" Color="#C42B1C" />
+          <!-- Colori con un significato, come ThemePalette di Windows (Accent, Success, Warning, Hover): testi almeno 4,5:1. -->
+          <SolidColorBrush x:Key="AppAccentTextBrush" Color="#005FB8" />
+          <SolidColorBrush x:Key="AppSuccessBrush" Color="#0F7B0F" />
+          <SolidColorBrush x:Key="AppWarningBrush" Color="#8A5A00" />
+          <SolidColorBrush x:Key="AppHoverBrush" Color="#D9EAF8" />
           <!-- Pulsanti, caselle di testo ed elenchi come i controlli di Windows Forms (stato normale, sopra, premuto). -->
           <SolidColorBrush x:Key="ButtonBackground" Color="#E1E1E1" />
           <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#E5F1FB" />
@@ -44,10 +49,10 @@
           <SolidColorBrush x:Key="TreeViewItemBackgroundPointerOver" Color="#E5F3FF" />
           <SolidColorBrush x:Key="TreeViewItemForegroundSelected" Color="#FFFFFF" />
           <SolidColorBrush x:Key="TreeViewItemForegroundSelectedPointerOver" Color="#FFFFFF" />
-          <SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="#F0F0F0" />
+          <SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="#FFFFFF" />
           <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush" Color="#A0A0A0" />
-          <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPointerOver" Color="#91C9F7" />
-          <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPressed" Color="#91C9F7" />
+          <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPointerOver" Color="#D9EAF8" />
+          <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPressed" Color="#C4DEF5" />
           <!-- Schede: linguetta scelta = colore delle caselle, le altre = colore dei controlli con testo grigio (Theme.DrawTabItem). -->
           <SolidColorBrush x:Key="TabItemHeaderBackgroundUnselected" Color="#F0F0F0" />
           <SolidColorBrush x:Key="TabItemHeaderBackgroundUnselectedPointerOver" Color="#FFFFFF" />
@@ -72,8 +77,12 @@
           <SolidColorBrush x:Key="AppBorderBrush" Color="#464850" />
           <SolidColorBrush x:Key="AppMutedBrush" Color="#9698A0" />
           <SolidColorBrush x:Key="AppDangerBrush" Color="#F0786E" />
+          <SolidColorBrush x:Key="AppAccentTextBrush" Color="#78AAFF" />
+          <SolidColorBrush x:Key="AppSuccessBrush" Color="#6ED278" />
+          <SolidColorBrush x:Key="AppWarningBrush" Color="#EBBE5A" />
+          <SolidColorBrush x:Key="AppHoverBrush" Color="#42464E" />
           <SolidColorBrush x:Key="ButtonBackground" Color="#34363B" />
-          <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#3E4147" />
+          <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#42464E" />
           <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#2D5FA5" />
           <SolidColorBrush x:Key="ButtonBackgroundDisabled" Color="#2B2D31" />
           <SolidColorBrush x:Key="ButtonBorderBrush" Color="#464850" />
@@ -94,10 +103,10 @@
           <SolidColorBrush x:Key="TreeViewItemBackgroundPointerOver" Color="#2B2D31" />
           <SolidColorBrush x:Key="TreeViewItemForegroundSelected" Color="#FFFFFF" />
           <SolidColorBrush x:Key="TreeViewItemForegroundSelectedPointerOver" Color="#FFFFFF" />
-          <SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="#2B2D31" />
+          <SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="#34363B" />
           <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush" Color="#464850" />
-          <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPointerOver" Color="#2D5FA5" />
-          <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPressed" Color="#2D5FA5" />
+          <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPointerOver" Color="#42464E" />
+          <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPressed" Color="#50555F" />
           <SolidColorBrush x:Key="TabItemHeaderBackgroundUnselected" Color="#2B2D31" />
           <SolidColorBrush x:Key="TabItemHeaderBackgroundUnselectedPointerOver" Color="#34363B" />
           <SolidColorBrush x:Key="TabItemHeaderBackgroundSelected" Color="#34363B" />
@@ -183,7 +192,7 @@
       <Setter Property="BorderThickness" Value="0" />
     </Style>
     <Style Selector="Button.flat:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+      <Setter Property="Background" Value="{DynamicResource AppHoverBrush}" />
     </Style>
     <Style Selector="Button.danger">
       <Setter Property="Foreground" Value="{DynamicResource AppDangerBrush}" />

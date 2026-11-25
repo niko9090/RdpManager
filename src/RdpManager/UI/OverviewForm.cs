@@ -32,9 +32,9 @@ internal sealed class OverviewForm : Form
         }
     }
 
-    private static readonly Color Back =Color.FromArgb(24, 25, 29);
-    private static readonly Color TileBack = Color.FromArgb(40, 42, 48);
-    private static readonly Color Accent = Color.FromArgb(70, 140, 230);
+    private static readonly Color Back = UiColors.ImmersiveBackdrop;
+    private static readonly Color TileBack = UiColors.ImmersiveTile;
+    private static readonly Color Accent = UiColors.ImmersiveAccent;
 
     private readonly List<Tile> _tiles = [];
     private IReadOnlyList<Rectangle> _cells = [];
@@ -144,8 +144,8 @@ internal sealed class OverviewForm : Form
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
         g.InterpolationMode = InterpolationMode.HighQualityBilinear;
-        using var text = new SolidBrush(Color.FromArgb(235, 235, 240));
-        using var gray = new SolidBrush(Color.FromArgb(160, 162, 170));
+        using var text = new SolidBrush(UiColors.ImmersiveText);
+        using var gray = new SolidBrush(UiColors.ImmersiveMuted);
         using var title = new Font(Font.FontFamily, 13f, FontStyle.Bold);
         g.DrawString("Panoramica", title, text, 16, 10);
         g.DrawString(_tiles.Count == 0
@@ -153,7 +153,7 @@ internal sealed class OverviewForm : Form
                 : "Tocca una sessione per aprirla · Invio e frecce da tastiera · Esc per chiudere",
             Font, gray, 150, 15);
         var close = CloseButtonRect;
-        using (var closeBack = new SolidBrush(_hoverClose ? Color.FromArgb(70, 74, 84) : TileBack))
+        using (var closeBack = new SolidBrush(_hoverClose ? UiColors.ImmersiveHover : TileBack))
             g.FillRectangle(closeBack, close);
         using (var closeFormat = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
             g.DrawString("Chiudi  ✕", Font, text, close, closeFormat);
@@ -179,7 +179,7 @@ internal sealed class OverviewForm : Form
             bool selected = i == _selected, hover = i == _hover;
             if (selected || hover)
             {
-                using var pen = new Pen(selected ? Accent : Color.FromArgb(120, 125, 135), selected ? 4 : 2);
+                using var pen = new Pen(selected ? Accent : UiColors.ImmersiveDisabled, selected ? 4 : 2);
                 g.DrawRectangle(pen, Rectangle.Inflate(r, 2, 2));
             }
 

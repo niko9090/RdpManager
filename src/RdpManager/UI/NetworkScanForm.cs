@@ -113,8 +113,8 @@ internal sealed class NetworkScanForm : TouchForm
     {
         var o = Overview;
         VpnStatusLabel.Text = o.Headline;
-        VpnStatusLabel.BackColor = o.VpnConnected ? Color.FromArgb(0xD6, 0xF0, 0xDC) : Color.FromArgb(0xF8, 0xDA, 0xD6);
-        VpnStatusLabel.ForeColor = o.VpnConnected ? Color.FromArgb(0x10, 0x5A, 0x24) : Color.FromArgb(0x8A, 0x1C, 0x14);
+        VpnStatusLabel.BackColor = o.VpnConnected ? ThemeManager.Current.GoodBack : ThemeManager.Current.BadBack;
+        VpnStatusLabel.ForeColor = o.VpnConnected ? ThemeManager.Current.GoodText : ThemeManager.Current.BadText;
         foreach (var (text, width) in new[] { ("Stato", 100), ("Scheda", 200), ("Tipo", 100), ("IP del PC", 130), ("Rete", 140) })
             CardsList.Columns.Add(text, width);
         foreach (var c in o.Cards)
@@ -123,7 +123,7 @@ internal sealed class NetworkScanForm : TouchForm
             if (c.IsOurVpn)
                 item.Font = new Font(CardsList.Font, FontStyle.Bold);
             if (!c.Connected)
-                item.ForeColor = Color.Firebrick;
+                item.ForeColor = ThemeManager.Current.Danger;
             CardsList.Items.Add(item);
         }
         var panel = new Panel { Dock = DockStyle.Top, Height = 34 + Math.Clamp(CardsList.Items.Count, 1, 5) * 20 + 28, Padding = new Padding(0, 0, 0, 6) };
@@ -277,7 +277,7 @@ internal sealed class NetworkScanForm : TouchForm
 
     private void ShowTailscaleProblem(string message)
     {
-        _tsMessage.ForeColor = Color.Firebrick;
+        _tsMessage.ForeColor = ThemeManager.Current.Danger;
         _tsMessage.Text = message;
     }
 
@@ -535,7 +535,7 @@ internal sealed class NetworkScanForm : TouchForm
 
         private void SetStatus(string text, bool problem)
         {
-            _status.ForeColor = problem ? Color.Firebrick : _owner.ForeColor;
+            _status.ForeColor = problem ? ThemeManager.Current.Danger : _owner.ForeColor;
             _status.Text = text;
         }
     }

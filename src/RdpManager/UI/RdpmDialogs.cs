@@ -57,7 +57,7 @@ public sealed class RdpmExportDialog : TouchForm
         if (RdpmFile.UnreadablePasswordsWarning(doc) is { } unreadable)
             layout.Controls.Add(new Label
             {
-                Text = unreadable, AutoSize = true, ForeColor = Color.Firebrick, MaximumSize = new Size(380, 0),
+                Text = unreadable, AutoSize = true, ForeColor = ThemeManager.Current.Danger, MaximumSize = new Size(380, 0),
                 Margin = new Padding(3, 0, 3, 8),
             });
         layout.Controls.Add(_without);
@@ -217,7 +217,7 @@ public sealed class FilePasswordDialog : TouchForm
 
         var layout = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Dock = DockStyle.Fill };
         if (retry)
-            layout.Controls.Add(new Label { Text = "Password sbagliata. Riprova.", AutoSize = true, ForeColor = Color.Firebrick });
+            layout.Controls.Add(new Label { Text = "Password sbagliata. Riprova.", AutoSize = true, ForeColor = ThemeManager.Current.Danger });
         layout.Controls.Add(new Label { Text = $"«{fileName}» contiene password cifrate.", AutoSize = true });
         layout.Controls.Add(_password);
 

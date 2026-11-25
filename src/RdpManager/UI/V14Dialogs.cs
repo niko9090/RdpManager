@@ -11,7 +11,7 @@ namespace RdpManager.UI;
 internal sealed class LockForm : Form
 {
     private readonly TextBox _pin = new() { Width = 220, UseSystemPasswordChar = true, MaxLength = PinLock.MaxLength, TextAlign = HorizontalAlignment.Center };
-    private readonly Label _error = new() { AutoSize = true, ForeColor = Color.FromArgb(240, 120, 110), Text = "" };
+    private readonly Label _error = new() { AutoSize = true, ForeColor = UiColors.ImmersiveDanger, Text = "" };
     private readonly Func<string, bool> _tryUnlock;
     private int _failures;
     private DateTime _waitUntil = DateTime.MinValue;
@@ -25,18 +25,18 @@ internal sealed class LockForm : Form
         FormBorderStyle = FormBorderStyle.None;
         StartPosition = FormStartPosition.Manual;
         Bounds = screen;
-        BackColor = Color.FromArgb(24, 25, 29);
-        ForeColor = Color.FromArgb(235, 235, 240);
+        BackColor = UiColors.ImmersiveBackdrop;
+        ForeColor = UiColors.ImmersiveText;
         TopMost = true;
         ShowInTaskbar = true;
         Font = new Font(SystemFonts.MessageBoxFont?.FontFamily ?? FontFamily.GenericSansSerif, 11f);
         KeyPreview = true;
 
         var title = new Label { Text = "RdpManager è bloccato", AutoSize = true, Font = new Font(Font.FontFamily, 18f, FontStyle.Bold) };
-        var hint = new Label { Text = "Le sessioni restano aperte ma nascoste; le password salvate restano cifrate finché non sblocchi.", AutoSize = true, ForeColor = Color.FromArgb(160, 162, 170), MaximumSize = new Size(520, 0) };
+        var hint = new Label { Text = "Le sessioni restano aperte ma nascoste; le password salvate restano cifrate finché non sblocchi.", AutoSize = true, ForeColor = UiColors.ImmersiveMuted, MaximumSize = new Size(520, 0) };
         _pin.Font = new Font(Font.FontFamily, 16f);
-        var unlock = new Button { Text = "Sblocca", AutoSize = true, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(45, 95, 165), ForeColor = Color.White };
-        var forgot = new LinkLabel { Text = "Ho dimenticato il PIN", AutoSize = true, LinkColor = Color.FromArgb(120, 170, 255) };
+        var unlock = new Button { Text = "Sblocca", AutoSize = true, FlatStyle = FlatStyle.Flat, BackColor = UiColors.ImmersiveSelected, ForeColor = Color.White };
+        var forgot = new LinkLabel { Text = "Ho dimenticato il PIN", AutoSize = true, LinkColor = UiColors.ImmersiveLink };
         var panel = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, BackColor = BackColor };
         panel.Controls.AddRange([title, hint, new Label { Text = "PIN", AutoSize = true, Margin = new Padding(3, 18, 3, 3) }, _pin, unlock, _error, forgot]);
         Controls.Add(panel);
