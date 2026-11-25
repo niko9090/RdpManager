@@ -76,6 +76,8 @@
   <Style Selector="MenuItem">
     <Setter Property="MinHeight" Value="22" />
     <Setter Property="Padding" Value="8,2" />
+    <!-- Evidenziazione arrotondata come i menu piatti del programma Windows (Theme.FlatRenderer). -->
+    <Setter Property="CornerRadius" Value="4" />
   </Style>
   <Style Selector="Rectangle.separator">
     <Setter Property="Fill" Value="{DynamicResource AppBorderBrush}" />
