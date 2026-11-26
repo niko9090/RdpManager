@@ -38,6 +38,8 @@ public sealed class App : Application
                 gatewayCredentials: c => viewModel?.Document.ResolveGatewayCredentials(c),
                 post: a => Dispatcher.UIThread.Post(a));
             sessions.CertificateDecider = prompt => shell.AskCertificateAsync(prompt);
+            sessions.CredentialsDecider = prompt => shell.AskCredentialsAsync(prompt);
+            sessions.CredentialsSaver = (id, credentials) => viewModel?.SaveCredentials(id, credentials);
             viewModel = new MainWindowViewModel(new ConnectionStore(), sessions, dialogs);
             _viewModel = viewModel;
             viewModel.StartupConfigFile = Program.StartupConfigFile;

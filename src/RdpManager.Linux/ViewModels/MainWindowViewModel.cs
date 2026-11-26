@@ -473,6 +473,22 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         StatusMessage = _sessions.IsAvailable ? $"Connessione a «{connection.DisplayName}» aperta." : _sessions.UnavailableReason ?? "";
     }
 
+    /// <summary>
+    /// Ricorda nella connessione utente e password inseriti all'avvio della sessione (richiesta dopo il codice 159 di FreeRDP).
+    /// Valgono per quella connessione sola: l'eventuale profilo di credenziali non si tocca, perché può servire ad altri PC.
+    /// </summary>
+    public void SaveCredentials(Guid connectionId, Features.CredentialsAnswer credentials)
+    {
+        if (Document.Connections.FirstOrDefault(c => c.Id == connectionId) is not { } connection)
+            return;
+        connection.Username = credentials.Username;
+        connection.Domain = credentials.Domain;
+        connection.Password = credentials.Password;
+        connection.ProtectedPassword = null;
+        connection.CredentialProfileId = null;
+        Save();
+    }
+
     private void CloseTab(SessionTabViewModel tab)
     {
         MarkClosedByUser(tab.Session);

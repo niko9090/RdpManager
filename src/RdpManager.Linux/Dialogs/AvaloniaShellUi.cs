@@ -153,6 +153,46 @@ public sealed class AvaloniaShellUi : IShellUi
         return await window.ShowDialogTracked<bool>(RequireOwner());
     }
 
+    public async Task<CredentialsAnswer?> AskCredentialsAsync(CredentialsPrompt prompt)
+    {
+        var user = new TextBox { Text = prompt.Username, Watermark = "Utente" };
+        var domain = new TextBox { Text = prompt.Domain, Watermark = "Dominio (facoltativo)" };
+        var password = new TextBox { PasswordChar = '•', Watermark = "Password" };
+        var save = new CheckBox { Content = "Ricorda per questo PC", IsChecked = true };
+        var ok = new Button { Content = "Connetti", IsDefault = true, MinWidth = 96 };
+        ok.Classes.Add("accent");
+        var cancel = new Button { Content = "Annulla", IsCancel = true, MinWidth = 96 };
+        var window = new Window
+        {
+            Title = "Accesso a " + prompt.Title,
+            Width = 440,
+            SizeToContent = SizeToContent.Height,
+            CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        ok.Click += (_, _) => { if (!string.IsNullOrWhiteSpace(user.Text)) window.Close(true); };
+        cancel.Click += (_, _) => window.Close(false);
+        window.Opened += (_, _) => (string.IsNullOrEmpty(user.Text) ? user : password).Focus();
+        window.Content = new StackPanel
+        {
+            Margin = new Thickness(20),
+            Spacing = 10,
+            Children =
+            {
+                new TextBlock { Text = prompt.Title, FontSize = 18, FontWeight = FontWeight.SemiBold },
+                new TextBlock { Text = prompt.Host + " — " + prompt.Reason, TextWrapping = TextWrapping.Wrap, Opacity = 0.75 },
+                user,
+                domain,
+                password,
+                save,
+                new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Children = { ok, cancel } },
+            },
+        };
+        if (!await window.ShowDialogTracked<bool>(RequireOwner()))
+            return null;
+        return new CredentialsAnswer((user.Text ?? "").Trim(), (domain.Text ?? "").Trim(), password.Text ?? "", save.IsChecked == true);
+    }
+
     public IUpdateProgressView ShowUpdateProgress(ReleaseInfo release)
     {
         var view = new AvaloniaUpdateProgress(release);

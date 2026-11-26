@@ -32,6 +32,7 @@ public sealed class FreeRdpSession : ViewModelBase, ISession
     private int _generation;
     private int _attempts;
     private bool _acceptCertificate;
+    private CredentialsAnswer? _credentials; // inserite dall'utente per questa sessione (codice 159 / password errata)
     private DateTime _startedAt;
 
     public FreeRdpSession(
@@ -69,6 +70,16 @@ public sealed class FreeRdpSession : ViewModelBase, ISession
 
     /// <summary>Chiede all'utente se fidarsi di un certificato non verificato (avviso certificato); null = non si chiede e la sessione finisce.</summary>
     public Func<CertificatePrompt, Task<bool>>? CertificateDecider { get; set; }
+
+    /// <summary>
+    /// Chiede utente e password quando FreeRDP esce per credenziali mancanti o rifiutate (codice 159 e simili); null = non
+    /// si chiede e la sessione finisce con l'errore. Succede con i PC della cartella marshmelloVPN senza password salvata
+    /// o con password cifrate su Windows, che su Linux non si possono leggere.
+    /// </summary>
+    public Func<CredentialsPrompt, Task<CredentialsAnswer?>>? CredentialsDecider { get; set; }
+
+    /// <summary>L'utente ha chiesto di ricordare le credenziali inserite: (Id della connessione, credenziali).</summary>
+    public Action<Guid, CredentialsAnswer>? CredentialsSaver { get; set; }
 
     /// <summary>Handle X11 della superficie in cui la sessione è incorporata (per la foto); null se in finestra separata.</summary>
     public long? SurfaceXid { get; private set; }
@@ -311,7 +322,20 @@ public sealed class FreeRdpSession : ViewModelBase, ISession
     {
         // Certificato accettato dall'utente: solo per questa sessione la politica passa a «ignora».
         var context = _acceptCertificate ? _context with { CertificatePolicy = CertificatePolicy.Ignore } : _context;
-        return FreeRdpCommandBuilder.Build(_connection, _client, context);
+        return FreeRdpCommandBuilder.Build(ConnectionForLaunch(), _client, context);
+    }
+
+    /// <summary>La connessione da avviare: con le credenziali inserite dall'utente, se ce ne sono.</summary>
+    internal RdpConnection ConnectionForLaunch()
+    {
+        if (_credentials is not { } c)
+            return _connection;
+        var copy = _connection.Clone();
+        copy.Username = c.Username;
+        copy.Domain = c.Domain;
+        copy.Password = c.Password;
+        copy.ProtectedPassword = null;
+        return copy;
     }
 
     private void OnProcessExited(FreeRdpProcess process, int exitCode, string error)
@@ -320,9 +344,20 @@ public sealed class FreeRdpSession : ViewModelBase, ISession
             return;
         lock (_gate)
             _process = null;
+        HandleExit(exitCode, error);
+    }
+
+    /// <summary>Cosa fare quando FreeRDP termina: certificato, credenziali, nuovo tentativo o fine (separato per le prove).</summary>
+    internal void HandleExit(int exitCode, string error)
+    {
         if (exitCode != 0 && CertificateTrust.IsCertificateProblem(exitCode, error) && CertificateDecider is not null)
         {
             _ = AskCertificateAsync(error);
+            return;
+        }
+        if (exitCode != 0 && CertificateTrust.IsCredentialsProblem(exitCode) && CredentialsDecider is not null)
+        {
+            _ = AskCredentialsAsync(exitCode);
             return;
         }
         if (DateTime.UtcNow - _startedAt > TimeSpan.FromSeconds(15))
@@ -359,6 +394,38 @@ public sealed class FreeRdpSession : ViewModelBase, ISession
             return;
         }
         _acceptCertificate = true;
+        Launch(_context);
+    }
+
+    private async Task AskCredentialsAsync(int exitCode)
+    {
+        var current = ConnectionForLaunch();
+        var reason = exitCode == CertificateTrust.MissingCredentialsExit && !current.HasPassword
+            ? "Per questo PC non c'è una password salvata su questo computer."
+            : exitCode == CertificateTrust.MissingCredentialsExit
+                ? "Il PC remoto chiede utente e password."
+                : "Utente o password non accettati dal PC remoto.";
+        CredentialsAnswer? answer = null;
+        try
+        {
+            IsRunning = false;
+            Message = "In attesa di utente e password…";
+            answer = await CredentialsDecider!(new CredentialsPrompt(_connection.DisplayName, _connection.Host, current.Username, current.Domain, reason));
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or OperationCanceledException)
+        {
+        }
+        if (_closed)
+            return;
+        if (answer is null)
+        {
+            Ended("Connessione annullata: servono utente e password (codice " + exitCode + ").");
+            return;
+        }
+        _credentials = answer;
+        if (answer.Save)
+            CredentialsSaver?.Invoke(_connection.Id, answer);
+        _attempts = 0;
         Launch(_context);
     }
 

@@ -1,5 +1,11 @@
 # Novità di RdpManager
 
+## 1.19.7 (26/11/2026)
+
+**Linux: i PC della VPN ora si aprono anche senza password salvata**
+- Linux: le connessioni ai PC della VPN si chiudevano subito con «codice 159». La rete funzionava: il codice vuol dire che a FreeRDP mancavano utente e password. Succede per i PC della cartella marshmelloVPN senza password salvata e per le password salvate su Windows, che su Linux non si possono leggere. Windows in questi casi chiede le credenziali da sé, FreeRDP no.
+- Ora l'app chiede utente e password (anche dopo una password errata) e riprova subito; con «Ricorda per questo PC» le salva nella connessione.
+
 ## 1.19.6 (26/11/2026)
 
 **Aggiornamento che non si installava più**

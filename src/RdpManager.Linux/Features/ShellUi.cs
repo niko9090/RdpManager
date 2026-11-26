@@ -33,6 +33,9 @@ public interface IShellUi
     /// <summary>Avviso certificato: vero se l'utente si fida e vuole continuare.</summary>
     Task<bool> AskCertificateAsync(CertificatePrompt prompt);
 
+    /// <summary>Chiede utente e password per un PC remoto; null se annullato.</summary>
+    Task<CredentialsAnswer?> AskCredentialsAsync(CredentialsPrompt prompt);
+
     /// <summary>
     /// Avviso di una nuova versione: vero se l'utente accetta. Con <paramref name="canInstall"/> si offre l'installazione
     /// automatica («Installa ora»); senza, solo l'apertura della pagina della release.
@@ -99,6 +102,12 @@ public sealed class NullUpdateProgress : IUpdateProgressView
 /// <summary>Cosa mostrare nell'avviso sul certificato del server.</summary>
 public sealed record CertificatePrompt(string Host, string Detail);
 
+/// <summary>Cosa mostrare nella richiesta di credenziali: il PC, l'utente già noto e perché si chiede.</summary>
+public sealed record CredentialsPrompt(string Title, string Host, string Username, string Domain, string Reason);
+
+/// <summary>Le credenziali inserite; <see cref="Save"/> = ricordarle nella connessione.</summary>
+public sealed record CredentialsAnswer(string Username, string Domain, string Password, bool Save);
+
 /// <summary>Interfaccia nulla: niente finestre, risposte predefinite (per le prove e per il funzionamento senza schermo).</summary>
 public class NullShellUi : IShellUi
 {
@@ -141,6 +150,15 @@ public class NullShellUi : IShellUi
     {
         CertificatePrompts.Add(prompt);
         return Task.FromResult(CertificateAnswer);
+    }
+
+    public CredentialsAnswer? CredentialsAnswer { get; set; }
+    public List<CredentialsPrompt> CredentialsPrompts { get; } = [];
+
+    public virtual Task<CredentialsAnswer?> AskCredentialsAsync(CredentialsPrompt prompt)
+    {
+        CredentialsPrompts.Add(prompt);
+        return Task.FromResult(CredentialsAnswer);
     }
 
     public List<bool> OffersCanInstall { get; } = [];

@@ -41,6 +41,17 @@ public static class CertificateTrust
         return detail.Length > 0 ? text + "\n\nDettaglio: " + detail : text;
     }
 
+    /// <summary>
+    /// Codici d'uscita di FreeRDP per credenziali mancanti o rifiutate: 159 = nessuna credenziale (FreeRDP senza terminale
+    /// non può chiederle, Windows invece le chiede da sé), 132 = autenticazione non riuscita, 134 = accesso non riuscito,
+    /// 154 = password errata.
+    /// </summary>
+    public const int MissingCredentialsExit = 159;
+    private static readonly HashSet<int> CredentialsExitCodes = [132, 134, 154, MissingCredentialsExit];
+
+    /// <summary>Vero se FreeRDP è uscito perché mancano utente/password o sono stati rifiutati: si chiedono all'utente.</summary>
+    public static bool IsCredentialsProblem(int exitCode) => CredentialsExitCodes.Contains(exitCode);
+
     /// <summary>Codici d'uscita di FreeRDP per cui ha senso ritentare: rete, DNS, TLS di trasporto, errori sconosciuti.</summary>
     private static readonly HashSet<int> Retryable = [12, 130, 131, 137, 138, 139, 140, 141, 142, 146, 149, 255];
 

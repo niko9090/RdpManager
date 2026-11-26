@@ -37,6 +37,12 @@ public sealed class FreeRdpSessionHost : ISessionHost
     /// <summary>Come chiedere all'utente se fidarsi di un certificato non verificato (avviso certificato); null = non si chiede.</summary>
     public Func<Features.CertificatePrompt, Task<bool>>? CertificateDecider { get; set; }
 
+    /// <summary>Come chiedere utente e password quando FreeRDP esce con il codice 159 o una password errata; null = non si chiede.</summary>
+    public Func<Features.CredentialsPrompt, Task<Features.CredentialsAnswer?>>? CredentialsDecider { get; set; }
+
+    /// <summary>Come ricordare le credenziali inserite, se l'utente lo chiede: (Id della connessione, credenziali).</summary>
+    public Action<Guid, Features.CredentialsAnswer>? CredentialsSaver { get; set; }
+
     public bool IsAvailable => FreeRdpLocator.Find(false, _isInstalled) is not null;
 
     public string? UnavailableReason => IsAvailable ? null : FreeRdpLocator.NotInstalledMessage();
@@ -50,6 +56,8 @@ public sealed class FreeRdpSessionHost : ISessionHost
         var session = new FreeRdpSession(connection, client, _gatewayCredentials(connection), ct => PrepareVpnAsync(connection, ct), _post)
         {
             CertificateDecider = CertificateDecider,
+            CredentialsDecider = CredentialsDecider,
+            CredentialsSaver = CredentialsSaver,
         };
         lock (_sessions)
             _sessions.Add(session);
