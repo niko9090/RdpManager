@@ -97,3 +97,55 @@ public class CredentialsPromptTests
         Assert.Equal("altro", profile.Username); // il profilo condiviso non si tocca
     }
 }
+
+public class ExitExplanationTests
+{
+    private static FreeRdpSession Session() =>
+        new(new RdpConnection { Name = "Z2", Host = "10.66.0.4" }, new FreeRdpClient("xfreerdp3", true, false), null,
+            _ => Task.FromResult<string?>("prova"), a => a());
+
+    [Fact]
+    public void Il_codice_147_dice_che_il_PC_non_risponde() =>
+        Assert.Contains("non risponde", FreeRdpExitCodes.Describe(147).Meaning);
+
+    [Theory]
+    [InlineData(5)]
+    [InlineData(133)]
+    [InlineData(147)]
+    [InlineData(148)]
+    [InlineData(159)]
+    [InlineData(255)]
+    [InlineData(999)]
+    public void Ogni_codice_ha_spiegazione_e_cosa_fare(int code)
+    {
+        var info = FreeRdpExitCodes.Describe(code);
+        Assert.False(string.IsNullOrWhiteSpace(info.Meaning));
+        Assert.False(string.IsNullOrWhiteSpace(info.Hint));
+    }
+
+    [Fact]
+    public void Con_un_errore_si_apre_la_finestra_con_codice_spiegazione_e_dettaglio()
+    {
+        var shown = new List<SessionErrorInfo>();
+        var session = Session();
+        session.ErrorReporter = shown.Add;
+        session.HandleExit(147, "[ERROR][com.freerdp.core] - transport_connect failed\nERRCONNECT_CONNECT_TRANSPORT_FAILED");
+        var e = Assert.Single(shown);
+        Assert.Equal(147, e.ExitCode);
+        Assert.Equal("10.66.0.4", e.Host);
+        Assert.Contains("TRANSPORT_FAILED", e.Detail);
+        Assert.Contains("non risponde", session.Message);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(11)]
+    public void Chiusure_normali_non_aprono_la_finestra(int code)
+    {
+        var shown = new List<SessionErrorInfo>();
+        var session = Session();
+        session.ErrorReporter = shown.Add;
+        session.HandleExit(code, "");
+        Assert.Empty(shown);
+    }
+}

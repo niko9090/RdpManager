@@ -40,6 +40,7 @@ public sealed class App : Application
             sessions.CertificateDecider = prompt => shell.AskCertificateAsync(prompt);
             sessions.CredentialsDecider = prompt => shell.AskCredentialsAsync(prompt);
             sessions.CredentialsSaver = (id, credentials) => viewModel?.SaveCredentials(id, credentials);
+            sessions.ErrorReporter = error => _ = shell.ShowSessionErrorAsync(error);
             viewModel = new MainWindowViewModel(new ConnectionStore(), sessions, dialogs);
             _viewModel = viewModel;
             viewModel.StartupConfigFile = Program.StartupConfigFile;

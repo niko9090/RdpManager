@@ -43,6 +43,9 @@ public sealed class FreeRdpSessionHost : ISessionHost
     /// <summary>Come ricordare le credenziali inserite, se l'utente lo chiede: (Id della connessione, credenziali).</summary>
     public Action<Guid, Features.CredentialsAnswer>? CredentialsSaver { get; set; }
 
+    /// <summary>Come mostrare la finestra che spiega il codice d'errore di una sessione finita male; null = solo il messaggio nella scheda.</summary>
+    public Action<Features.SessionErrorInfo>? ErrorReporter { get; set; }
+
     public bool IsAvailable => FreeRdpLocator.Find(false, _isInstalled) is not null;
 
     public string? UnavailableReason => IsAvailable ? null : FreeRdpLocator.NotInstalledMessage();
@@ -58,6 +61,7 @@ public sealed class FreeRdpSessionHost : ISessionHost
             CertificateDecider = CertificateDecider,
             CredentialsDecider = CredentialsDecider,
             CredentialsSaver = CredentialsSaver,
+            ErrorReporter = ErrorReporter,
         };
         lock (_sessions)
             _sessions.Add(session);

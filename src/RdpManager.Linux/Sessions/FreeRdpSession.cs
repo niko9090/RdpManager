@@ -81,6 +81,13 @@ public sealed class FreeRdpSession : ViewModelBase, ISession
     /// <summary>L'utente ha chiesto di ricordare le credenziali inserite: (Id della connessione, credenziali).</summary>
     public Action<Guid, CredentialsAnswer>? CredentialsSaver { get; set; }
 
+    /// <summary>La sessione è finita con un errore (non una chiusura normale): mostra la finestra che spiega il codice.</summary>
+    public Action<SessionErrorInfo>? ErrorReporter { get; set; }
+
+    /// <summary>Le ultime righe utili dell'uscita di FreeRDP, per il dettaglio tecnico della finestra d'errore.</summary>
+    private static string TechnicalDetail(string error) =>
+        string.Join("\n", error.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).TakeLast(6));
+
     /// <summary>Handle X11 della superficie in cui la sessione è incorporata (per la foto); null se in finestra separata.</summary>
     public long? SurfaceXid { get; private set; }
 
@@ -370,8 +377,11 @@ public sealed class FreeRdpSession : ViewModelBase, ISession
         var detail = LastLine(error);
         var message = exitCode == 0
             ? "La sessione è terminata."
-            : "La sessione si è chiusa (codice " + exitCode + ")." + (detail.Length > 0 ? "\n" + detail : "");
+            : "La sessione si è chiusa (codice " + exitCode + "). " + FreeRdpExitCodes.Describe(exitCode).Meaning
+              + (detail.Length > 0 ? "\n" + detail : "");
         Ended(message);
+        if (!FreeRdpExitCodes.IsNormalClose(exitCode))
+            ErrorReporter?.Invoke(new SessionErrorInfo(_connection.DisplayName, TargetText, exitCode, FreeRdpExitCodes.Describe(exitCode), TechnicalDetail(error)));
     }
 
     private async Task AskCertificateAsync(string error)

@@ -193,6 +193,46 @@ public sealed class AvaloniaShellUi : IShellUi
         return new CredentialsAnswer((user.Text ?? "").Trim(), (domain.Text ?? "").Trim(), password.Text ?? "", save.IsChecked == true);
     }
 
+    public async Task ShowSessionErrorAsync(SessionErrorInfo error)
+    {
+        var ok = new Button { Content = "OK", IsDefault = true, IsCancel = true, MinWidth = 96 };
+        ok.Classes.Add("accent");
+        var copy = new Button { Content = "Copia dettagli", MinWidth = 120 };
+        var window = new Window
+        {
+            Title = "Connessione a " + error.Title + " non riuscita",
+            Width = 520,
+            SizeToContent = SizeToContent.Height,
+            CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var report = $"{error.Title} ({error.Host}) — codice {error.ExitCode}: {error.Info.Meaning}"
+                     + (error.Detail.Length > 0 ? "\n" + error.Detail : "");
+        ok.Click += (_, _) => window.Close();
+        copy.Click += async (_, _) => { if (window.Clipboard is { } clip) await clip.SetTextAsync(report); };
+        var panel = new StackPanel
+        {
+            Margin = new Thickness(20),
+            Spacing = 12,
+            Children =
+            {
+                new TextBlock { Text = $"Errore {error.ExitCode}", FontSize = 18, FontWeight = FontWeight.SemiBold },
+                new TextBlock { Text = error.Info.Meaning, TextWrapping = TextWrapping.Wrap, FontWeight = FontWeight.SemiBold },
+                new TextBlock { Text = "Cosa fare: " + error.Info.Hint, TextWrapping = TextWrapping.Wrap },
+                new TextBlock { Text = error.Title + " — " + error.Host, TextWrapping = TextWrapping.Wrap, Opacity = 0.75 },
+            },
+        };
+        if (error.Detail.Length > 0)
+            panel.Children.Add(new Expander
+            {
+                Header = "Dettaglio tecnico (FreeRDP)",
+                Content = new SelectableTextBlock { Text = error.Detail, TextWrapping = TextWrapping.Wrap, FontFamily = new FontFamily("monospace"), FontSize = 12 },
+            });
+        panel.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Children = { copy, ok } });
+        window.Content = panel;
+        await window.ShowDialogTracked<object?>(RequireOwner());
+    }
+
     public IUpdateProgressView ShowUpdateProgress(ReleaseInfo release)
     {
         var view = new AvaloniaUpdateProgress(release);

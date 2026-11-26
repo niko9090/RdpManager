@@ -36,6 +36,9 @@ public interface IShellUi
     /// <summary>Chiede utente e password per un PC remoto; null se annullato.</summary>
     Task<CredentialsAnswer?> AskCredentialsAsync(CredentialsPrompt prompt);
 
+    /// <summary>Finestra che spiega perché una sessione si è chiusa con un errore (codice di FreeRDP, cosa fare, dettaglio).</summary>
+    Task ShowSessionErrorAsync(SessionErrorInfo error);
+
     /// <summary>
     /// Avviso di una nuova versione: vero se l'utente accetta. Con <paramref name="canInstall"/> si offre l'installazione
     /// automatica («Installa ora»); senza, solo l'apertura della pagina della release.
@@ -159,6 +162,14 @@ public class NullShellUi : IShellUi
     {
         CredentialsPrompts.Add(prompt);
         return Task.FromResult(CredentialsAnswer);
+    }
+
+    public List<SessionErrorInfo> SessionErrors { get; } = [];
+
+    public virtual Task ShowSessionErrorAsync(SessionErrorInfo error)
+    {
+        SessionErrors.Add(error);
+        return Task.CompletedTask;
     }
 
     public List<bool> OffersCanInstall { get; } = [];

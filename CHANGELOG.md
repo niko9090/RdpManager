@@ -1,5 +1,11 @@
 # Novità di RdpManager
 
+## 1.19.8 (26/11/2026)
+
+**Linux: finestra che spiega gli errori di connessione**
+- Quando una connessione si chiude con un errore si apre una finestra con il codice, cosa significa e cosa fare, più il dettaglio tecnico di FreeRDP (con «Copia dettagli»). Ad esempio il codice 147 vuol dire che il PC remoto non risponde sulla porta del desktop remoto: è spento, non è collegato alla VPN o un firewall lo blocca.
+- Le chiusure normali (disconnessione dell'utente, sessione chiusa dal PC remoto) non aprono la finestra.
+
 ## 1.19.7 (26/11/2026)
 
 **Linux: i PC della VPN ora si aprono anche senza password salvata**
