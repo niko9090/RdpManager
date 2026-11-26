@@ -40,11 +40,11 @@ public class VpnDashboardViewModelTests
         await vm.RefreshAsync();
 
         var up = vm.Rows[0];
-        Assert.Equal("Collegato", up.StateText);
+        Assert.Equal("In linea", up.StateText);
         Assert.Equal(UiColors.Connected, up.StatusColor);
         Assert.Equal("adesso", up.LastContactText);
         var down = vm.Rows[1];
-        Assert.Equal("Non collegato", down.StateText);
+        Assert.Equal("Non in linea", down.StateText);
         Assert.Equal(UiColors.Unreachable, down.StatusColor);
         Assert.Equal("mai", down.LastContactText);
     }
@@ -149,10 +149,61 @@ public class VpnDashboardViewModelTests
     }
 
     [Fact]
-    public void Il_menu_Strumenti_ha_Plancia_VPN_con_lo_stesso_testo_di_Windows()
+    public void La_Plancia_e_un_menu_principale_subito_prima_di_Aiuto()
     {
         var axaml = File.ReadAllText(SettingsViewModelTests.RepoFile("src/RdpManager.Linux/Menus/MainMenu.axaml"));
-        Assert.Contains("Header=\"Pl_ancia marshmelloVPN…\" Command=\"{Binding VpnDashboardCommand}\"", axaml);
+        int plancia = axaml.IndexOf("<MenuItem Header=\"_Plancia\" Command=\"{Binding VpnDashboardCommand}\"", StringComparison.Ordinal);
+        int aiuto = axaml.IndexOf("<MenuItem Header=\"A_iuto\">", StringComparison.Ordinal);
+        Assert.True(plancia > 0 && plancia < aiuto);
+        Assert.DoesNotContain("Pl_ancia marshmelloVPN…", axaml); // non più in Strumenti
+        var windows = File.ReadAllText(SettingsViewModelTests.RepoFile("src/RdpManager/UI/MainForm.cs"));
+        Assert.Contains("[file, conn, session, view, workspaces, tools, dashboard, help]", windows);
+    }
+
+    [Fact]
+    public async Task Un_PC_rinominato_mostra_il_nome_scelto_che_resta_dopo_l_aggiornamento()
+    {
+        var names = new Dictionary<string, string>();
+        int saved = 0;
+        var vm = new VpnDashboardViewModel(() => true, _ => Task.FromResult<IReadOnlyList<VpnDashboardDevice>>(
+                [new("Z2-TECNICO", "10.66.0.4/32", true, Now, DeviceId: "d4", Owner: "tecnico"), new("pc", "10.66.0.9/32", true, Now)]),
+            () => Now, names: names, saveNames: () => saved++, askName: (_, _) => Task.FromResult<string?>("Ufficio tecnico"));
+        await vm.RefreshAsync();
+        vm.Selected = vm.Rows.Single(r => r.Address == "10.66.0.4");
+        Assert.True(vm.RenameCommand.CanExecute(null));
+        await vm.RenameSelectedAsync();
+
+        Assert.Equal(1, saved);
+        Assert.Equal("Ufficio tecnico", names["id:d4"]);
+        var row = vm.Rows.Single(r => r.Address == "10.66.0.4");
+        Assert.Equal("Ufficio tecnico", row.Name);
+        Assert.Equal("Z2-TECNICO", row.DeviceName); // per inviare file serve il nome vero
+        Assert.Equal("Z2-TECNICO · tecnico", row.SubText);
+
+        await vm.RefreshAsync();
+        Assert.Equal("Ufficio tecnico", vm.Rows.Single(r => r.Address == "10.66.0.4").Name);
+
+        vm.Selected = vm.Rows.Single(r => r.Address == "10.66.0.4");
+        vm.ResetSelectedName();
+        Assert.Empty(names);
+        Assert.Equal("Z2-TECNICO", vm.Rows.Single(r => r.Address == "10.66.0.4").Name);
+    }
+
+    [Fact]
+    public async Task Ricerca_e_riepilogo()
+    {
+        var vm = Make(Devices(
+            new("alfa", "10.66.0.2/32", true, Now),
+            new("beta", "10.66.0.3/32", false, null),
+            new("gamma", "10.66.0.5/32", true, Now)));
+        await vm.RefreshAsync();
+        Assert.Equal("2 di 3 PC in linea", vm.SummaryText);
+        vm.Query = "0.3";
+        Assert.Equal(["beta"], vm.Rows.Select(r => r.Name));
+        vm.Query = "GAM";
+        Assert.Equal(["gamma"], vm.Rows.Select(r => r.Name));
+        vm.Query = "";
+        Assert.Equal(3, vm.Rows.Count);
     }
 
     [Fact]

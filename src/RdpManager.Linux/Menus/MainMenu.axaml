@@ -104,10 +104,11 @@
       <MenuItem Header="S_trumenti">
         <MenuItem Header="Cerca _PC in rete…" Command="{Binding NetworkScanCommand}" />
         <MenuItem Header="_marshmelloVPN (WireGuard)…" Command="{Binding VpnCommand}" />
-        <MenuItem Header="Pl_ancia marshmelloVPN…" Command="{Binding VpnDashboardCommand}" />
         <MenuItem Header="Account e _sincronizzazione…" Command="{Binding SyncAccountCommand}" />
         <MenuItem Header="_Carica file di configurazione…" Command="{Binding LoadConfigFileCommand}" />
       </MenuItem>
+      <!-- Plancia marshmelloVPN: voce del menu principale, prima di Aiuto (si apre con un clic) -->
+      <MenuItem Header="_Plancia" Command="{Binding VpnDashboardCommand}" ToolTip.Tip="Plancia marshmelloVPN: i PC della VPN" />
       <!-- ===== Zona blocco A: Aiuto (le voci Scorciatoie e Aggiornamenti sono del blocco B) ===== -->
       <MenuItem Header="A_iuto">
         <MenuItem Header="_Scorciatoie da tastiera" Command="{Binding ShortcutsHelpCommand}" InputGesture="F1" />

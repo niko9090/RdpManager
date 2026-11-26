@@ -82,6 +82,9 @@ public sealed class AppSettings
     /// </summary>
     public Dictionary<string, string> Shortcuts { get; set; } = [];
 
+    /// <summary>Nomi dati dall'utente ai PC nella Plancia marshmelloVPN (chiave <see cref="VpnDashboardModel.NameKey"/> → nome).</summary>
+    public Dictionary<string, string> VpnNames { get; set; } = [];
+
     // --- Dalla 1.2 ---
 
     public AppTheme Theme { get; set; } = AppTheme.System;

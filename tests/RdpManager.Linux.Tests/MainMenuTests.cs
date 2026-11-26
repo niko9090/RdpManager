@@ -14,7 +14,7 @@ public class MainMenuTests
     public void Il_menu_ha_i_menu_del_programma_Windows()
     {
         var headers = Regex.Matches(Axaml, @"^      <MenuItem Header=""([^""]+)""", RegexOptions.Multiline).Select(m => m.Groups[1].Value);
-        Assert.Equal(["_File", "_Connessioni", "_Sessione", "_Visualizza", "Spazi di la_voro", "S_trumenti", "A_iuto"], headers);
+        Assert.Equal(["_File", "_Connessioni", "_Sessione", "_Visualizza", "Spazi di la_voro", "S_trumenti", "_Plancia", "A_iuto"], headers);
     }
 
     [Fact]

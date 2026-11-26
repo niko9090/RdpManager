@@ -10,7 +10,7 @@ public class MarshmelloVpnNameTests
     {
         var menu = File.ReadAllText(SettingsViewModelTests.RepoFile("src/RdpManager.Linux/Menus/MainMenu.axaml"));
         Assert.Contains("Header=\"_marshmelloVPN (WireGuard)…\"", menu);
-        Assert.Contains("Header=\"Pl_ancia marshmelloVPN…\"", menu);
+        Assert.Contains("Header=\"_Plancia\"", menu);
         Assert.Contains("Title=\"marshmelloVPN (WireGuard)\"",
             File.ReadAllText(SettingsViewModelTests.RepoFile("src/RdpManager.Linux/Dialogs/VpnWindow.axaml")));
         Assert.Contains("\"Plancia marshmelloVPN\"",

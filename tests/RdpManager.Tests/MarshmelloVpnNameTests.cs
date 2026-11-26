@@ -26,7 +26,7 @@ public class MarshmelloVpnNameTests
     {
         var menu = File.ReadAllText(RepoFile("src/RdpManager/UI/MainForm.cs"));
         Assert.Contains("\"&marshmelloVPN (WireGuard)…\"", menu);
-        Assert.Contains("\"Pl&ancia marshmelloVPN…\"", menu);
+        Assert.Contains("\"&Plancia\"", menu);
         Assert.Contains("Text = \"marshmelloVPN (WireGuard)\";", File.ReadAllText(RepoFile("src/RdpManager/UI/VpnForm.cs")));
         Assert.Contains("\"Plancia marshmelloVPN\"", File.ReadAllText(RepoFile("src/RdpManager/UI/VpnDashboardForm.cs")));
     }

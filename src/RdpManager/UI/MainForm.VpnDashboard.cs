@@ -2,7 +2,7 @@ using RdpManager.Core;
 
 namespace RdpManager.UI;
 
-/// <summary>Voce «Plancia VPN…» del menu Strumenti (codice a parte per non toccare MainForm.Vpn.cs).</summary>
+/// <summary>Menu «Plancia» (prima di Aiuto) (codice a parte per non toccare MainForm.Vpn.cs).</summary>
 public sealed partial class MainForm
 {
     private VpnDashboardForm? _vpnDashboard;
@@ -27,7 +27,8 @@ public sealed partial class MainForm
             return;
         }
         _vpnDashboard = new VpnDashboardForm(() => _sync.SignedIn, ct => _sync.GetVpnDevicesAsync(ct), OpenVpnDashboardPc,
-            sendFile: (to, path, ct) => _sync.SendVpnFileAsync(to, path, ct));
+            sendFile: (to, path, ct) => _sync.SendVpnFileAsync(to, path, ct),
+            names: _doc.Settings.VpnNames, saveNames: SaveConnections);
         _vpnDashboard.FormClosed += (_, _) => _vpnDashboard = null;
         _vpnDashboard.Show(this);
     }

@@ -106,7 +106,18 @@ public sealed class VpnDashboardClient : IDisposable
 public enum VpnDashboardStatus { NotSignedIn, Ok, Empty, Unauthorized, Unreachable, Disabled, Error }
 
 /// <summary>Una riga della plancia, già in testo italiano.</summary>
-public sealed record VpnDashboardRow(string Name, string Address, bool Connected, string StateText, string LastContactText);
+/// <param name="Name">Nome mostrato: quello scelto dall'utente (<see cref="AppSettings.VpnNames"/>) o quello del PC.</param>
+/// <param name="DeviceName">Nome del PC registrato nella VPN (serve per inviargli file).</param>
+/// <param name="Key">Chiave del nome personalizzato (<see cref="VpnDashboardModel.NameKey"/>).</param>
+public sealed record VpnDashboardRow(string Name, string Address, bool Connected, string StateText, string LastContactText,
+    string DeviceName = "", string Key = "", string? Owner = null)
+{
+    /// <summary>Nome del PC da usare per la VPN: quello registrato (o il nome mostrato, per righe vecchie).</summary>
+    public string Device => DeviceName.Length > 0 ? DeviceName : Name;
+
+    /// <summary>L'utente ha dato a questo PC un nome suo.</summary>
+    public bool IsRenamed => DeviceName.Length > 0 && !string.Equals(Name, DeviceName, StringComparison.Ordinal);
+}
 
 /// <summary>Cosa mostra la finestra: stato, messaggio (vuoto se tutto bene) e righe.</summary>
 public sealed record VpnDashboardView(VpnDashboardStatus Status, string Message, IReadOnlyList<VpnDashboardRow> Rows)
@@ -123,17 +134,65 @@ public static class VpnDashboardModel
     public static VpnDashboardView NotSignedIn() => new(VpnDashboardStatus.NotSignedIn,
         "Per vedere i PC di marshmelloVPN serve l'accesso all'account: apri «Account e sincronizzazione» dal menu Strumenti.", []);
 
-    public static VpnDashboardView FromDevices(IEnumerable<VpnDashboardDevice> devices, DateTimeOffset now)
+    /// <summary>Chiave del nome personalizzato di un PC: l'Id dato dal server, se c'è, altrimenti il nome del PC.</summary>
+    public static string NameKey(VpnDashboardDevice d) =>
+        d.DeviceId is { Length: > 0 } id ? "id:" + id : "nome:" + d.Name.Trim().ToLowerInvariant();
+
+    /// <param name="names">Nomi scelti dall'utente (chiave <see cref="NameKey"/> → nome); null = i nomi dei PC.</param>
+    public static VpnDashboardView FromDevices(IEnumerable<VpnDashboardDevice> devices, DateTimeOffset now,
+        IReadOnlyDictionary<string, string>? names = null)
     {
         var rows = devices
-            .OrderByDescending(d => d.Connected)
-            .ThenBy(d => d.Name, StringComparer.CurrentCultureIgnoreCase)
-            .Select(d => new VpnDashboardRow(d.Name, StripMask(d.Address), d.Connected,
-                d.Connected ? "Collegato" : "Non collegato", LastContactText(d.LastContact, now)))
+            .Select(d =>
+            {
+                var key = NameKey(d);
+                var shown = names is not null && names.TryGetValue(key, out var custom) && custom.Trim().Length > 0 ? custom.Trim() : d.Name;
+                return new VpnDashboardRow(shown, StripMask(d.Address), d.Connected,
+                    d.Connected ? "In linea" : "Non in linea", LastContactText(d.LastContact, now), d.Name, key, d.Owner);
+            })
+            .OrderByDescending(r => r.Connected)
+            .ThenBy(r => r.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
         return rows.Count == 0
             ? new VpnDashboardView(VpnDashboardStatus.Empty, "Nessun PC registrato in marshmelloVPN.", rows)
             : new VpnDashboardView(VpnDashboardStatus.Ok, "", rows);
+    }
+
+    /// <summary>Riepilogo in cima alla plancia: «6 di 9 PC in linea».</summary>
+    public static string Summary(VpnDashboardView view)
+    {
+        if (view.Rows.Count == 0)
+            return "";
+        int online = view.Rows.Count(r => r.Connected);
+        return $"{online} di {view.Rows.Count} PC in linea";
+    }
+
+    /// <summary>Filtro della casella di ricerca: nome mostrato, nome del PC, IP o proprietario.</summary>
+    public static bool Matches(VpnDashboardRow row, string? query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+            return true;
+        var q = query.Trim();
+        return row.Name.Contains(q, StringComparison.CurrentCultureIgnoreCase)
+               || row.DeviceName.Contains(q, StringComparison.CurrentCultureIgnoreCase)
+               || row.Address.Contains(q, StringComparison.OrdinalIgnoreCase)
+               || (row.Owner?.Contains(q, StringComparison.CurrentCultureIgnoreCase) ?? false);
+    }
+
+    /// <summary>
+    /// Salva il nome scelto per un PC; vuoto o uguale al nome del PC = torna al nome originale. Vero se è cambiato qualcosa.
+    /// </summary>
+    public static bool SetName(IDictionary<string, string> names, VpnDashboardRow row, string? name)
+    {
+        if (row.Key.Length == 0)
+            return false;
+        var clean = (name ?? "").Trim();
+        if (clean.Length == 0 || string.Equals(clean, row.DeviceName, StringComparison.Ordinal))
+            return names.Remove(row.Key);
+        if (names.TryGetValue(row.Key, out var old) && old == clean)
+            return false;
+        names[row.Key] = clean;
+        return true;
     }
 
     public static VpnDashboardView FromError(Exception ex) => ex switch

@@ -702,12 +702,14 @@ public sealed partial class MainWindowViewModel
         finally { vpn.Persist(); }
     });
 
-    /// <summary>Strumenti, Plancia VPN: i PC della VPN; da uno si apre il desktop remoto.</summary>
+    /// <summary>Menu «Plancia» (prima di Aiuto): i PC della VPN; da uno si apre il desktop remoto.</summary>
     public RelayCommand VpnDashboardCommand => AsyncCmd(async () =>
     {
         var dashboard = new VpnDashboardViewModel(() => SyncService.SignedIn, ct => SyncService.GetVpnDevicesAsync(ct),
             send: (to, path, ct) => SyncService.SendVpnFileAsync(to, path, ct),
-            pickFile: to => Ui.PickFileAsync($"Invia a {to}", "Tutti i file", "*"));
+            pickFile: to => Ui.PickFileAsync($"Invia a {to}", "Tutti i file", "*"),
+            names: Document.Settings.VpnNames, saveNames: () => Save(),
+            askName: (device, current) => _dialogs.PromptAsync("Rinomina PC", $"Nome da mostrare per «{device}» (vuoto = nome originale):", current));
         await Ui.ShowVpnDashboardAsync(dashboard);
         if (dashboard.Chosen is { } pc)
             OpenVpnDashboardPc(pc.Name, pc.Address);

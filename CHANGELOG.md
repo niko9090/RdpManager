@@ -1,5 +1,13 @@
 # Novità di RdpManager
 
+## 1.19.9 (26/11/2026)
+
+**Plancia marshmelloVPN rinnovata**
+- La Plancia ora è un menu principale, «Plancia», subito prima di «Aiuto»: si apre con un clic (non è più dentro Strumenti). Vale su Windows e su Linux.
+- Ogni PC si può rinominare con il nome che preferisci («Rinomina…», F2 o tasto destro); il nome vero del PC resta visibile accanto. Lasciando il nome vuoto, o con «Torna al nome originale», torna quello del PC. I nomi restano salvati su questo computer.
+- In cima il riepilogo «N di M PC in linea» e una casella di ricerca per nome, IP o proprietario.
+- Cerchio verde o grigio per lo stato, «In linea» / «Non in linea», PC non in linea in grigio; menu col tasto destro con apri, rinomina, invia file e copia l'IP.
+
 ## 1.19.8 (26/11/2026)
 
 **Linux: finestra che spiega gli errori di connessione**

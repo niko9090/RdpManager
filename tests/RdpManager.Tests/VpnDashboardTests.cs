@@ -122,9 +122,9 @@ public class VpnDashboardTests
 
         Assert.Equal(VpnDashboardStatus.Ok, view.Status);
         Assert.Equal(["Alfa", "beta", "Zeta"], view.Rows.Select(r => r.Name));
-        Assert.Equal("Collegato", view.Rows[0].StateText);
+        Assert.Equal("In linea", view.Rows[0].StateText);
         Assert.Equal("adesso", view.Rows[0].LastContactText);
-        Assert.Equal("Non collegato", view.Rows[1].StateText);
+        Assert.Equal("Non in linea", view.Rows[1].StateText);
         Assert.Equal("3 h fa", view.Rows[1].LastContactText);
         Assert.Equal("mai", view.Rows[2].LastContactText);
         Assert.Equal("10.66.0.9", view.Rows[2].Address); // senza «/32»
@@ -172,5 +172,59 @@ public class VpnDashboardTests
     public void L_aggiornamento_e_ogni_30_secondi()
     {
         Assert.Equal(30, VpnDashboardModel.RefreshSeconds);
+    }
+}
+
+public class VpnDashboardNamesTests
+{
+    private static readonly DateTimeOffset Now = new(2026, 11, 26, 12, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    public void Il_nome_scelto_sostituisce_quello_del_PC_e_si_ordina_con_quello()
+    {
+        var names = new Dictionary<string, string> { ["id:a"] = "Zeta ufficio" };
+        var view = VpnDashboardModel.FromDevices(
+            [new("AAA", "10.66.0.2/32", true, Now, DeviceId: "a"), new("BBB", "10.66.0.3/32", true, Now)], Now, names);
+        Assert.Equal(["BBB", "Zeta ufficio"], view.Rows.Select(r => r.Name));
+        Assert.True(view.Rows[1].IsRenamed);
+        Assert.Equal("AAA", view.Rows[1].Device);
+    }
+
+    [Fact]
+    public void Senza_Id_del_server_la_chiave_e_il_nome_del_PC()
+    {
+        Assert.Equal("nome:pc-fisso", VpnDashboardModel.NameKey(new("PC-FISSO", "10.66.0.3", true, null)));
+        Assert.Equal("id:x", VpnDashboardModel.NameKey(new("PC-FISSO", "10.66.0.3", true, null, DeviceId: "x")));
+    }
+
+    [Fact]
+    public void Nome_vuoto_o_uguale_a_quello_del_PC_torna_all_originale()
+    {
+        var names = new Dictionary<string, string>();
+        var row = VpnDashboardModel.FromDevices([new("PC", "10.66.0.3", true, null, DeviceId: "x")], Now).Rows[0];
+        Assert.True(VpnDashboardModel.SetName(names, row, "  Magazzino "));
+        Assert.Equal("Magazzino", names["id:x"]);
+        Assert.False(VpnDashboardModel.SetName(names, row, "Magazzino"));
+        Assert.True(VpnDashboardModel.SetName(names, row, "PC"));
+        Assert.Empty(names);
+        Assert.False(VpnDashboardModel.SetName(names, row, ""));
+    }
+
+    [Fact]
+    public void Riepilogo_dei_PC_in_linea()
+    {
+        var view = VpnDashboardModel.FromDevices([new("a", "1", true, null), new("b", "2", false, null)], Now);
+        Assert.Equal("1 di 2 PC in linea", VpnDashboardModel.Summary(view));
+        Assert.Equal("", VpnDashboardModel.Summary(VpnDashboardModel.FromDevices([], Now)));
+    }
+
+    [Fact]
+    public void I_nomi_si_salvano_nelle_impostazioni()
+    {
+        var doc = new ConnectionsDocument();
+        doc.Settings.VpnNames["id:x"] = "Magazzino";
+        var json = System.Text.Json.JsonSerializer.Serialize(doc);
+        var back = System.Text.Json.JsonSerializer.Deserialize<ConnectionsDocument>(json)!;
+        Assert.Equal("Magazzino", back.Settings.VpnNames["id:x"]);
     }
 }

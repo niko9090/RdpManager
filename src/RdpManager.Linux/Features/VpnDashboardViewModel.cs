@@ -12,13 +12,19 @@ public sealed record VpnDashboardItem(VpnDashboardRow Row)
     public string StateText => Row.StateText;
     public string LastContactText => Row.LastContactText;
     public bool Connected => Row.Connected;
+    public string DeviceName => Row.Device;
+    public bool IsRenamed => Row.IsRenamed;
+
+    /// <summary>Seconda riga sotto il nome: il nome vero del PC (se rinominato) e il proprietario.</summary>
+    public string SubText => string.Join(" · ", new[] { Row.IsRenamed ? Row.DeviceName : null, Row.Owner }.Where(s => !string.IsNullOrEmpty(s)));
+    public bool HasSubText => SubText.Length > 0;
 
     /// <summary>Cerchio dello stato: verde se collegato, grigio altrimenti (colori di <see cref="UiColors"/>).</summary>
     public string StatusColor => Row.Connected ? UiColors.Connected : UiColors.Unreachable;
 }
 
 /// <summary>
-/// «Strumenti → Plancia VPN»: i PC della VPN (collegati per primi), gli stessi dati della pagina web /vpn del server.
+/// Menu «Plancia»: i PC della VPN (collegati per primi), gli stessi dati della pagina web /vpn del server.
 /// La finestra chiama <see cref="RefreshAsync"/> ogni <see cref="VpnDashboardModel.RefreshSeconds"/> secondi.
 /// </summary>
 public sealed class VpnDashboardViewModel : ViewModelBase
@@ -33,6 +39,10 @@ public sealed class VpnDashboardViewModel : ViewModelBase
 
     private readonly Func<string, string, CancellationToken, Task>? _send;
     private readonly Func<string, Task<string?>>? _pickFile;
+    private readonly IDictionary<string, string> _names;
+    private readonly Action _saveNames;
+    private readonly Func<string, string, Task<string?>>? _askName;
+    private string _query = "";
     private bool _sending;
     private string _sendInfo = "";
     private string? _sendError;
@@ -41,8 +51,14 @@ public sealed class VpnDashboardViewModel : ViewModelBase
     /// <param name="pickFile">Sceglie il file da inviare al PC indicato; null se annullato.</param>
     public VpnDashboardViewModel(Func<bool> signedIn, Func<CancellationToken, Task<IReadOnlyList<VpnDashboardDevice>>> load,
         Func<DateTimeOffset>? now = null, Func<string, string, CancellationToken, Task>? send = null,
-        Func<string, Task<string?>>? pickFile = null)
+        Func<string, Task<string?>>? pickFile = null, IDictionary<string, string>? names = null, Action? saveNames = null,
+        Func<string, string, Task<string?>>? askName = null)
     {
+        _names = names ?? new Dictionary<string, string>();
+        _saveNames = saveNames ?? (() => { });
+        _askName = askName;
+        RenameCommand = new RelayCommand(() => _ = RenameSelectedAsync(), () => CanRename);
+        ResetNameCommand = new RelayCommand(ResetSelectedName, () => Selected is { IsRenamed: true });
         _signedIn = signedIn;
         _load = load;
         _now = now ?? (() => DateTimeOffset.UtcNow);
@@ -54,6 +70,57 @@ public sealed class VpnDashboardViewModel : ViewModelBase
     }
 
     public RelayCommand SendFileCommand { get; }
+    public RelayCommand RenameCommand { get; }
+    public RelayCommand ResetNameCommand { get; }
+
+    /// <summary>Si può dare un nome al PC selezionato (c'è chi chiede il nome).</summary>
+    public bool CanRename => _askName is not null && Selected is { Row.Key.Length: > 0 };
+
+    /// <summary>Testo della casella di ricerca: filtra per nome, nome del PC, IP o proprietario.</summary>
+    public string Query
+    {
+        get => _query;
+        set
+        {
+            if (Set(ref _query, value ?? ""))
+                Fill();
+        }
+    }
+
+    /// <summary>«6 di 9 PC in linea».</summary>
+    public string SummaryText => VpnDashboardModel.Summary(_view);
+
+    /// <summary>«Rinomina…»: chiede il nome da mostrare per il PC selezionato (vuoto = nome originale) e lo salva.</summary>
+    public async Task RenameSelectedAsync()
+    {
+        if (_askName is null || Selected is not { } pc)
+            return;
+        var name = await _askName(pc.DeviceName, pc.Name);
+        if (name is null)
+            return;
+        ApplyName(pc, name);
+    }
+
+    /// <summary>«Nome originale»: il PC torna a chiamarsi come nella VPN.</summary>
+    public void ResetSelectedName()
+    {
+        if (Selected is { } pc)
+            ApplyName(pc, "");
+    }
+
+    private void ApplyName(VpnDashboardItem pc, string name)
+    {
+        if (!VpnDashboardModel.SetName(_names, pc.Row, name))
+            return;
+        _saveNames();
+        var address = pc.Address;
+        var rows = _view.Rows.Select(r => r.Key == pc.Row.Key
+            ? r with { Name = _names.TryGetValue(r.Key, out var n) ? n : r.DeviceName }
+            : r).OrderByDescending(r => r.Connected).ThenBy(r => r.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+        _view = _view with { Rows = rows };
+        Fill();
+        Selected = Rows.FirstOrDefault(r => r.Address == address);
+    }
 
     /// <summary>La plancia offre «Invia file…» (c'è chi invia e chi sceglie il file).</summary>
     public bool CanSendFeature => _send is not null && _pickFile is not null;
@@ -79,8 +146,8 @@ public sealed class VpnDashboardViewModel : ViewModelBase
     {
         if (_send is null || _pickFile is null || _sending || Selected is not { } pc || _cts.IsCancellationRequested)
             return;
-        var to = pc.Name;
-        var path = await _pickFile(to);
+        var to = pc.DeviceName;
+        var path = await _pickFile(pc.Name);
         if (string.IsNullOrEmpty(path))
             return;
         var fileName = Path.GetFileName(path);
@@ -132,6 +199,8 @@ public sealed class VpnDashboardViewModel : ViewModelBase
             {
                 OpenCommand.RaiseCanExecuteChanged();
                 SendFileCommand.RaiseCanExecuteChanged();
+                RenameCommand.RaiseCanExecuteChanged();
+                ResetNameCommand.RaiseCanExecuteChanged();
             }
         }
     }
@@ -183,7 +252,7 @@ public sealed class VpnDashboardViewModel : ViewModelBase
             {
                 try
                 {
-                    view = VpnDashboardModel.FromDevices(await _load(_cts.Token), _now());
+                    view = VpnDashboardModel.FromDevices(await _load(_cts.Token), _now(), new Dictionary<string, string>(_names));
                 }
                 catch (OperationCanceledException) when (_cts.IsCancellationRequested)
                 {
@@ -206,16 +275,23 @@ public sealed class VpnDashboardViewModel : ViewModelBase
     private void Show(VpnDashboardView view)
     {
         _view = view;
-        var selected = Selected?.Address;
-        Rows.Clear();
-        foreach (var row in view.Rows)
-            Rows.Add(new VpnDashboardItem(row));
-        Selected = selected is null ? null : Rows.FirstOrDefault(r => r.Address == selected);
+        Fill();
         OnPropertyChanged(nameof(Current));
         OnPropertyChanged(nameof(ErrorText));
         OnPropertyChanged(nameof(InfoText));
         OnPropertyChanged(nameof(HasInfo));
         OpenCommand.RaiseCanExecuteChanged();
         SendFileCommand.RaiseCanExecuteChanged();
+    }
+
+    /// <summary>Righe da mostrare: quelle della plancia che passano il filtro, mantenendo la selezione.</summary>
+    private void Fill()
+    {
+        var selected = Selected?.Address;
+        Rows.Clear();
+        foreach (var row in _view.Rows.Where(r => VpnDashboardModel.Matches(r, _query)))
+            Rows.Add(new VpnDashboardItem(row));
+        Selected = selected is null ? null : Rows.FirstOrDefault(r => r.Address == selected);
+        OnPropertyChanged(nameof(SummaryText));
     }
 }

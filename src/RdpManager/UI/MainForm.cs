@@ -253,7 +253,6 @@ public sealed partial class MainForm : Form
         var tools = new ToolStripMenuItem("S&trumenti");
         tools.DropDownItems.Add(Item("Cerca &PC in rete…", Keys.None, (_, _) => ShowNetworkScan()));
         tools.DropDownItems.Add(Item("&marshmelloVPN (WireGuard)…", Keys.None, (_, _) => ShowVpn()));
-        tools.DropDownItems.Add(Item("Pl&ancia marshmelloVPN…", Keys.None, (_, _) => ShowVpnDashboard()));
         tools.DropDownItems.Add(Item("Account e &sincronizzazione…", Keys.None, (_, _) => ShowSyncAccount()));
         tools.DropDownItems.Add(Item("&Carica file di configurazione…", Keys.None,
             async (_, _) => { if (PickConfigFile(this) is { } file) await ImportConfigFileAsync(file, this); }));
@@ -261,7 +260,10 @@ public sealed partial class MainForm : Form
         var workspaces = new ToolStripMenuItem("Spazi di la&voro");
         workspaces.DropDownItems.Add("(caricamento)");
         workspaces.DropDownOpening += (_, _) => FillWorkspacesMenu(workspaces);
-        _menu.Items.AddRange([file, conn, session, view, workspaces, tools, help]);
+        // Plancia marshmelloVPN: voce del menu principale, prima di Aiuto; si apre con un clic.
+        var dashboard = new ToolStripMenuItem("&Plancia") { ToolTipText = "Plancia marshmelloVPN: i PC della VPN" };
+        dashboard.Click += (_, _) => ShowVpnDashboard();
+        _menu.Items.AddRange([file, conn, session, view, workspaces, tools, dashboard, help]);
     }
 
     private ToolStrip BuildTreeToolbar()
