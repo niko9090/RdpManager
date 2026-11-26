@@ -26,17 +26,39 @@ public sealed partial class MainForm
             open.Activate();
             return;
         }
-        _vpnDashboard = new VpnDashboardForm(() => _sync.SignedIn, ct => _sync.GetVpnDevicesAsync(ct), OpenVpnDashboardPc,
+        _vpnDashboard = new VpnDashboardForm(() => _sync.SignedIn, async ct =>
+            {
+                var devices = await _sync.GetVpnDevicesAsync(ct);
+                if (VpnFolder.MigrateLegacyNames(_doc, devices))
+                    SaveConnections();
+                return devices;
+            }, OpenVpnDashboardPc,
             sendFile: (to, path, ct) => _sync.SendVpnFileAsync(to, path, ct),
-            names: _doc.Settings.VpnNames, saveNames: SaveConnections);
+            names: () => VpnFolder.CustomNames(_doc), rename: RenameVpnPc);
         _vpnDashboard.FormClosed += (_, _) => _vpnDashboard = null;
         _vpnDashboard.Show(this);
+    }
+
+    /// <summary>
+    /// «Rinomina…» della Plancia: il nome va sulla connessione del PC nella cartella marshmelloVPN (sincronizzata), così si
+    /// vede su tutti i PC, nell'elenco e nella barra della sessione.
+    /// </summary>
+    private bool RenameVpnPc(VpnDashboardRow row, string name)
+    {
+        if (!VpnFolder.Rename(_doc, row.Device, name, row.Address))
+            return false;
+        SaveConnections();
+        RefreshTree();
+        UpdateSessionTitles(); // le schede già aperte di quel PC prendono subito il nome nuovo
+        return true;
     }
 
     /// <summary>Apre il desktop remoto verso l'IP VPN: usa la connessione salvata con quell'indirizzo, se c'è; altrimenti ne tiene una temporanea.</summary>
     private void OpenVpnDashboardPc(string name, string address)
     {
-        var saved = _doc.Connections.FirstOrDefault(c => string.Equals(c.Host, address, StringComparison.OrdinalIgnoreCase));
+        // Prima la connessione della cartella marshmelloVPN (ha il nome scelto nella Plancia), poi un'altra verso lo stesso IP.
+        var saved = _doc.Connections.FirstOrDefault(c => c.AutoVpnDevice is not null && string.Equals(c.Host, address, StringComparison.OrdinalIgnoreCase))
+                    ?? _doc.Connections.FirstOrDefault(c => string.Equals(c.Host, address, StringComparison.OrdinalIgnoreCase));
         if (saved is null && !_vpnDashboardConnections.TryGetValue(address, out saved))
         {
             saved = new RdpConnection { Name = name, Host = address };

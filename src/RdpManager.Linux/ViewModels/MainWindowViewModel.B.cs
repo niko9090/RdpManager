@@ -705,20 +705,42 @@ public sealed partial class MainWindowViewModel
     /// <summary>Menu «Plancia» (prima di Aiuto): i PC della VPN; da uno si apre il desktop remoto.</summary>
     public RelayCommand VpnDashboardCommand => AsyncCmd(async () =>
     {
-        var dashboard = new VpnDashboardViewModel(() => SyncService.SignedIn, ct => SyncService.GetVpnDevicesAsync(ct),
+        var dashboard = new VpnDashboardViewModel(() => SyncService.SignedIn, async ct =>
+            {
+                var devices = await SyncService.GetVpnDevicesAsync(ct);
+                if (VpnFolder.MigrateLegacyNames(Document, devices))
+                    Save();
+                return devices;
+            },
             send: (to, path, ct) => SyncService.SendVpnFileAsync(to, path, ct),
             pickFile: to => Ui.PickFileAsync($"Invia a {to}", "Tutti i file", "*"),
-            names: Document.Settings.VpnNames, saveNames: () => Save(),
+            names: () => VpnFolder.CustomNames(Document),
+            rename: (row, name) => RenameVpnPc(row, name),
             askName: (device, current) => _dialogs.PromptAsync("Rinomina PC", $"Nome da mostrare per «{device}» (vuoto = nome originale):", current));
         await Ui.ShowVpnDashboardAsync(dashboard);
         if (dashboard.Chosen is { } pc)
             OpenVpnDashboardPc(pc.Name, pc.Address);
     });
 
+    /// <summary>
+    /// «Rinomina…» della Plancia: il nome va sulla connessione del PC nella cartella marshmelloVPN (sincronizzata), così si
+    /// vede su tutti i PC, nell'elenco e nella barra della sessione.
+    /// </summary>
+    private bool RenameVpnPc(VpnDashboardRow row, string name)
+    {
+        if (!VpnFolder.Rename(Document, row.Device, name, row.Address))
+            return false;
+        Save();
+        RebuildTree();
+        return true;
+    }
+
     /// <summary>Apre il desktop remoto verso l'IP VPN: usa la connessione salvata con quell'indirizzo, se c'è; altrimenti ne tiene una temporanea.</summary>
     internal void OpenVpnDashboardPc(string name, string address)
     {
-        var connection = Document.Connections.FirstOrDefault(c => string.Equals(c.Host, address, StringComparison.OrdinalIgnoreCase));
+        // Prima la connessione della cartella marshmelloVPN (ha il nome scelto nella Plancia), poi un'altra verso lo stesso IP.
+        var connection = Document.Connections.FirstOrDefault(c => c.AutoVpnDevice is not null && string.Equals(c.Host, address, StringComparison.OrdinalIgnoreCase))
+                         ?? Document.Connections.FirstOrDefault(c => string.Equals(c.Host, address, StringComparison.OrdinalIgnoreCase));
         if (connection is null && !_vpnDashboardConnections.TryGetValue(address, out connection))
         {
             connection = new RdpConnection { Name = name, Host = address };

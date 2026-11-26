@@ -106,7 +106,7 @@ public sealed class VpnDashboardClient : IDisposable
 public enum VpnDashboardStatus { NotSignedIn, Ok, Empty, Unauthorized, Unreachable, Disabled, Error }
 
 /// <summary>Una riga della plancia, già in testo italiano.</summary>
-/// <param name="Name">Nome mostrato: quello scelto dall'utente (<see cref="AppSettings.VpnNames"/>) o quello del PC.</param>
+/// <param name="Name">Nome mostrato: quello scelto dall'utente (il nome della connessione nella cartella marshmelloVPN, <see cref="VpnFolder.CustomNames"/>) o quello del PC.</param>
 /// <param name="DeviceName">Nome del PC registrato nella VPN (serve per inviargli file).</param>
 /// <param name="Key">Chiave del nome personalizzato (<see cref="VpnDashboardModel.NameKey"/>).</param>
 public sealed record VpnDashboardRow(string Name, string Address, bool Connected, string StateText, string LastContactText,
@@ -134,9 +134,19 @@ public static class VpnDashboardModel
     public static VpnDashboardView NotSignedIn() => new(VpnDashboardStatus.NotSignedIn,
         "Per vedere i PC di marshmelloVPN serve l'accesso all'account: apri «Account e sincronizzazione» dal menu Strumenti.", []);
 
-    /// <summary>Chiave del nome personalizzato di un PC: l'Id dato dal server, se c'è, altrimenti il nome del PC.</summary>
-    public static string NameKey(VpnDashboardDevice d) =>
-        d.DeviceId is { Length: > 0 } id ? "id:" + id : "nome:" + d.Name.Trim().ToLowerInvariant();
+    /// <summary>Chiave del nome personalizzato di un PC: il suo nome nella VPN (come la cartella marshmelloVPN).</summary>
+    public static string NameKey(string deviceName) => "nome:" + (deviceName ?? "").Trim().ToLowerInvariant();
+
+    public static string NameKey(VpnDashboardDevice d) => NameKey(d.Name);
+
+    /// <summary>La stessa plancia con i nomi scelti aggiornati (dopo «Rinomina…»), riordinata.</summary>
+    public static VpnDashboardView WithNames(VpnDashboardView view, IReadOnlyDictionary<string, string> names) =>
+        view with
+        {
+            Rows = view.Rows
+                .Select(r => r.Key.Length == 0 ? r : r with { Name = names.TryGetValue(r.Key, out var n) && n.Trim().Length > 0 ? n.Trim() : r.DeviceName })
+                .OrderByDescending(r => r.Connected).ThenBy(r => r.Name, StringComparer.CurrentCultureIgnoreCase).ToList(),
+        };
 
     /// <param name="names">Nomi scelti dall'utente (chiave <see cref="NameKey"/> → nome); null = i nomi dei PC.</param>
     public static VpnDashboardView FromDevices(IEnumerable<VpnDashboardDevice> devices, DateTimeOffset now,
@@ -177,22 +187,6 @@ public static class VpnDashboardModel
                || row.DeviceName.Contains(q, StringComparison.CurrentCultureIgnoreCase)
                || row.Address.Contains(q, StringComparison.OrdinalIgnoreCase)
                || (row.Owner?.Contains(q, StringComparison.CurrentCultureIgnoreCase) ?? false);
-    }
-
-    /// <summary>
-    /// Salva il nome scelto per un PC; vuoto o uguale al nome del PC = torna al nome originale. Vero se è cambiato qualcosa.
-    /// </summary>
-    public static bool SetName(IDictionary<string, string> names, VpnDashboardRow row, string? name)
-    {
-        if (row.Key.Length == 0)
-            return false;
-        var clean = (name ?? "").Trim();
-        if (clean.Length == 0 || string.Equals(clean, row.DeviceName, StringComparison.Ordinal))
-            return names.Remove(row.Key);
-        if (names.TryGetValue(row.Key, out var old) && old == clean)
-            return false;
-        names[row.Key] = clean;
-        return true;
     }
 
     public static VpnDashboardView FromError(Exception ex) => ex switch

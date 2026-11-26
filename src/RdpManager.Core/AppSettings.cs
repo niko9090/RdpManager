@@ -82,7 +82,11 @@ public sealed class AppSettings
     /// </summary>
     public Dictionary<string, string> Shortcuts { get; set; } = [];
 
-    /// <summary>Nomi dati dall'utente ai PC nella Plancia marshmelloVPN (chiave <see cref="VpnDashboardModel.NameKey"/> → nome).</summary>
+    /// <summary>
+    /// Solo per leggere i dati della 1.19.9: nomi dati ai PC nella Plancia, salvati su questo PC. Dalla 1.19.10 il nome è
+    /// quello della connessione nella cartella marshmelloVPN (sincronizzato); questi si spostano lì e si svuotano
+    /// (<see cref="VpnFolder.MigrateLegacyNames"/>).
+    /// </summary>
     public Dictionary<string, string> VpnNames { get; set; } = [];
 
     // --- Dalla 1.2 ---

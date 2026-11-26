@@ -178,36 +178,86 @@ public class VpnDashboardTests
 public class VpnDashboardNamesTests
 {
     private static readonly DateTimeOffset Now = new(2026, 11, 26, 12, 0, 0, TimeSpan.Zero);
+    private static readonly VpnDashboardDevice[] Devices =
+        [new("Z2-TECNICO", "10.66.0.4/32", true, Now, DeviceId: "d4"), new("PC-FISSO", "10.66.0.3/32", true, Now)];
+
+    private static ConnectionsDocument WithFolder()
+    {
+        var doc = new ConnectionsDocument();
+        VpnFolder.Apply(doc, Devices);
+        return doc;
+    }
 
     [Fact]
-    public void Il_nome_scelto_sostituisce_quello_del_PC_e_si_ordina_con_quello()
+    public void Rinominare_cambia_il_nome_della_connessione_nella_cartella_che_e_sincronizzata()
     {
-        var names = new Dictionary<string, string> { ["id:a"] = "Zeta ufficio" };
-        var view = VpnDashboardModel.FromDevices(
-            [new("AAA", "10.66.0.2/32", true, Now, DeviceId: "a"), new("BBB", "10.66.0.3/32", true, Now)], Now, names);
-        Assert.Equal(["BBB", "Zeta ufficio"], view.Rows.Select(r => r.Name));
+        var doc = WithFolder();
+        Assert.True(VpnFolder.Rename(doc, "Z2-TECNICO", "  Ufficio tecnico ", "10.66.0.4"));
+        var c = doc.Connections.Single(x => x.AutoVpnDevice == "Z2-TECNICO");
+        Assert.Equal("Ufficio tecnico", c.Name);        // nell'elenco e nella barra della sessione
+        Assert.Equal("Ufficio tecnico", c.DisplayName);
+        Assert.Equal("Ufficio tecnico", VpnFolder.CustomNames(doc)[VpnDashboardModel.NameKey("z2-tecnico")]);
+        Assert.False(VpnFolder.Rename(doc, "Z2-TECNICO", "Ufficio tecnico", "10.66.0.4"));
+
+        // La sincronizzazione della cartella non rimette il nome del PC.
+        Assert.False(VpnFolder.Apply(doc, Devices));
+        Assert.Equal("Ufficio tecnico", doc.Connections.Single(x => x.AutoVpnDevice == "Z2-TECNICO").Name);
+    }
+
+    [Fact]
+    public void Il_nome_arriva_agli_altri_PC_con_la_sincronizzazione()
+    {
+        var mine = WithFolder();
+        var other = SyncMerge.Snapshot(mine); // stato comune dopo l'ultima sincronizzazione
+        var fp = new SyncFingerprints(new byte[32]);
+        var baseHashes = fp.Of(mine);
+        VpnFolder.Rename(mine, "Z2-TECNICO", "Ufficio tecnico", "10.66.0.4");
+
+        Assert.True(SyncMerge.MergeInto(other, SyncMerge.Snapshot(mine), baseHashes, fp));
+        Assert.Equal("Ufficio tecnico", other.Connections.Single(x => x.AutoVpnDevice == "Z2-TECNICO").Name);
+    }
+
+    [Fact]
+    public void Nome_vuoto_torna_al_nome_del_PC()
+    {
+        var doc = WithFolder();
+        VpnFolder.Rename(doc, "Z2-TECNICO", "Ufficio tecnico", "10.66.0.4");
+        Assert.True(VpnFolder.Rename(doc, "Z2-TECNICO", " ", "10.66.0.4"));
+        Assert.Equal("Z2-TECNICO", doc.Connections.Single(x => x.AutoVpnDevice == "Z2-TECNICO").Name);
+        Assert.Empty(VpnFolder.CustomNames(doc));
+    }
+
+    [Fact]
+    public void Senza_connessione_nella_cartella_si_crea()
+    {
+        var doc = new ConnectionsDocument();
+        Assert.True(VpnFolder.Rename(doc, "NUOVO", "Magazzino", "10.66.0.11/32"));
+        var c = Assert.Single(doc.Connections);
+        Assert.Equal(("Magazzino", "10.66.0.11", "NUOVO", VpnFolder.FolderName), (c.Name, c.Host, c.AutoVpnDevice, c.Group));
+    }
+
+    [Fact]
+    public void La_plancia_mostra_il_nome_scelto_e_tiene_il_nome_vero()
+    {
+        var doc = WithFolder();
+        VpnFolder.Rename(doc, "Z2-TECNICO", "Zeta ufficio", "10.66.0.4");
+        var view = VpnDashboardModel.FromDevices(Devices, Now, VpnFolder.CustomNames(doc));
+        Assert.Equal(["PC-FISSO", "Zeta ufficio"], view.Rows.Select(r => r.Name));
         Assert.True(view.Rows[1].IsRenamed);
-        Assert.Equal("AAA", view.Rows[1].Device);
+        Assert.Equal("Z2-TECNICO", view.Rows[1].Device); // per inviare file serve il nome vero
     }
 
     [Fact]
-    public void Senza_Id_del_server_la_chiave_e_il_nome_del_PC()
+    public void I_nomi_della_1_19_9_salvati_solo_qui_passano_nella_cartella()
     {
-        Assert.Equal("nome:pc-fisso", VpnDashboardModel.NameKey(new("PC-FISSO", "10.66.0.3", true, null)));
-        Assert.Equal("id:x", VpnDashboardModel.NameKey(new("PC-FISSO", "10.66.0.3", true, null, DeviceId: "x")));
-    }
-
-    [Fact]
-    public void Nome_vuoto_o_uguale_a_quello_del_PC_torna_all_originale()
-    {
-        var names = new Dictionary<string, string>();
-        var row = VpnDashboardModel.FromDevices([new("PC", "10.66.0.3", true, null, DeviceId: "x")], Now).Rows[0];
-        Assert.True(VpnDashboardModel.SetName(names, row, "  Magazzino "));
-        Assert.Equal("Magazzino", names["id:x"]);
-        Assert.False(VpnDashboardModel.SetName(names, row, "Magazzino"));
-        Assert.True(VpnDashboardModel.SetName(names, row, "PC"));
-        Assert.Empty(names);
-        Assert.False(VpnDashboardModel.SetName(names, row, ""));
+        var doc = WithFolder();
+        doc.Settings.VpnNames["id:d4"] = "Ufficio tecnico";
+        doc.Settings.VpnNames["nome:pc-fisso"] = "Fisso";
+        Assert.True(VpnFolder.MigrateLegacyNames(doc, Devices));
+        Assert.Empty(doc.Settings.VpnNames);
+        Assert.Equal("Ufficio tecnico", doc.Connections.Single(x => x.AutoVpnDevice == "Z2-TECNICO").Name);
+        Assert.Equal("Fisso", doc.Connections.Single(x => x.AutoVpnDevice == "PC-FISSO").Name);
+        Assert.False(VpnFolder.MigrateLegacyNames(doc, Devices));
     }
 
     [Fact]
@@ -216,15 +266,5 @@ public class VpnDashboardNamesTests
         var view = VpnDashboardModel.FromDevices([new("a", "1", true, null), new("b", "2", false, null)], Now);
         Assert.Equal("1 di 2 PC in linea", VpnDashboardModel.Summary(view));
         Assert.Equal("", VpnDashboardModel.Summary(VpnDashboardModel.FromDevices([], Now)));
-    }
-
-    [Fact]
-    public void I_nomi_si_salvano_nelle_impostazioni()
-    {
-        var doc = new ConnectionsDocument();
-        doc.Settings.VpnNames["id:x"] = "Magazzino";
-        var json = System.Text.Json.JsonSerializer.Serialize(doc);
-        var back = System.Text.Json.JsonSerializer.Deserialize<ConnectionsDocument>(json)!;
-        Assert.Equal("Magazzino", back.Settings.VpnNames["id:x"]);
     }
 }

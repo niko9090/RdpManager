@@ -329,4 +329,85 @@ public static class VpnFolder
         if (to.MacAddress.Length == 0)
             to.MacAddress = from.MacAddress;
     }
+
+    // --- Nomi scelti dall'utente (Plancia «Rinomina…») ---
+    // Il nome scelto è il nome della connessione automatica del PC: la cartella è nel documento sincronizzato, quindi il nome
+    // arriva su tutti i PC dell'account e si vede ovunque si veda la connessione (elenco, schede, barra della sessione).
+    // Apply non tocca mai il nome di una connessione già creata.
+
+    /// <summary>Nomi scelti per i PC della VPN: chiave <see cref="VpnDashboardModel.NameKey(string)"/> del PC → nome.</summary>
+    public static Dictionary<string, string> CustomNames(ConnectionsDocument doc)
+    {
+        var names = new Dictionary<string, string>();
+        foreach (var c in doc.Connections)
+        {
+            if (c.AutoVpnDevice is not { } device || device.Trim().Length == 0)
+                continue;
+            var name = c.Name.Trim();
+            if (name.Length > 0 && !name.Equals(device.Trim(), StringComparison.Ordinal))
+                names.TryAdd(VpnDashboardModel.NameKey(device), name);
+        }
+        return names;
+    }
+
+    /// <summary>
+    /// Dà al PC <paramref name="deviceName"/> il nome <paramref name="name"/> (vuoto = il nome del PC) rinominando la sua
+    /// connessione nella cartella; se la connessione non c'è ancora la crea con l'IP <paramref name="address"/>.
+    /// Vero se il documento è cambiato (va salvato e sincronizzato).
+    /// </summary>
+    public static bool Rename(ConnectionsDocument doc, string deviceName, string? name, string address)
+    {
+        var device = (deviceName ?? "").Trim();
+        if (device.Length == 0)
+            return false;
+        var clean = (name ?? "").Trim();
+        var target = clean.Length == 0 ? device : clean;
+        var connections = doc.Connections.Where(c => c.AutoVpnDevice is { } d && d.Trim().Equals(device, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (connections.Count == 0)
+        {
+            var host = VpnDashboardModel.StripMask(address ?? "");
+            if (host.Length == 0)
+                return false;
+            doc.Connections.Add(new RdpConnection
+            {
+                Id = FreeId(doc, device),
+                Name = target,
+                Host = host,
+                AutoVpnDevice = device,
+                Group = doc.AddFolder("", FolderName) ?? FolderName,
+            });
+            return true;
+        }
+        bool changed = false;
+        foreach (var c in connections.Where(c => c.Name != target))
+        {
+            c.Name = target;
+            changed = true;
+        }
+        return changed;
+    }
+
+    /// <summary>
+    /// I nomi della 1.19.9, salvati solo su questo PC (<see cref="AppSettings.VpnNames"/>), passano nella cartella
+    /// sincronizzata e si tolgono dalle impostazioni. Vero se il documento è cambiato.
+    /// </summary>
+    public static bool MigrateLegacyNames(ConnectionsDocument doc, IReadOnlyList<VpnDashboardDevice> devices)
+    {
+        var legacy = doc.Settings.VpnNames;
+        if (legacy is null || legacy.Count == 0)
+            return false;
+        bool changed = false;
+        foreach (var d in devices)
+        {
+            string? name = null;
+            if (d.DeviceId is { Length: > 0 } id && legacy.TryGetValue("id:" + id, out var byId))
+                name = byId;
+            else if (legacy.TryGetValue(VpnDashboardModel.NameKey(d.Name), out var byName))
+                name = byName;
+            if (name is not null)
+                changed |= Rename(doc, d.Name, name, d.Address);
+        }
+        legacy.Clear();
+        return true;
+    }
 }

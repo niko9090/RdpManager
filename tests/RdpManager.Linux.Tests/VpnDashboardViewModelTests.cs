@@ -163,18 +163,20 @@ public class VpnDashboardViewModelTests
     [Fact]
     public async Task Un_PC_rinominato_mostra_il_nome_scelto_che_resta_dopo_l_aggiornamento()
     {
-        var names = new Dictionary<string, string>();
+        var doc = new ConnectionsDocument();
         int saved = 0;
         var vm = new VpnDashboardViewModel(() => true, _ => Task.FromResult<IReadOnlyList<VpnDashboardDevice>>(
                 [new("Z2-TECNICO", "10.66.0.4/32", true, Now, DeviceId: "d4", Owner: "tecnico"), new("pc", "10.66.0.9/32", true, Now)]),
-            () => Now, names: names, saveNames: () => saved++, askName: (_, _) => Task.FromResult<string?>("Ufficio tecnico"));
+            () => Now, names: () => VpnFolder.CustomNames(doc),
+            rename: (row, name) => { var changed = VpnFolder.Rename(doc, row.Device, name, row.Address); saved += changed ? 1 : 0; return changed; },
+            askName: (_, _) => Task.FromResult<string?>("Ufficio tecnico"));
         await vm.RefreshAsync();
         vm.Selected = vm.Rows.Single(r => r.Address == "10.66.0.4");
         Assert.True(vm.RenameCommand.CanExecute(null));
         await vm.RenameSelectedAsync();
 
         Assert.Equal(1, saved);
-        Assert.Equal("Ufficio tecnico", names["id:d4"]);
+        Assert.Equal("Ufficio tecnico", doc.Connections.Single(c => c.AutoVpnDevice == "Z2-TECNICO").Name);
         var row = vm.Rows.Single(r => r.Address == "10.66.0.4");
         Assert.Equal("Ufficio tecnico", row.Name);
         Assert.Equal("Z2-TECNICO", row.DeviceName); // per inviare file serve il nome vero
@@ -185,7 +187,7 @@ public class VpnDashboardViewModelTests
 
         vm.Selected = vm.Rows.Single(r => r.Address == "10.66.0.4");
         vm.ResetSelectedName();
-        Assert.Empty(names);
+        Assert.Empty(VpnFolder.CustomNames(doc));
         Assert.Equal("Z2-TECNICO", vm.Rows.Single(r => r.Address == "10.66.0.4").Name);
     }
 

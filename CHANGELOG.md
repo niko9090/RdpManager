@@ -1,5 +1,13 @@
 # Novità di RdpManager
 
+## 1.19.10 (26/11/2026)
+
+**Nomi della Plancia sincronizzati e visibili nella sessione**
+- Il nome dato a un PC nella Plancia ora è il nome della sua connessione nella cartella marshmelloVPN: si sincronizza con tutti gli altri PC dell'account e si vede nell'elenco delle connessioni, nelle schede e nella barra della sessione remota (su Windows anche nelle schede già aperte).
+- Aprendo un PC dalla Plancia si usa la connessione della cartella marshmelloVPN, con il nome scelto.
+- Rinominare la connessione dall'elenco cambia anche il nome nella Plancia.
+- I nomi dati con la 1.19.9, salvati solo su un PC, passano da soli nella cartella sincronizzata alla prima apertura della Plancia.
+
 ## 1.19.9 (26/11/2026)
 
 **Plancia marshmelloVPN rinnovata**

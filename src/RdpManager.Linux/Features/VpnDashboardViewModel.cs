@@ -39,8 +39,8 @@ public sealed class VpnDashboardViewModel : ViewModelBase
 
     private readonly Func<string, string, CancellationToken, Task>? _send;
     private readonly Func<string, Task<string?>>? _pickFile;
-    private readonly IDictionary<string, string> _names;
-    private readonly Action _saveNames;
+    private readonly Func<IReadOnlyDictionary<string, string>> _names;
+    private readonly Func<VpnDashboardRow, string, bool>? _rename;
     private readonly Func<string, string, Task<string?>>? _askName;
     private string _query = "";
     private bool _sending;
@@ -51,12 +51,12 @@ public sealed class VpnDashboardViewModel : ViewModelBase
     /// <param name="pickFile">Sceglie il file da inviare al PC indicato; null se annullato.</param>
     public VpnDashboardViewModel(Func<bool> signedIn, Func<CancellationToken, Task<IReadOnlyList<VpnDashboardDevice>>> load,
         Func<DateTimeOffset>? now = null, Func<string, string, CancellationToken, Task>? send = null,
-        Func<string, Task<string?>>? pickFile = null, IDictionary<string, string>? names = null, Action? saveNames = null,
-        Func<string, string, Task<string?>>? askName = null)
+        Func<string, Task<string?>>? pickFile = null, Func<IReadOnlyDictionary<string, string>>? names = null,
+        Func<VpnDashboardRow, string, bool>? rename = null, Func<string, string, Task<string?>>? askName = null)
     {
-        _names = names ?? new Dictionary<string, string>();
-        _saveNames = saveNames ?? (() => { });
-        _askName = askName;
+        _names = names ?? (() => new Dictionary<string, string>());
+        _rename = rename;
+        _askName = rename is null ? null : askName;
         RenameCommand = new RelayCommand(() => _ = RenameSelectedAsync(), () => CanRename);
         ResetNameCommand = new RelayCommand(ResetSelectedName, () => Selected is { IsRenamed: true });
         _signedIn = signedIn;
@@ -110,14 +110,10 @@ public sealed class VpnDashboardViewModel : ViewModelBase
 
     private void ApplyName(VpnDashboardItem pc, string name)
     {
-        if (!VpnDashboardModel.SetName(_names, pc.Row, name))
+        if (_rename is null || !_rename(pc.Row, name))
             return;
-        _saveNames();
         var address = pc.Address;
-        var rows = _view.Rows.Select(r => r.Key == pc.Row.Key
-            ? r with { Name = _names.TryGetValue(r.Key, out var n) ? n : r.DeviceName }
-            : r).OrderByDescending(r => r.Connected).ThenBy(r => r.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
-        _view = _view with { Rows = rows };
+        _view = VpnDashboardModel.WithNames(_view, _names());
         Fill();
         Selected = Rows.FirstOrDefault(r => r.Address == address);
     }
@@ -252,7 +248,7 @@ public sealed class VpnDashboardViewModel : ViewModelBase
             {
                 try
                 {
-                    view = VpnDashboardModel.FromDevices(await _load(_cts.Token), _now(), new Dictionary<string, string>(_names));
+                    view = VpnDashboardModel.FromDevices(await _load(_cts.Token), _now(), _names());
                 }
                 catch (OperationCanceledException) when (_cts.IsCancellationRequested)
                 {

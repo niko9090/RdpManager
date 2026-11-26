@@ -6,7 +6,7 @@ namespace RdpManager.UI;
 /// Menu «Plancia»: i PC della VPN con il riepilogo «N di M in linea», la ricerca, il nome scelto dall'utente (e il nome
 /// vero del PC), IP, stato (cerchio verde o grigio) e ultimo contatto: gli stessi dati della pagina web /vpn del server.
 /// Si aggiorna da sola ogni 30 secondi finché è aperta. Da ogni PC si apre il desktop remoto, si inviano file e si
-/// sceglie il nome da mostrare (salvato nelle impostazioni, <see cref="AppSettings.VpnNames"/>).
+/// sceglie il nome da mostrare: è il nome della connessione nella cartella marshmelloVPN, sincronizzato con gli altri PC.
 /// </summary>
 internal sealed class VpnDashboardForm : TouchForm
 {
@@ -15,8 +15,8 @@ internal sealed class VpnDashboardForm : TouchForm
     private readonly Action<string, string> _open;
     private readonly Func<DateTimeOffset> _now;
     private readonly Func<string, string, CancellationToken, Task>? _sendFile;
-    private readonly IDictionary<string, string> _names;
-    private readonly Action _saveNames;
+    private readonly Func<IReadOnlyDictionary<string, string>> _names;
+    private readonly Func<VpnDashboardRow, string, bool>? _rename;
 
     private readonly ListView _list = new()
     {
@@ -27,7 +27,7 @@ internal sealed class VpnDashboardForm : TouchForm
     private readonly TextBox _search = new() { Width = 260, PlaceholderText = "Cerca per nome, IP o proprietario" };
     private readonly Label _message = new() { Dock = DockStyle.Top, AutoSize = true, MaximumSize = new Size(820, 0), Padding = new Padding(0, 4, 0, 8) };
     private readonly Button _refresh = DialogStyle.Button("Aggiorna");
-    private readonly Button _rename = DialogStyle.Button("Rinomina…");
+    private readonly Button _renameButton = DialogStyle.Button("Rinomina…");
     private readonly Button _openRdp = DialogStyle.Button("Apri desktop remoto");
     private readonly Button _sendFileButton = DialogStyle.Button("Invia file…");
     private readonly Button _close = DialogStyle.Button("Chiudi", DialogResult.Cancel);
@@ -45,14 +45,14 @@ internal sealed class VpnDashboardForm : TouchForm
 
     public VpnDashboardForm(Func<bool> signedIn, Func<CancellationToken, Task<IReadOnlyList<VpnDashboardDevice>>> load,
         Action<string, string> open, Func<DateTimeOffset>? now = null, Func<string, string, CancellationToken, Task>? sendFile = null,
-        IDictionary<string, string>? names = null, Action? saveNames = null)
+        Func<IReadOnlyDictionary<string, string>>? names = null, Func<VpnDashboardRow, string, bool>? rename = null)
     {
         _signedIn = signedIn;
         _load = load;
         _open = open;
         _sendFile = sendFile;
-        _names = names ?? new Dictionary<string, string>();
-        _saveNames = saveNames ?? (() => { });
+        _names = names ?? (() => new Dictionary<string, string>());
+        _rename = rename;
         _now = now ?? (() => DateTimeOffset.UtcNow);
         DialogStyle.Setup(this, "Plancia marshmelloVPN", resizable: true);
         ShowInTaskbar = true;
@@ -77,7 +77,7 @@ internal sealed class VpnDashboardForm : TouchForm
         };
         _openRdp.Click += (_, _) => OpenSelected();
         _miOpen.Click += (_, _) => OpenSelected();
-        _rename.Click += (_, _) => Rename();
+        _renameButton.Click += (_, _) => Rename();
         _miRename.Click += (_, _) => Rename();
         _miReset.Click += (_, _) => { if (SelectedRow is { } row) ApplyName(row, ""); };
         _miCopy.Click += (_, _) => { if (SelectedRow is { } row) Clipboard.SetText(row.Address); };
@@ -94,7 +94,7 @@ internal sealed class VpnDashboardForm : TouchForm
         top.Controls.Add(_summary, 0, 0);
         top.Controls.Add(_search, 1, 0);
 
-        var buttons = DialogStyle.Buttons(_refresh, _rename, _sendFileButton, _openRdp, _close);
+        var buttons = DialogStyle.Buttons(_refresh, _renameButton, _sendFileButton, _openRdp, _close);
         buttons.Dock = DockStyle.Bottom;
         Controls.Add(_list);
         Controls.Add(_message);
@@ -142,8 +142,8 @@ internal sealed class VpnDashboardForm : TouchForm
         var row = SelectedRow;
         _openRdp.Enabled = _miOpen.Enabled = row is not null && VpnDashboardView.CanOpen(row);
         _sendFileButton.Enabled = _miSend.Enabled = row is not null && !_sending;
-        _rename.Enabled = _miRename.Enabled = row is { Key.Length: > 0 };
-        _miReset.Enabled = row is { IsRenamed: true };
+        _renameButton.Enabled = _miRename.Enabled = _rename is not null && row is { Key.Length: > 0 };
+        _miReset.Enabled = _rename is not null && row is { IsRenamed: true };
         _miCopy.Enabled = row is { Address.Length: > 0 };
     }
 
@@ -156,7 +156,7 @@ internal sealed class VpnDashboardForm : TouchForm
     /// <summary>«Rinomina…» (anche F2): il nome da mostrare per il PC; vuoto = il nome originale.</summary>
     private void Rename()
     {
-        if (SelectedRow is not { Key.Length: > 0 } row)
+        if (_rename is null || SelectedRow is not { Key.Length: > 0 } row)
             return;
         var name = TextPromptDialog.Ask(this, "Rinomina PC", $"Nome da mostrare per «{row.Device}» (vuoto = nome originale):", row.Name);
         if (name is not null)
@@ -165,12 +165,9 @@ internal sealed class VpnDashboardForm : TouchForm
 
     private void ApplyName(VpnDashboardRow row, string name)
     {
-        if (!VpnDashboardModel.SetName(_names, row, name))
+        if (_rename is null || !_rename(row, name))
             return;
-        _saveNames();
-        var rows = Current.Rows.Select(r => r.Key == row.Key ? r with { Name = _names.TryGetValue(r.Key, out var n) ? n : r.DeviceName } : r)
-            .OrderByDescending(r => r.Connected).ThenBy(r => r.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
-        Current = Current with { Rows = rows };
+        Current = VpnDashboardModel.WithNames(Current, _names());
         Fill(row.Address);
     }
 
@@ -231,7 +228,7 @@ internal sealed class VpnDashboardForm : TouchForm
             {
                 try
                 {
-                    view = VpnDashboardModel.FromDevices(await _load(_cts.Token), _now(), new Dictionary<string, string>(_names));
+                    view = VpnDashboardModel.FromDevices(await _load(_cts.Token), _now(), _names());
                 }
                 catch (OperationCanceledException) when (_cts.IsCancellationRequested)
                 {
