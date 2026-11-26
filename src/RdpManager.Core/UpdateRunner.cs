@@ -161,6 +161,14 @@ public interface IUpdateEnvironment
     /// vero se alla fine non gira più.
     /// </summary>
     bool StopVpnService(Action<string> log);
+
+    /// <summary>
+    /// Processi (descritti per il log: nome, PID, sessione, percorso) che girano da un exe dentro <paramref name="folder"/>,
+    /// di qualunque utente o sessione, escluso il programma di aggiornamento stesso. Le prove senza processi non lo ridefiniscono.
+    /// </summary>
+    IReadOnlyList<string> ProcessesInFolder(string folder) => [];
+
+    void Pause(TimeSpan time) => Thread.Sleep(time);
 }
 
 /// <summary>Il programma di aggiornamento vero e proprio: sequenza dei passi e ritorno alla versione di prima.</summary>
@@ -168,6 +176,39 @@ public static class UpdateRunner
 {
     public static readonly TimeSpan AppExitTimeout = TimeSpan.FromSeconds(90);
     public static readonly TimeSpan InstallerTimeout = TimeSpan.FromMinutes(10);
+
+    /// <summary>Quanto si aspetta che nessun processo usi più i file della cartella installata, prima dell'installer e del ripristino.</summary>
+    public static readonly TimeSpan FolderFreeTimeout = TimeSpan.FromSeconds(60);
+
+    /// <summary>
+    /// Aspetta che nessun processo giri più dalla cartella installata. Difetto della 1.19.5 su un PC: l'app chiusa e il servizio
+    /// della VPN «fermato», ma un RdpManager.exe di un'altra sessione teneva ancora clrjit.dll; l'installer è fallito con il
+    /// codice 5 e anche il ripristino. Qui si scrive nel log chi li tiene, si riprova a fermare il servizio (può essere
+    /// ripartito) e si aspetta; se restano, si prova comunque (l'installer chiude a sua volta i processi dell'utente).
+    /// </summary>
+    internal static void WaitUntilFolderFree(string folder, IUpdateEnvironment env, Action<string> log)
+    {
+        var users = env.ProcessesInFolder(folder);
+        if (users.Count == 0)
+            return;
+        log("File della cartella installata in uso da: " + string.Join("; ", users) + " — aspetto che si liberino");
+        var step = TimeSpan.FromSeconds(1);
+        var waited = TimeSpan.Zero;
+        while (waited < FolderFreeTimeout)
+        {
+            if (waited == TimeSpan.FromSeconds(5) || waited == TimeSpan.FromSeconds(30))
+                env.StopVpnService(log);
+            env.Pause(step);
+            waited += step;
+            users = env.ProcessesInFolder(folder);
+            if (users.Count == 0)
+            {
+                log($"Cartella installata libera (atteso {waited.TotalSeconds:0} s)");
+                return;
+            }
+        }
+        log($"Dopo {FolderFreeTimeout.TotalSeconds:0} s ancora in uso da: " + string.Join("; ", users) + " — provo comunque");
+    }
 
     public static UpdateRunResult Run(UpdateJob job, IUpdateEnvironment env, Action<string> log)
     {
@@ -197,6 +238,7 @@ public static class UpdateRunner
                 try
                 {
                     log("Rimetto la versione " + previous + " dalla copia di riserva");
+                    WaitUntilFolderFree(job.InstallDir, env, log);
                     env.Restore(job.BackupDir, job.InstallDir);
                     rolledBack = true;
                     log("Versione " + previous + " rimessa");
@@ -228,6 +270,7 @@ public static class UpdateRunner
         // uso, fallisce e si torna alla versione di prima (difetto della 1.14.0 con la VPN accesa).
         if (!env.StopVpnService(log))
             log("Il servizio della VPN non si è fermato: provo comunque a installare");
+        WaitUntilFolderFree(job.InstallDir, env, log);
 
         log($"Avvio dell'installer: {Path.GetFileName(job.InstallerPath)} {job.InstallerArguments()}");
         int? code = env.RunInstaller(job.InstallerPath, job.InstallerArguments(), InstallerTimeout);
@@ -459,6 +502,13 @@ public sealed class SystemUpdateEnvironment : IUpdateEnvironment
     public Func<Action<string>, bool>? VpnStopper { get; init; }
 
     public bool StopVpnService(Action<string> log) => VpnStopper?.Invoke(log) ?? true;
+
+    /// <summary>Come trovare i processi che girano da una cartella (lo imposta il programma Windows); senza, nessuno.</summary>
+    public Func<string, IReadOnlyList<string>>? FolderProcesses { get; init; }
+
+    public IReadOnlyList<string> ProcessesInFolder(string folder) => FolderProcesses?.Invoke(folder) ?? [];
+
+    public void Pause(TimeSpan time) => Thread.Sleep(time);
 
     public void Launch(string exePath, IReadOnlyList<string> arguments)
     {

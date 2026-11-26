@@ -864,7 +864,23 @@ public sealed partial class MainForm
     /// <summary>Per le prove: cartella installata da usare al posto di quella dell'exe.</summary>
     internal string? InstallDirOverride { get; set; }
 
-    private string InstallDir => InstallDirOverride ?? Path.GetDirectoryName(Path.GetFullPath(Application.ExecutablePath))!;
+    // Dalla copia di riserva (riaperta dopo un aggiornamento fallito) si aggiorna la cartella installata vera, non la riserva.
+    private string InstallDir => InstallDirOverride ?? InstallLocation.ResolveInstallDir(
+        Path.GetDirectoryName(Path.GetFullPath(Application.ExecutablePath))!, UpdateRunnerFolder, RegisteredInstallDir(),
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "RdpManager"), File.Exists);
+
+    private static string? RegisteredInstallDir()
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(InstallLocation.UninstallKey);
+            return key?.GetValue("InstallLocation") as string;
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
     private string RunnerBackupDir => Path.Combine(UpdateRunnerFolder, "riserva");
     private bool _runnerReady, _installerStarted;
     private string? _backupDirUsed;

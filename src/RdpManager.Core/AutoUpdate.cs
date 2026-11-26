@@ -118,6 +118,42 @@ public static class InstallLocation
         return dir is null || !File.Exists(Path.Combine(dir, UninstallerName));
     }
 
+    /// <summary>AppId di Inno Setup (installer\RdpManager.iss): la chiave di disinstallazione è «{AppId}_is1».</summary>
+    public const string InnoAppId = "{7FF64784-2691-4921-9773-262F51FF85B9}";
+
+    /// <summary>Chiave (sotto HKCU) con «InstallLocation», scritta dall'installer.</summary>
+    public const string UninstallKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\" + InnoAppId + "_is1";
+
+    /// <summary>
+    /// La cartella da aggiornare. Di solito è quella dell'exe, ma se l'app gira dalla copia di riserva del programma di
+    /// aggiornamento (riaperta da lì dopo un aggiornamento fallito) la cartella dell'exe NON è l'installazione: aggiornare
+    /// «lì» fa installare l'installer nella cartella vera e poi controllare e ripristinare la riserva, e ogni aggiornamento
+    /// risulta fallito per sempre (difetto visto sulla 1.19.5: «dopo l'installazione la versione è 1.19.2 invece di 1.19.5»).
+    /// In quel caso si usa la cartella registrata dall'installer, o quella predefinita, se contiene RdpManager.exe.
+    /// </summary>
+    public static string ResolveInstallDir(string exeDir, string runnerFolder, string? registered, string defaultDir, Func<string, bool> fileExists)
+    {
+        if (!IsSameOrInside(exeDir, runnerFolder))
+            return exeDir;
+        foreach (var candidate in new[] { registered, defaultDir })
+        {
+            if (string.IsNullOrWhiteSpace(candidate) || !Path.IsPathFullyQualified(candidate.Trim()))
+                continue;
+            var dir = Path.TrimEndingDirectorySeparator(Path.GetFullPath(candidate.Trim()));
+            if (!IsSameOrInside(dir, runnerFolder) && fileExists(Path.Combine(dir, UpdateJob.ExeName)))
+                return dir;
+        }
+        return exeDir;
+    }
+
+    /// <summary>Vero se <paramref name="path"/> è <paramref name="folder"/> o sta dentro.</summary>
+    public static bool IsSameOrInside(string path, string folder)
+    {
+        var p = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path)) + Path.DirectorySeparatorChar;
+        var f = Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder)) + Path.DirectorySeparatorChar;
+        return p.StartsWith(f, StringComparison.OrdinalIgnoreCase);
+    }
+
     /// <summary>Argomenti dell'installer per l'aggiornamento silenzioso; con <paramref name="relaunch"/> l'app si riapre.</summary>
     public static string SilentArguments(bool relaunch) =>
         "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER" + (relaunch ? " /RELAUNCH=1" : "");

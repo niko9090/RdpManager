@@ -1,5 +1,11 @@
 # Novità di RdpManager
 
+## 1.19.6 (26/11/2026)
+
+**Aggiornamento che non si installava più**
+- Windows: se un aggiornamento falliva (file del programma ancora in uso), RdpManager si riapriva dalla copia di riserva e da lì ogni aggiornamento successivo risultava fallito («dopo l'installazione la versione è … invece di …»). Ora, anche dalla copia di riserva, si aggiorna la cartella installata vera.
+- Windows: prima di avviare l'installer (e prima di rimettere la versione precedente) il programma di aggiornamento aspetta fino a un minuto che nessun processo, di qualunque sessione, usi i file del programma, riprova a fermare il servizio della VPN e scrive nel log chi li teneva in uso.
+
 ## 1.19.5 (26/11/2026)
 
 **Cartella marshmelloVPN completa su tutti i PC**
